@@ -1,0 +1,18 @@
+[package]
+name = "mdh-driver"
+description = "Device drivers (adb, simctl) for mobile-dev-harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+mdh-core.workspace = true
+tokio.workspace = true
+which.workspace = true
+
+[lints]
+workspace = true
