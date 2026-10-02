@@ -17,6 +17,9 @@ works. When it changes a mobile app, it usually can't: it edits code and hopes. 
 - **Knows what a change reaches.** `mdh impact` reads the uncommitted change and the project's Kotlin, Java and
   resource files — no device, no build, ~150 ms on a 300-file app — and lists the screens it affects, how to reach
   each one, the call sites of changed signatures and what to verify.
+- **Verdicts, not impressions.** `mdh verify` checks the app (`enabled id=sign_in`, `screen .MessagesActivity`,
+  always `no crash`) and answers pass or fail with what it observed and a screenshot on disk; what the agent did
+  can be saved as a flow and replayed from a clean start, with JUnit for CI.
 - **Build errors an agent can act on.** `mdh run` builds with Gradle, installs only what changed and restarts the
   app; compiler, resource, manifest and dependency failures come back as `file:line` with the offending line.
 - **One engine, two interfaces.** A CLI for humans, scripts and shell-based agents, and an MCP server for agents
@@ -88,7 +91,41 @@ verify
 note: syntax only: reflection, dependency injection, generated code and routes built at run time are not followed
 ```
 
-And when the app crashes, the agent knows right away (exit code 5):
+The harness judges, not the agent: checks come back with what was observed, and evidence stays on disk:
+
+```
+$ mdh verify 'screen .LoginActivity' 'enabled id=sign_in' 'not visible id=error'
+verdict: FAIL · 3 of 4 checks passed · 3.7 s
+  ✓ screen .LoginActivity
+  ✗ enabled id=sign_in — disabled: [e72] button "SIGN IN" disabled #sign_in
+  ✓ not visible id=error
+  ✓ no crash
+evidence: .mdh/runs/1790957616814-verify (screenshot.jpg, tree.txt, logs.txt)
+```
+
+What the agent did becomes a regression test, replayed from a clean start; a crash anywhere fails it:
+
+```
+$ mdh flow save login-success --check 'screen .MessagesActivity'
+saved .mdh/flows/login-success.yaml (4 steps, 1 check); set MDH_PASSWORD before running it
+$ MDH_PASSWORD=… mdh flow run login-success troubles-crash --junit report.xml
+verdict login-success: PASS · 4 steps · 2 of 2 checks passed · 5.8 s
+  ✓ screen .MessagesActivity
+  ✓ no crash
+evidence: .mdh/runs/1790958025069-flow-login-success (screenshot.jpg, tree.txt, logs.txt)
+
+verdict troubles-crash: FAIL · stopped after 1 of 3 steps · 0 of 2 checks passed · 3.1 s
+  ✗ step 2: tap "Crash (Java)" — the app crashed (report below)
+  ✗ no crash — java.lang.IllegalStateException: Sample crash: could not pay for the cart
+    !! CRASH dev.mdh.sample (pid 26651): java.lang.IllegalStateException: Sample crash: could not pay for the cart
+         at dev.mdh.sample.Checkout.pay(TroublesActivity.kt:61)
+         …
+evidence: .mdh/runs/1790958184747-flow-troubles-crash (screenshot.jpg, tree.txt, logs.txt)
+
+flows: 1 of 2 passed
+```
+
+And when the app crashes during an action, the agent knows right away (exit code 5):
 
 ```
 $ mdh tap "Crash (Java)"
@@ -109,7 +146,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional, UI consistency, performance (planned) — and the compatibility matrix repeats them across devices and configurations (planned); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
+  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional (done), UI consistency, performance (planned) — and the compatibility matrix repeats them across devices and configurations (planned); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
 </picture>
 
 - **Two entry points, one engine.** Agents connect over MCP, people, CI and scripts use the CLI; both get the same
@@ -232,6 +269,8 @@ claude mcp add mdh -- mdh mcp
 | `mdh_wait` | Wait until an element appears or disappears |
 | `mdh_logs` | Recent log lines and crash reports |
 | `mdh_app` | Launch, stop or install an app |
+| `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows; a verdict with what was observed and evidence on disk |
+| `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
 | `mdh_status` | Device and session status; switch device or reset |
 
@@ -258,6 +297,9 @@ Agents that only have a shell can use the CLI directly — every command takes `
 | `mdh key NAME` | Press a key: `back`, `home`, `enter`, … |
 | `mdh wait TARGET [--gone] [--timeout 10]` | Wait for an element to appear (or disappear) |
 | `mdh logs [--level warn] [--lines 50]` | Recent logs and crash reports of the app |
+| `mdh verify CHECK... [--timeout 3]` | Check the app as it is now and print a verdict (exit 1 on failure); checks: `visible T`, `not visible T`, `enabled\|disabled\|checked\|unchecked\|focused T`, `text T == V`, `text T ~= V`, `screen ACTIVITY`, `no crash`, `log ~= TEXT`, `no log ~= TEXT` |
+| `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | Save the session's recorded steps as `.mdh/flows/NAME.yaml` |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start, one verdict each |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
 | `mdh session show` · `mdh session reset` | Inspect or reset the session |
@@ -335,7 +377,8 @@ Test account: `alice@example.com` / `correct-horse`.
 ## Status and roadmap
 
 Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
-crash reports, change impact analysis, the CLI and the MCP server. Planned: verification as an engine with pluggable check kinds, and a
+crash reports, change impact analysis, verdicts with evidence, flows saved and replayed (JUnit), the CLI and the
+MCP server. Planned: verification as an engine with pluggable check kinds, and a
 matrix that repeats it across devices:
 
 | | Layer | What's planned |
@@ -343,8 +386,8 @@ matrix that repeats it across devices:
 | ✅ | **Control** | Drive the app reliably (done) |
 | ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
 | ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
-| ⏳ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests, baselines, reports, Claude Code plugin — with pluggable check kinds: |
-| ⏳ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? |
+| ⏳ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests, JUnit reports (done); baselines and the Claude Code plugin next — with pluggable check kinds: |
+| ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
 | ⏳ | ↳ **UI consistency checks** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
 | ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
 | ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |

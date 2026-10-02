@@ -11,16 +11,19 @@ consistency, performance) into one verdict; the **compatibility matrix** repeats
 across devices and configurations; all on a shared foundation. Exposed as a CLI and (from M1) an MCP server. Android
 first; iOS, React Native and Flutter later.
 
-**Current state: M1 (control) in progress.** Implemented: the session engine in `mdh-control`
+**Current state: M0–M2 done, M4 in progress.** Implemented: the session engine in `mdh-control`
 (session-stable refs, ref/selector/label targeting, wait-for-stable, diffs after actions, recorded
 steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
-`scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
-observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
-ADR-0005 output envelope; `examples/android-sample`; M2: `mdh run` / `mdh_run` (Gradle probe, build,
-structured diagnostics, install-if-changed, restart, first observation); M4 so far: change impact
-analysis in `mdh-impact` (`mdh impact` / `mdh_impact`, ADR-0010). Next in M4: the verification engine,
-together with the state capabilities flows need (state and config is a track that grows with each
-milestone). The benchmark is the last milestone (M10).
+`scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`;
+log digests and crash reports on every observation (crash → exit 5); the MCP server (`mdh mcp`); the
+on-device helper; the ADR-0005 output envelope; `examples/android-sample`; M2: `mdh run` / `mdh_run`
+(Gradle probe, build, structured diagnostics, install-if-changed, restart, first observation); M4 so
+far: change impact analysis in `mdh-impact` (`mdh impact` / `mdh_impact`, ADR-0010) and the
+verification engine in `mdh-verify` (`Check` interface, functional checks, verdicts with evidence in
+`.mdh/runs/`, flows saved from recordings and replayed with setup, JUnit; `mdh verify`, `mdh flow`,
+`mdh_verify`, `mdh_flow`). Next in M4: animations off, the Claude Code plugin, and using impact
+analysis to pick the flows a change needs. State and config is a track that grows with each
+milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## What we optimize for
@@ -41,7 +44,8 @@ crates/
   mdh-impact/    verification input: change impact — tree-sitter index of Kotlin/Java/Android XML, git
                  change set, declaration diff, users up to screens, what to verify (no device, no build)
   mdh-control/   control: session engine, targeting, actions, waiting, app lifecycle, `run`
-  mdh-verify/    verification engine: Check interface, verdicts, flows, functional checks — empty until M4
+  mdh-verify/    verification engine: Check interface, functional checks, verdicts and evidence, flows
+                 (YAML via serde_norway behind `yaml.rs`), replay, JUnit
   mdh-visual/    check kind: UI consistency                                 — empty until M5
   mdh-perf/      check kind: performance                                    — empty until M6
   mdh-compat/    matrix: compatibility across devices and configurations   — empty until M7
@@ -141,6 +145,16 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Every tool's parameters must be a struct (object schema at the root); `crates/mdh-mcp/tests/tools.rs`
   checks this. Document parameters with doc comments — they become the schema descriptions agents read.
 - Keep the tool count and descriptions small; every definition costs agent context on every turn.
+
+## Verification engine
+
+- Verification is tested against the scripted fake driver in `crates/mdh-verify/tests/verify.rs`
+  (screens advance on each input); add a scenario for every behavior change.
+- `no crash` must look at the whole window (session or flow), not only unreported logs: a crash the
+  agent already saw must still fail the verdict.
+- Screen checks poll until they hold; never add fixed sleeps to flows or checks.
+- Verdict text is what agents read: one line per check, observed values only for failures, evidence
+  as file paths (never inline screenshots).
 
 ## Impact analysis
 

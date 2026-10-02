@@ -17,6 +17,9 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
 - **知道改动影响到哪里**：`mdh impact` 读取未提交的改动和项目里的 Kotlin、Java 与资源文件——不需要设备，
   不需要构建，300 个文件的 App 约 150ms——列出受影响的界面、每个界面怎么进入、签名变了的函数有哪些调用点，
   以及需要校验什么。
+- **给出结论，而不是印象**：`mdh verify` 检查 App（`enabled id=sign_in`、`screen .MessagesActivity`，并且总会检查
+  `no crash`），返回通过或失败、实际观测到了什么，截图等证据保存在磁盘上；agent 做过的操作可以保存成 flow，
+  从干净的状态重放，并为 CI 输出 JUnit 报告。
 - **agent 能直接动手修的构建错误**：`mdh run` 用 Gradle 构建，只安装有变化的部分，并重启 App；编译、资源、Manifest
   和依赖方面的错误都会以 `文件:行号` 加出错源码行的形式返回。
 - **一套引擎，两种接口**：给人、脚本和只有命令行的 agent 用的 CLI，以及给 Claude Code 等 agent 用的
@@ -84,7 +87,41 @@ verify
 note: syntax only: reflection, dependency injection, generated code and routes built at run time are not followed
 ```
 
-App 崩溃时，agent 立刻就能知道（退出码 5）：
+由 harness 来判定，而不是 agent：每项检查都附上实际观测到的内容，证据留在磁盘上：
+
+```
+$ mdh verify 'screen .LoginActivity' 'enabled id=sign_in' 'not visible id=error'
+verdict: FAIL · 3 of 4 checks passed · 3.7 s
+  ✓ screen .LoginActivity
+  ✗ enabled id=sign_in — disabled: [e72] button "SIGN IN" disabled #sign_in
+  ✓ not visible id=error
+  ✓ no crash
+evidence: .mdh/runs/1790957616814-verify (screenshot.jpg, tree.txt, logs.txt)
+```
+
+agent 做过的操作会变成回归测试，从干净的状态重放；任何一处崩溃都会让它失败：
+
+```
+$ mdh flow save login-success --check 'screen .MessagesActivity'
+saved .mdh/flows/login-success.yaml (4 steps, 1 check); set MDH_PASSWORD before running it
+$ MDH_PASSWORD=… mdh flow run login-success troubles-crash --junit report.xml
+verdict login-success: PASS · 4 steps · 2 of 2 checks passed · 5.8 s
+  ✓ screen .MessagesActivity
+  ✓ no crash
+evidence: .mdh/runs/1790958025069-flow-login-success (screenshot.jpg, tree.txt, logs.txt)
+
+verdict troubles-crash: FAIL · stopped after 1 of 3 steps · 0 of 2 checks passed · 3.1 s
+  ✗ step 2: tap "Crash (Java)" — the app crashed (report below)
+  ✗ no crash — java.lang.IllegalStateException: Sample crash: could not pay for the cart
+    !! CRASH dev.mdh.sample (pid 26651): java.lang.IllegalStateException: Sample crash: could not pay for the cart
+         at dev.mdh.sample.Checkout.pay(TroublesActivity.kt:61)
+         …
+evidence: .mdh/runs/1790958184747-flow-troubles-crash (screenshot.jpg, tree.txt, logs.txt)
+
+flows: 1 of 2 passed
+```
+
+执行操作时 App 崩溃，agent 立刻就能知道（退出码 5）：
 
 ```
 $ mdh tap "Crash (Java)"
@@ -105,7 +142,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（计划中）；兼容性矩阵在不同设备和配置上重复这些检查（计划中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
+  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能（已完成）、UI 一致性、性能（计划中）；兼容性矩阵在不同设备和配置上重复这些检查（计划中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
 </picture>
 
 - **两个入口，一套引擎**：agent 通过 MCP 接入，人、CI 和脚本使用 CLI，拿到的是同样的紧凑文本。
@@ -222,6 +259,8 @@ claude mcp add mdh -- mdh mcp
 | `mdh_wait` | 等待某个元素出现或消失 |
 | `mdh_logs` | 最近的日志和崩溃报告 |
 | `mdh_app` | 启动、停止或安装 App |
+| `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow；返回结论、实际观测值，证据保存在磁盘上 |
+| `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |
 | `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
 | `mdh_status` | 设备和会话状态；切换设备或重置会话 |
 
@@ -247,6 +286,9 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh key NAME` | 按键：`back`、`home`、`enter` 等 |
 | `mdh wait TARGET [--gone] [--timeout 10]` | 等待元素出现（或消失） |
 | `mdh logs [--level warn] [--lines 50]` | App 最近的日志和崩溃报告 |
+| `mdh verify CHECK... [--timeout 3]` | 检查 App 当前的状态并输出结论（失败时退出码 1）；检查项：`visible T`、`not visible T`、`enabled\|disabled\|checked\|unchecked\|focused T`、`text T == V`、`text T ~= V`、`screen ACTIVITY`、`no crash`、`log ~= TEXT`、`no log ~= TEXT` |
+| `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | 把会话中录制的步骤保存为 `.mdh/flows/NAME.yaml` |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow，每个 flow 一份结论 |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |
 | `mdh session show` · `mdh session reset` | 查看或重置会话 |
@@ -318,15 +360,15 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、CLI 以及 MCP server。后续计划：把校验做成一个可插拔检查类型的引擎，再用矩阵在不同设备上重复执行：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、带证据的验证结论、flow 的保存与重放（JUnit）、CLI 以及 MCP server。后续计划：把校验做成一个可插拔检查类型的引擎，再用矩阵在不同设备上重复执行：
 
 | | 层次 | 计划内容 |
 |---|---|---|
 | ✅ | **控制** | 可靠地驱动 App（已完成） |
 | ✅ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动（已完成） |
 | ✅ | **影响面分析** | 通过静态分析得出一处代码改动影响到哪些界面、在那里需要校验什么（已完成） |
-| ⏳ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放、基线、报告、Claude Code 插件；检查类型可插拔： |
-| ⏳ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？ |
+| ⏳ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放、JUnit 报告（已完成）；接下来是基线和 Claude Code 插件；检查类型可插拔： |
+| ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
 | ⏳ | ↳ **UI 一致性检查** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
 | ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |
 | ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |

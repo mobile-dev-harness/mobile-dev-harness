@@ -119,9 +119,9 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F6.1 | Functional checks | `visible` / `not_visible` / element state (enabled, checked, text, …) / `screen` (current screen) / `no_crash` / log contains or not / screenshot match (optional) |
-| F6.2 | **Verdict** | Structured result: overall status, expected vs. observed per assertion, per-step timings, evidence paths (screenshots, log excerpts, crash report) |
-| F6.3 | Evidence | Failures always include a screenshot and relevant logs; passes keep the final screenshot for human review |
+| F6.1 | Functional checks ✅ | `visible` / `not visible` / element state (`enabled`, `disabled`, `checked`, `unchecked`, `focused`) / `text` equals or contains / `screen` (current activity) / `no crash` (always checked, over the whole session or flow, including crashes already shown) / `log` and `no log`. Screen checks are re-read until they hold or a timeout (default 3 s) passes, so a result that is still loading isn't a false fail. Screenshot match comes with F13 |
+| F6.2 | **Verdict** ✅ | Structured result: overall status (pass, fail, error), one line per check with what was observed when it failed, steps completed, duration, the run directory |
+| F6.3 | Evidence ✅ | Every verdict writes `screenshot.jpg`, `tree.txt`, `logs.txt` and `verdict.json` to `.mdh/runs/<time>-verify/` (or `-flow-<name>/`); crash reports go into the verdict itself |
 | F6.4 | Check kinds | Functional checks are built in; UI consistency (F13) and performance (F11) checks implement the same check interface, run on the same flows and report into the same verdict, so one run can say "functional: pass; UI: 2 deviations; cold start +180 ms" |
 
 ### F7 Flows: record and replay (`mdh-verify`)
@@ -132,10 +132,10 @@ inspects the screens it passes, the compatibility matrix replays it on every cel
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F7.1 | Automatic recording | Every action in a session is recorded as a **selector-based step** (never coordinates); secret input is recorded as an env reference |
-| F7.2 | Save | `flow save <name>` turns the recording (or a slice of it) into YAML; agents can edit it and add assertions |
-| F7.3 | Replay | `flow run` executes deterministically, waiting for elements instead of sleeping; supports `setup` (reset, permissions, route) |
-| F7.4 | CI reports | JUnit XML and exit codes; failures produce the same evidence as F6.3 |
+| F7.1 | Automatic recording ✅ | Every action in a session is recorded as a **selector-based step** (never refs); password input is recorded as `${env:MDH_<FIELD>}` |
+| F7.2 | Save ✅ | `flow save <name> [--last N] [--check …]` turns the recording (or its last N steps) into YAML with checks to run at the end; agents edit the file to change it |
+| F7.3 | Replay ✅ | `flow run` restarts the app (or opens `setup.open`, after `reset: data` and `permissions` if given) and runs the steps; each step waits for its target instead of sleeping; the first step that can't run stops the flow with what was on screen; missing `${env:…}` variables fail before the app is touched |
+| F7.4 | CI reports ✅ | `--junit FILE` and exit codes; failures produce the same evidence as F6.3 |
 | F7.5 | Maestro import (later) | Imports the common subset of Maestro flows to ease migration |
 
 ### F8 Cost and speed
@@ -244,8 +244,9 @@ mdh open <route|uri>
 mdh state animations off|restore | grant <perm> | reset data | snapshot save|load <name> | locale <tag> | dark on|off
 mdh logs [--level warn] [--lines 50]
 mdh impact [--base REF] [--project DIR]   # what the change reaches; no device needed
-mdh verify <assertions.yaml | -e '<inline assertion>'>
-mdh flow save <name> | list | run <name...> [--junit out.xml]
+mdh verify CHECK... [--timeout 3]     # e.g. 'visible "Sign in"' 'enabled id=sign_in' 'screen .LoginActivity'
+mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name>
+mdh flow run <name...> [--junit out.xml] [--step-timeout 10]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
 mdh compat run [--matrix <name>] [flows...] | devices
 mdh visual check [screen|flow] | baseline save|approve | rules
@@ -277,8 +278,8 @@ than split into many small tools.
 | `mdh_navigate` | Open a route or deep link | open | M3 |
 | `mdh_state` | Permissions, reset, snapshots, appearance, animations | state | M3 |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches and what to verify | impact | M4 |
-| `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run | M4 |
-| `mdh_flow` | Save and list flows | flow save / list | M4 |
+| `mdh_verify` | Run checks or replay flows, return a verdict | verify / flow run | M4 ✅ |
+| `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
 | `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual | M5 |
 | `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf | M6 |
 | `mdh_compat` | Run flows across a matrix; matrix report | compat | M7 |
@@ -379,21 +380,34 @@ visual:
 
 ### 4.6 Flow files
 
+Saved in `.mdh/flows/<name>.yaml`; `mdh flow save` writes them, people and agents edit them.
+
 ```yaml
 name: login-success
+app: dev.mdh.sample            # restarted before the steps (unless setup.launch: false)
 setup:
-  reset: data
-  route: login
+  reset: data                  # none (default) | data: clear the app's data first
+  permissions: [android.permission.POST_NOTIFICATIONS]
+  open: mdhsample://login      # start from a deep link instead of the launcher activity
 steps:
-  - type: { id: email_input, text: alice@example.com }
-  - type: { id: password_input, text: ${secrets.TEST_PASSWORD} }
-  - tap: { text: Sign in }
-  - wait: { id: inbox_list, timeout: 10s }
-assert:
-  - screen: .HomeActivity
-  - visible: { text: Inbox }
-  - no_crash
+  - tap: "Log in"                                   # targets as on the CLI: label, id=…, text~=…, role=…
+  - type: { into: id=email, text: alice@example.com }
+  - type: { into: { id: password }, text: "${env:MDH_PASSWORD}" }   # targets also as maps
+  - tap: id=sign_in
+  - wait: { target: role=progress, gone: true, timeout: 20 }        # or `wait: TARGET`
+  - scroll: { direction: down, until: "Message 30" }                # or `scroll: down`
+  - key: back
+  - open: mdhsample://settings
+  - assert:                                         # checks in the middle of a flow
+      - visible "Messages"
+assert:                                             # checks after the last step; `no crash` is implied
+  - screen .MessagesActivity
+  - text: { target: id=title, equals: Messages }    # the structured form of `text id=title == "Messages"`
 ```
+
+Checks use the inline syntax of `mdh verify` (`visible TARGET`, `not visible TARGET`, `enabled|disabled|checked|
+unchecked|focused TARGET`, `text TARGET == VALUE`, `text TARGET ~= VALUE`, `screen ACTIVITY`, `no crash`,
+`log ~= TEXT`, `no log ~= TEXT`) or the same as YAML maps (`- enabled: { id: sign_in }`).
 
 ### 4.7 Project directory layout
 

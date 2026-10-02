@@ -61,7 +61,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-project` | foundation | Gradle probing, building, diagnostics, APK selection; later RN, Expo, Flutter, Xcode | ✅ |
 | `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
 | `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
-| `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, baselines, flow record/replay, reports (JUnit), functional checks | M4 |
+| `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
 | `mdh-visual` | check kind | UI consistency: structural and pixel comparison with baselines, cross-config layout checks, rule checks, design mocks | M5, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
 | `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
@@ -207,9 +207,9 @@ resolve target:  ref → current tree; missing → selector derived from the age
 
 ### 4.3 Flow replay
 
-Uses the same executor as 4.2, except that targets are always selectors, each step first waits for its target
-(with a timeout), assertions are evaluated by `mdh-verify`, and a verdict with evidence is produced at the end.
-Recording and replay share one executor so that whatever was recorded can be replayed.
+Uses the same executor as 4.2 (`Session::act`), except that targets are always selectors, each step first waits
+for its target (with a timeout), checks are evaluated by `mdh-verify`, and a verdict with evidence is produced at
+the end. Recording and replay share one executor so that whatever was recorded can be replayed. Details in §24.
 
 ## 5. UI tree compression (`mdh-observe`)
 
@@ -395,8 +395,9 @@ build "up to date" in 0.8 s and the install skipped; a one-line edit to the visi
 ## 9. State and directories
 
 - `mdh.yaml`: the config model is defined in `mdh-core`, deserialized with serde and validated; validation errors
-  carry line numbers. The YAML crate is chosen in M3 (`serde_yaml` is unmaintained, so a well-maintained
-  alternative is needed) and wrapped in an internal module so it can be swapped later.
+  carry line numbers. YAML is read and written with `serde_norway` (the maintained fork of the unmaintained
+  `serde_yaml`; `serde-saphyr` needs a newer Rust than the MSRV), behind `mdh-verify`'s `yaml` module so it can be
+  swapped; enums are written as single-key maps (`- tap: Sign in`), not YAML tags.
 - `.mdh/session.json`: CLI mode only, versioned; incompatible versions are discarded and rebuilt.
 - `.mdh/runs/`: one directory per run; the latest 20 are kept (configurable).
 - Restoring global settings: original values (e.g. animation scales) are recorded at session start and restored on
@@ -734,4 +735,59 @@ Measured on Now in Android (386 files analyzed, 1,900 declarations, 20,000 refer
 ~60 ms to index on all cores, ~15 ms to analyze, ~140 ms end to end including git. The sample app takes ~100 ms,
 mostly git. Text output is budgeted per section (12 changes, 10 screens, 4 call-site groups, …) with folded
 counts; `--json` carries everything.
+
+## 24. Verification engine (`mdh-verify`)
+
+ADR-0009; features F6, F7. One entry point per question: `verify` (checks on the app as it is now) and
+`run_flow` (replay, then checks). Both produce a `Verdict`.
+
+### 24.1 Checks and verdicts
+
+Check kinds implement `Check` (`kind()`, `run(&mut CheckContext) -> Vec<Finding>`); the context carries the
+session, the run directory, the flow step and the verification window (device time since when crashes and logs
+count). A `Finding` is one checked expectation: outcome (`pass`, `warn`, `fail`, `error`), the check in inline
+syntax, what was observed when it didn't pass, the step, and evidence excerpts (a crash report). The verdict's
+status is the worst outcome: `error` when a check couldn't be evaluated (an ambiguous target), else `fail` or
+`pass`; `VERIFICATION_FAILED` (exit 1) carries the counts, the verdict the details.
+
+Functional checks (`Functional`, built in):
+
+- **Screen checks** (`visible`, `not visible`, states, `text`, `screen`) are evaluated on fresh observations,
+  re-read every 250 ms until all hold or the timeout (3 s) passes, or the app crashes. Evaluating them once
+  would turn "the result is still loading" into a false fail; waiting on a fixed sleep would be slower and still
+  flaky. Targets resolve like actions do (refs, selectors, labels; a control wins over the text labeling it); an
+  element that isn't there fails with the closest candidates, one that matches several elements is an `error`
+  with them, and `visible` fails for an element covered by system windows.
+- **`no crash`** is added to every verification. It reads the logs of the whole window (the session since it
+  started watching, or the flow since it started), not just what is new: a crash the agent was shown after an
+  action and then moved past still fails the verdict. That is the false pass this check exists for.
+- **`log` / `no log`** search the app's log lines of the last 10 minutes.
+
+### 24.2 Evidence
+
+Each verification gets `.mdh/runs/<unix ms>-verify/` (flows: `-flow-<name>/`; the newest 20 run directories are
+kept, builds included): `screenshot.jpg` (1024 px), `tree.txt` (the compact tree), `logs.txt` (the app's recent
+info-level lines and crash reports) and `verdict.json`. Evidence is best effort; a screen that can't be captured
+doesn't change the verdict. The verdict text names the directory but carries none of it, so evidence costs the
+agent no tokens unless it opens a file.
+
+### 24.3 Flows
+
+`Flow` is the YAML of functional design §4.6. Saving converts the session's recorded actions: refs were already
+replaced by selectors when they were recorded, typed passwords (recorded as `<secret>`) become
+`${env:MDH_<FIELD>}` named after the field's id or label, and the names of those variables are reported.
+
+Replay (`run_flow`):
+
+1. Every `${env:…}` the flow uses must be set, or the run fails with `MISSING_SECRET` before touching the app.
+2. Setup: `reset: data` (`pm clear`), `permissions` (`pm grant`), then a clean start: the app is stopped and
+   launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`).
+3. Steps run in order. A step aimed at an element first waits for it (`--step-timeout`, 10 s); an element that
+   never shows fails the step with what was on screen instead (closest elements, current activity). An app crash
+   during a step fails it. The first failing step stops the flow; the remaining steps and the final checks are
+   skipped, `no crash` still runs, and the verdict says how many steps completed.
+4. `assert` steps and the final `assert` run `Functional` with the step number.
+
+`run_flows` replays several flows one after another; `junit()` renders their verdicts as one test suite with a
+test case per flow, the first failed check as the failure message and the verdict text as its body.
 
