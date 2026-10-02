@@ -12,6 +12,7 @@ authors.workspace = true
 base64 = "0.22"
 mdh-control.workspace = true
 mdh-core.workspace = true
+mdh-impact.workspace = true
 mdh-observe.workspace = true
 rmcp = { version = "2.2.0", features = ["server", "transport-io", "macros", "schemars"] }
 serde.workspace = true

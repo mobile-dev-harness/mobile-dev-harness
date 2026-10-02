@@ -1,0 +1,23 @@
+[package]
+name = "mdh-impact"
+description = "Change impact analysis for mobile-dev-harness: what a code change affects"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+mdh-core.workspace = true
+serde.workspace = true
+tree-sitter = "0.26.13"
+tree-sitter-java = "0.23.5"
+tree-sitter-kotlin-ng = "1.1.0"
+tree-sitter-xml = "0.7.0"
+
+[dev-dependencies]
+insta = "1.48.0"
+
+[lints]
+workspace = true

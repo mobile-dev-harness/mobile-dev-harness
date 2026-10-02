@@ -33,7 +33,9 @@ Targets are a ref, coordinates (\"100,200\"), a selector (\"id=login\", \"text=S
 \"text~=sign\", \"role=switch\", combined with ';') or a plain label. Every action waits for the UI \
 to settle and returns only what changed (+ added, ~ changed, - removed), or the whole tree when the \
 screen changed; don't observe again after an action. Lines starting with !! are crashes of the app: \
-fix them before anything else. Prefer refs and labels over coordinates.";
+fix them before anything else. Prefer refs and labels over coordinates. After changing code, call \
+mdh_impact to learn which screens the change reaches, then verify each of them, not only the one you \
+edited.";
 
 const SCREENSHOT_EDGE: u32 = 1024;
 
@@ -171,6 +173,15 @@ pub struct RunParams {
     pub grant: Option<bool>,
     /// Uninstall first: replaces an app signed with another key or a newer version; clears its data.
     pub reinstall: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ImpactParams {
+    /// A directory inside the project; default: the server's working directory.
+    pub project: Option<String>,
+    /// Revision to compare the working tree with, such as `main` or `HEAD~1`; default `HEAD`
+    /// (the uncommitted change).
+    pub base: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -437,6 +448,23 @@ impl MdhServer {
             .with_session(async |s| Ok(s.logs(level, lines).await?.text()))
             .await;
         Ok(text_result(result))
+    }
+
+    #[tool(
+        description = "What a code change reaches, from static analysis (no device, no build): changed declarations, what they call before vs. after, the screens affected and how to reach them, call sites of changed signatures, and what to verify (functional, UI, performance, compatibility, tests). Run it after editing and before verifying, so every affected screen gets checked."
+    )]
+    async fn mdh_impact(
+        &self,
+        Parameters(p): Parameters<ImpactParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let options = mdh_impact::Options {
+            project: p.project.map_or_else(|| ".".into(), Into::into),
+            base: p.base.unwrap_or_else(|| "HEAD".into()),
+        };
+        let result = tokio::task::spawn_blocking(move || mdh_impact::analyze(&options))
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(text_result(result.map(|r| mdh_impact::render(&r))))
     }
 
     #[tool(description = "Launch, stop or install an app.")]

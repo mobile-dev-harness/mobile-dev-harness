@@ -100,6 +100,12 @@ pub enum Error {
         detail: String,
     },
 
+    #[error("{dir} is not inside a git repository")]
+    NotARepository { dir: String },
+
+    #[error("unknown revision `{rev}`")]
+    UnknownRevision { rev: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -130,6 +136,8 @@ impl Error {
             Error::BuildFailed { .. } => ErrorCode::BuildFailed,
             Error::NoApk { .. } => ErrorCode::NoApk,
             Error::InstallFailed { .. } => ErrorCode::InstallFailed,
+            Error::NotARepository { .. } => ErrorCode::NotARepository,
+            Error::UnknownRevision { .. } => ErrorCode::UnknownRevision,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -201,6 +209,14 @@ impl Error {
             }
             Error::NoApk { .. } => "build it first (run without --no-build), or build an APK for this device".into(),
             Error::InstallFailed { reason, .. } => install_hint(reason).into(),
+            Error::NotARepository { .. } => {
+                "impact analysis compares against git; run it inside the repository (or `git init` \
+                 and commit a baseline first)"
+                    .into()
+            }
+            Error::UnknownRevision { .. } => {
+                "pass a branch, tag or commit that exists, e.g. `--base main` or `--base HEAD~1`".into()
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -234,6 +250,8 @@ pub enum ErrorCode {
     BuildFailed,
     NoApk,
     InstallFailed,
+    NotARepository,
+    UnknownRevision,
     Io,
 }
 
@@ -264,6 +282,8 @@ impl ErrorCode {
             ErrorCode::BuildFailed => "BUILD_FAILED",
             ErrorCode::NoApk => "NO_APK",
             ErrorCode::InstallFailed => "INSTALL_FAILED",
+            ErrorCode::NotARepository => "NOT_A_REPOSITORY",
+            ErrorCode::UnknownRevision => "UNKNOWN_REVISION",
             ErrorCode::Io => "IO",
         }
     }
@@ -278,7 +298,8 @@ impl ErrorCode {
             | ErrorCode::TargetObscured => 1,
             ErrorCode::InvalidTarget
             | ErrorCode::AmbiguousBuildTarget
-            | ErrorCode::UnknownBuildTarget => 2,
+            | ErrorCode::UnknownBuildTarget
+            | ErrorCode::UnknownRevision => 2,
             ErrorCode::BuildFailed | ErrorCode::ProbeFailed | ErrorCode::NoApk => 4,
             ErrorCode::AppCrashed => 5,
             ErrorCode::ToolNotFound
@@ -290,7 +311,8 @@ impl ErrorCode {
             | ErrorCode::AppNotFound
             | ErrorCode::LaunchFailed
             | ErrorCode::ProjectNotFound
-            | ErrorCode::InstallFailed => 3,
+            | ErrorCode::InstallFailed
+            | ErrorCode::NotARepository => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }

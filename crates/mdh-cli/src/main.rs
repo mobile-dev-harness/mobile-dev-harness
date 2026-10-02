@@ -142,6 +142,15 @@ enum Command {
         #[arg(long)]
         reinstall: bool,
     },
+    /// What the uncommitted change reaches and what to verify there (no device needed)
+    Impact {
+        /// Directory inside the project
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Revision to compare the working tree with, e.g. `main` or `HEAD~1`
+        #[arg(long, default_value = "HEAD")]
+        base: String,
+    },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
     /// Force-stop an app
@@ -229,6 +238,9 @@ async fn main() -> ExitCode {
             finish(json, started, timings, Some(checks), error)
         }
         Command::Devices => report!(devices().await),
+        Command::Impact { project, base } => {
+            report!(mdh_impact::analyze(&mdh_impact::Options { project, base }))
+        }
         Command::Mcp => match mdh_mcp::serve_stdio(cli.device).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
@@ -283,7 +295,7 @@ async fn run(
     let target = |s: &str| Target::parse(s);
 
     match command {
-        Command::Doctor | Command::Devices | Command::Mcp => {
+        Command::Doctor | Command::Devices | Command::Impact { .. } | Command::Mcp => {
             unreachable!("handled before connecting")
         }
         Command::Observe { diff } => report_crash!(session.observe(diff, timings).await),

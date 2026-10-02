@@ -1,0 +1,22 @@
+---
+source: crates/mdh-impact/tests/analyze.rs
+expression: text
+---
+impact vs HEAD (<commit>): 5 files changed · 3 declarations
+changed
+  ~ Legacy.compute  body  Legacy.java:4
+  ~ Greeter.greet   signature (name: String) → (name: String, formal: Boolean)  Greeter.kt:4
+  ~ @string/log_in  value "Log in" → "Sign in"  strings.xml:2
+  comments or formatting only: MainActivity.kt
+affected screens
+  LoginActivity  via Greeter.greet → LoginActivity.onCreate (+1 more change) · reach: shop://login | MainActivity ▸ "Sign in" ▸ LoginActivity
+  MainActivity   via @string/log_in → @layout/activity_main → MainActivity.onCreate · reach: launcher
+callers of changed signatures
+  Greeter.greet: LoginActivity.kt:7 in LoginActivity.onCreate — 1 argument, needs 2 · GreeterTest.kt:4 in GreeterTest.greets — 1 argument, needs 2
+verify
+  functional     LoginActivity, MainActivity
+  ui             @string/log_in → MainActivity
+  compatibility  @string/log_in changed; translations may be stale: values-zh
+  tests          GreeterTest
+build configuration changed (build.gradle.kts): dependencies and build settings can affect every screen
+note: syntax only: reflection, dependency injection, generated code and routes built at run time are not followed

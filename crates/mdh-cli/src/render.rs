@@ -67,3 +67,9 @@ impl Human for SessionSummary {
         self.text()
     }
 }
+
+impl Human for mdh_impact::ImpactReport {
+    fn human(&self) -> String {
+        mdh_impact::render(self)
+    }
+}
