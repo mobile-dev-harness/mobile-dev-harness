@@ -1,10 +1,11 @@
 //! `mdh doctor`: report whether the local toolchain can build and drive Android apps.
 
-use std::process::ExitCode;
-
+use mdh_core::Error;
 use mdh_driver::android::{Adb, AndroidSdk};
 use serde::Serialize;
 use tokio::process::Command;
+
+use crate::output::Human;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -31,28 +32,37 @@ impl Check {
     }
 }
 
-pub async fn run(json: bool) -> anyhow::Result<ExitCode> {
-    let checks = collect().await;
+#[derive(Serialize)]
+#[serde(transparent)]
+pub struct Checks(Vec<Check>);
 
-    if json {
-        println!("{}", serde_json::to_string_pretty(&checks)?);
-    } else {
-        for c in &checks {
-            let mark = match c.status {
-                Status::Ok => "✓",
-                Status::Warn => "!",
-                Status::Fail => "✗",
-            };
-            println!("{mark} {:<12} {}", c.name, c.detail);
-        }
+impl Human for Checks {
+    fn human(&self) -> String {
+        self.0
+            .iter()
+            .map(|c| {
+                let mark = match c.status {
+                    Status::Ok => "✓",
+                    Status::Warn => "!",
+                    Status::Fail => "✗",
+                };
+                format!("{mark} {:<12} {}", c.name, c.detail)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
+}
 
-    let failed = checks.iter().any(|c| c.status == Status::Fail);
-    Ok(if failed {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    })
+/// Runs every check. Failing checks turn into `EnvironmentNotReady`; the checks are returned either way.
+pub async fn run() -> (Checks, Option<Error>) {
+    let checks = collect().await;
+    let failed: Vec<String> = checks
+        .iter()
+        .filter(|c| c.status == Status::Fail)
+        .map(|c| c.name.to_owned())
+        .collect();
+    let error = (!failed.is_empty()).then_some(Error::EnvironmentNotReady { failed });
+    (Checks(checks), error)
 }
 
 async fn collect() -> Vec<Check> {
@@ -61,7 +71,7 @@ async fn collect() -> Vec<Check> {
     let sdk = match AndroidSdk::locate() {
         Ok(sdk) => sdk,
         Err(e) => {
-            checks.push(Check::new("adb", Status::Fail, e.to_string()));
+            checks.push(Check::new("adb", Status::Fail, with_hint(&e)));
             checks.push(java().await);
             return checks;
         }
@@ -79,7 +89,7 @@ async fn collect() -> Vec<Check> {
     let adb = Adb::new(sdk.adb.clone());
     checks.push(match adb.version().await {
         Ok(v) => Check::new("adb", Status::Ok, format!("{v} ({})", adb.path().display())),
-        Err(e) => Check::new("adb", Status::Fail, e.to_string()),
+        Err(e) => Check::new("adb", Status::Fail, with_hint(&e)),
     });
 
     checks.push(match &sdk.emulator {
@@ -95,7 +105,7 @@ async fn collect() -> Vec<Check> {
                 "no AVDs found; create one in Android Studio or with avdmanager",
             ),
             Ok(avds) => Check::new("emulator", Status::Ok, format!("AVDs: {}", avds.join(", "))),
-            Err(e) => Check::new("emulator", Status::Warn, e.to_string()),
+            Err(e) => Check::new("emulator", Status::Warn, with_hint(&e)),
         },
     });
 
@@ -104,7 +114,7 @@ async fn collect() -> Vec<Check> {
     checks.push(match adb.devices().await {
         Ok(d) if d.is_empty() => Check::new("devices", Status::Warn, "none connected"),
         Ok(d) => Check::new("devices", Status::Ok, format!("{} connected", d.len())),
-        Err(e) => Check::new("devices", Status::Fail, e.to_string()),
+        Err(e) => Check::new("devices", Status::Fail, with_hint(&e)),
     });
 
     checks
@@ -118,15 +128,29 @@ async fn java() -> Check {
             let version = stderr.lines().next().unwrap_or_default().trim().to_owned();
             Check::new("java", Status::Ok, version)
         }
-        Ok(out) => Check::new(
-            "java",
-            Status::Fail,
-            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
-        ),
+        // e.g. the macOS `/usr/bin/java` stub when no JDK is installed.
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let reason = stderr
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .trim_end_matches('.');
+            Check::new(
+                "java",
+                Status::Fail,
+                format!("{reason}; Gradle builds need a JDK (17+)"),
+            )
+        }
         Err(_) => Check::new(
             "java",
             Status::Fail,
             "not found; Gradle builds need a JDK (17+)",
         ),
     }
+}
+
+fn with_hint(e: &Error) -> String {
+    format!("{e}; {}", e.hint())
 }

@@ -48,9 +48,12 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   toolchain is newer.
 - **Shared dependency versions live in the root `Cargo.toml`** under `[workspace.dependencies]`;
   crates reference them with `foo.workspace = true`. Every crate sets `[lints] workspace = true`.
-- **Errors:** library crates return `mdh_core::Result` with typed `mdh_core::Error` variants;
-  only `mdh-cli` uses `anyhow`. Error messages should tell the user what to do next
-  (see `Error::ToolNotFound { hint }`).
+- **Errors:** all crates return `mdh_core::Result` with typed `mdh_core::Error` variants. Every
+  variant maps to a stable `ErrorCode` (exit code via `ErrorCode::exit_code`) and must produce a
+  `hint` telling the caller what to do next. Adding a variant means adding its code and hint.
+- **Output:** CLI commands return data implementing `Serialize + Human` and print through
+  `output::finish`, which emits the ADR-0005 envelope with `--json`. Never `println!` results
+  directly from a command.
 - **External tools:** inside `mdh-driver`, run them through `crate::process::run` (async, `tokio::process`), which
   returns stdout or `Error::CommandFailed` with stderr. Don't shell out via `sh -c`.
 - **Parsers are pure functions over `&str`**, separated from the code that runs the tool, and unit

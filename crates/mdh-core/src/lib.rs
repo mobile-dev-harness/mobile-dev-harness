@@ -2,6 +2,7 @@
 
 mod device;
 mod error;
+pub mod output;
 
 pub use device::{Device, DeviceState, Platform};
-pub use error::{Error, Result};
+pub use error::{Error, ErrorCode, Result};

@@ -1,11 +1,16 @@
 mod doctor;
+mod output;
 
 use std::process::ExitCode;
+use std::time::Instant;
 
 use clap::{Parser, Subcommand};
-use mdh_core::DeviceState;
+use mdh_core::{Device, DeviceState, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
+use serde::Serialize;
+
+use crate::output::{Human, finish};
 
 #[derive(Parser)]
 #[command(name = "mdh", version, about)]
@@ -27,34 +32,49 @@ enum Command {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<ExitCode> {
+async fn main() -> ExitCode {
     let cli = Cli::parse();
+    let started = Instant::now();
     match cli.command {
-        Command::Doctor => doctor::run(cli.json).await,
-        Command::Devices => devices(cli.json).await,
+        Command::Doctor => {
+            let (checks, error) = doctor::run().await;
+            finish(cli.json, started, Some(checks), error)
+        }
+        Command::Devices => match devices().await {
+            Ok(list) => finish(cli.json, started, Some(list), None),
+            Err(e) => finish::<DeviceList>(cli.json, started, None, Some(e)),
+        },
     }
 }
 
-async fn devices(json: bool) -> anyhow::Result<ExitCode> {
-    let sdk = AndroidSdk::locate()?;
-    let devices = AndroidDriver::new(&sdk).devices().await?;
+#[derive(Serialize)]
+#[serde(transparent)]
+struct DeviceList(Vec<Device>);
 
-    if json {
-        println!("{}", serde_json::to_string_pretty(&devices)?);
-    } else if devices.is_empty() {
-        println!("No devices connected. Start an emulator or plug in a device.");
-    } else {
-        for d in &devices {
-            let state = match &d.state {
-                DeviceState::Online => "online",
-                DeviceState::Offline => "offline",
-                DeviceState::Unauthorized => "unauthorized (accept the USB debugging prompt)",
-                DeviceState::Other(s) => s,
-            };
-            let kind = if d.is_emulator { "emulator" } else { "device" };
-            let model = d.model.as_deref().unwrap_or("-");
-            println!("{:<20} {:<9} {:<24} {}", d.id, kind, model, state);
+impl Human for DeviceList {
+    fn human(&self) -> String {
+        if self.0.is_empty() {
+            return "No devices connected. Start an emulator or plug in a device.".into();
         }
+        self.0
+            .iter()
+            .map(|d| {
+                let state = match &d.state {
+                    DeviceState::Online => "online",
+                    DeviceState::Offline => "offline",
+                    DeviceState::Unauthorized => "unauthorized (accept the USB debugging prompt)",
+                    DeviceState::Other(s) => s,
+                };
+                let kind = if d.is_emulator { "emulator" } else { "device" };
+                let model = d.model.as_deref().unwrap_or("-");
+                format!("{:<20} {:<9} {:<24} {}", d.id, kind, model, state)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
-    Ok(ExitCode::SUCCESS)
+}
+
+async fn devices() -> Result<DeviceList> {
+    let sdk = AndroidSdk::locate()?;
+    Ok(DeviceList(AndroidDriver::new(&sdk).devices().await?))
 }

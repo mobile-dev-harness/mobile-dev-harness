@@ -16,7 +16,6 @@ name = "mdh"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace = true
 clap.workspace = true
 mdh-core.workspace = true
 mdh-driver.workspace = true
