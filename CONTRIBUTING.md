@@ -23,3 +23,4 @@ and at least one AVD. Run `cargo run -- doctor` to check your setup.
 - **Agent-facing output is a product surface.** Keep it compact, stable and actionable; every
   `--json` shape change is a breaking change.
 - Crate layout and dependency direction are described in [docs/DESIGN.md](docs/DESIGN.md).
+- Coding agents should also read [AGENTS.md](AGENTS.md).
