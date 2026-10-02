@@ -381,7 +381,10 @@ fn a_change_selects_the_flows_that_pass_its_screens() {
     let dir = std::env::temp_dir().join(format!("mdh-flows-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let store = mdh_verify::FlowStore::new(&dir);
-    for (name, screens) in [("login", "[LoginActivity, InboxActivity]"), ("settings", "[SettingsActivity]")] {
+    for (name, screens) in [
+        ("login", "[LoginActivity, InboxActivity]"),
+        ("settings", "[SettingsActivity]"),
+    ] {
         let yaml = format!("name: {name}\nscreens: {screens}\nsteps:\n- key: back\n");
         store.save(&Flow::parse(name, &yaml).unwrap()).unwrap();
     }
@@ -407,6 +410,9 @@ fn a_change_selects_the_flows_that_pass_its_screens() {
         status: mdh_impact::FileStatus::Modified,
         kind: "build",
     });
-    assert_eq!(mdh_verify::flows_for(&report, &store).unwrap(), ["login", "settings"]);
+    assert_eq!(
+        mdh_verify::flows_for(&report, &store).unwrap(),
+        ["login", "settings"]
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }
