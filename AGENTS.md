@@ -10,7 +10,8 @@ build/install, device state setup, compact UI/log observation, assertions and re
 exposed as a CLI and (from M1) an MCP server. Android first; iOS, React Native and Flutter later.
 
 **Current state: M0 done.** Implemented: Android SDK discovery, `mdh doctor`, `mdh devices`.
-Next: M1 (compact UI tree, screenshots, input, logcat, crash detection, MCP server).
+Next: M1 (engine/session, output envelope, compact UI tree, diffs, screenshots, input,
+logcat, crash detection, MCP server). Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout
 
@@ -19,7 +20,7 @@ crates/
   mdh-core/     shared types (Device, Platform, Error/Result) — no I/O
   mdh-driver/   Driver trait + android/ (SDK discovery, adb wrapper)
   mdh-cli/      package `mobile-dev-harness`, binary `mdh` (clap)
-docs/DESIGN.md  design doc (Chinese), milestone table
+docs/DESIGN.md  design overview + roadmap; details in docs/design/, decisions in docs/adr/
 ```
 
 Dependency direction is strictly downward: `cli/mcp → verify/build/state → ui/observe → driver → core`.
@@ -78,3 +79,4 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   No trailers.
 - Keep changes scoped to one milestone item; update the milestone table in `docs/DESIGN.md` and
   `README.md` when a milestone item lands.
+- Significant design decisions get an ADR in `docs/adr/` (never edit an accepted ADR; supersede it).
