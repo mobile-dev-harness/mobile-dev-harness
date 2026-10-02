@@ -2,7 +2,7 @@
 
 use std::fmt::Write;
 
-use mdh_core::ui::Rect;
+use mdh_core::ui::{Rect, ScreenInfo};
 
 use crate::diff::{Field, TreeDiff, checked_word};
 use crate::tree::{OpaqueReason, Role, UiNode, UiTree};
@@ -98,6 +98,24 @@ pub(crate) fn line(node: &UiNode) -> String {
         }
     }
     s
+}
+
+/// `screen com.example/.LoginActivity  1080x2400  keyboard  overlay:com.android.permissioncontroller`
+pub fn render_screen(screen: &ScreenInfo) -> String {
+    let mut line = format!(
+        "screen {}  {}x{}",
+        screen.activity.as_deref().unwrap_or("?"),
+        screen.size.width(),
+        screen.size.height()
+    );
+    if screen.keyboard {
+        line.push_str("  keyboard");
+    }
+    if let Some(overlay) = &screen.overlay {
+        line.push_str("  overlay:");
+        line.push_str(overlay);
+    }
+    line
 }
 
 /// `+` added, `~` changed, `-` removed (refs merged into ranges).

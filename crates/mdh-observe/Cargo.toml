@@ -1,6 +1,6 @@
 [package]
-name = "mdh-ui"
-description = "UI tree compression, stable refs and diffs for mobile-dev-harness"
+name = "mdh-observe"
+description = "Observation for mobile-dev-harness: compact UI trees, stable refs, diffs, screenshots"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

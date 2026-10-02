@@ -1,7 +1,7 @@
 //! Targeted compression, ref and diff behaviors on synthetic hierarchies.
 
 use mdh_core::ui::{NodeFlags, RawNode, Rect};
-use mdh_ui::{RefTable, UiTree, compress, diff, render, render_diff};
+use mdh_observe::{RefTable, UiTree, compress, diff, render, render_diff};
 
 const SCREEN: Rect = Rect {
     left: 0,

@@ -1,7 +1,7 @@
 //! Compresses real uiautomator dumps and pins the rendered output with snapshots.
 
 use mdh_driver::android::parse_hierarchy;
-use mdh_ui::{RefTable, UiTree, compress, render};
+use mdh_observe::{RefTable, UiTree, compress, render};
 
 fn load(name: &str) -> (String, UiTree) {
     let path = format!(

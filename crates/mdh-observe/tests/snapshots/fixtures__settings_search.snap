@@ -1,5 +1,5 @@
 ---
-source: crates/mdh-ui/tests/fixtures.rs
+source: crates/mdh-observe/tests/fixtures.rs
 expression: "snapshot(concat! (stringify! (settings_search), \"_api36\"))"
 ---
 raw: 57 nodes, ~5849 tokens | compact: 10 nodes, ~131 tokens

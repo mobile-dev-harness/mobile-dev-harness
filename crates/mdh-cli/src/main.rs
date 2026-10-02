@@ -1,21 +1,21 @@
-mod act;
-mod context;
 mod doctor;
-mod observe;
 mod output;
+mod render;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
+use mdh_control::Control;
+use mdh_core::output::Timings;
 use mdh_core::{Device, DeviceState, Input, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
 use serde::Serialize;
 
-use crate::context::Context;
-use crate::output::{Human, Phases, finish};
+use crate::output::{Human, finish};
+use crate::render::Done;
 
 #[derive(Parser)]
 #[command(name = "mdh", version, about)]
@@ -80,35 +80,38 @@ enum Command {
 async fn main() -> ExitCode {
     let cli = Cli::parse();
     let started = Instant::now();
-    let mut phases = Phases::new();
+    let mut timings = Timings::default();
     let json = cli.json;
     macro_rules! report {
         ($result:expr) => {{
             let (data, error) = split($result);
-            finish(json, started, phases, data, error)
+            finish(json, started, timings, data, error)
         }};
     }
 
     match cli.command {
         Command::Doctor => {
             let (checks, error) = doctor::run().await;
-            finish(json, started, phases, Some(checks), error)
+            finish(json, started, timings, Some(checks), error)
         }
         Command::Devices => report!(devices().await),
         command => {
-            let cx = match Context::new(cli.device.as_deref()).await {
-                Ok(cx) => cx,
-                Err(e) => return finish::<act::Done>(json, started, phases, None, Some(e)),
+            let control = match Control::connect(cli.device.as_deref()).await {
+                Ok(control) => control,
+                Err(e) => return finish::<Done>(json, started, timings, None, Some(e)),
             };
+            let cx = &control;
             match command {
                 Command::Doctor | Command::Devices => unreachable!("handled above"),
-                Command::Observe => report!(observe::observe(&cx, &mut phases).await),
+                Command::Observe => report!(cx.observe(&mut timings).await),
                 Command::Screenshot { output, max_edge } => {
-                    report!(observe::screenshot(&cx, output, max_edge, &mut phases).await)
+                    report!(cx.screenshot(output, max_edge, &mut timings).await)
                 }
-                Command::Tap { x, y } => {
-                    report!(act::input(&cx, Input::Tap { x, y }, format!("tapped {x},{y}")).await)
-                }
+                Command::Tap { x, y } => report!(
+                    cx.input(&Input::Tap { x, y })
+                        .await
+                        .map(|()| Done::new(format!("tapped {x},{y}")))
+                ),
                 Command::Swipe {
                     x1,
                     y1,
@@ -116,29 +119,34 @@ async fn main() -> ExitCode {
                     y2,
                     duration_ms,
                 } => report!(
-                    act::input(
-                        &cx,
-                        Input::Swipe {
-                            from: (x1, y1),
-                            to: (x2, y2),
-                            duration_ms,
-                        },
-                        format!("swiped {x1},{y1} → {x2},{y2}"),
-                    )
+                    cx.input(&Input::Swipe {
+                        from: (x1, y1),
+                        to: (x2, y2),
+                        duration_ms,
+                    })
                     .await
+                    .map(|()| Done::new(format!("swiped {x1},{y1} → {x2},{y2}")))
                 ),
                 Command::Key { name } => {
                     let name = name.to_uppercase();
-                    let describe = format!("pressed {name}");
-                    report!(act::input(&cx, Input::Key { name }, describe).await)
+                    let done = Done::new(format!("pressed {name}"));
+                    report!(cx.input(&Input::Key { name }).await.map(|()| done))
                 }
                 Command::Type { text } => {
-                    let describe = format!("typed {text:?}");
-                    report!(act::input(&cx, Input::SetText { text }, describe).await)
+                    let done = Done::new(format!("typed {text:?}"));
+                    report!(cx.input(&Input::SetText { text }).await.map(|()| done))
                 }
-                Command::Launch { app } => report!(act::launch(&cx, &app).await),
-                Command::Stop { package } => report!(act::stop(&cx, &package).await),
-                Command::Install { apk, grant } => report!(act::install(&cx, &apk, grant).await),
+                Command::Launch { app } => report!(cx.launch(&app).await),
+                Command::Stop { package } => report!(
+                    cx.stop(&package)
+                        .await
+                        .map(|()| Done::new(format!("stopped {package}")))
+                ),
+                Command::Install { apk, grant } => report!(
+                    cx.install(&apk, grant)
+                        .await
+                        .map(|()| Done::new(format!("installed {}", apk.display())))
+                ),
             }
         }
     }

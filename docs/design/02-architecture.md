@@ -1,58 +1,63 @@
 # 02 · Technical Architecture
 
-> Status: draft v0.2 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
+> Status: draft v0.3 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
 
 ## 1. Overview
 
 ```
-             ┌──────────────┐      ┌──────────────┐
-  agent ───▶ │   mdh-mcp    │      │   mdh-cli    │ ◀─── humans / CI / agents (shell)
-             └──────┬───────┘      └──────┬───────┘
-                    └──────────┬──────────┘
+            agent ──▶ mdh-mcp            mdh-cli ◀── humans / CI / agents (shell)
+                         └───────┬───────────┘
+   ┌──────────────┬──────────────┼──────────────┬──────────────┐
+   │  mdh-verify  │   mdh-perf   │  mdh-compat  │  mdh-visual  │   quality domains (ADR-0008)
+   │  assertions  │   startup    │  device and  │  baselines   │
+   │  verdicts    │   frames     │  config      │  design      │   compat orchestrates the
+   │  flows       │   memory/CPU │  matrices    │  mocks/rules │   other three across a matrix
+   └──────┬───────┴──────┬───────┴──────┬───────┴──────┬───────┘
+          └──────────────┴──────┬───────┴──────────────┘
+                         ┌──────▼───────┐
+                         │ mdh-control  │   sessions · targeting · actions · waiting · state · navigation
+                         └──┬────────┬──┘
+               ┌────────────▼─┐    ┌─▼────────────┐
+               │ mdh-observe  │    │ mdh-project  │   UI trees, logs, crashes, screenshots │ builds
+               └──────┬───────┘    └──────┬───────┘
+                      └────────┬──────────┘
                         ┌──────▼──────┐
-                        │ mdh-engine  │  session · orchestration · recording · output contract
+                        │ mdh-driver  │   Driver trait · android (adb + on-device helper) · ios (later)
                         └──────┬──────┘
-     ┌──────────────┬──────────┼──────────┬──────────────┐
-┌────▼─────┐ ┌──────▼────┐ ┌───▼────┐ ┌───▼──────┐ ┌─────▼─────┐
-│mdh-build │ │ mdh-state │ │ mdh-ui │ │mdh-observe│ │mdh-verify │
-│Gradle    │ │perms,     │ │compress│ │logs,      │ │assertions,│
-│adapters, │ │snapshots, │ │diff,   │ │crashes    │ │flows,     │
-│diagnostic│ │deep links │ │images  │ │           │ │verdicts   │
-└────┬─────┘ └──────┬────┘ └───┬────┘ └───┬──────┘ └───────────┘
-     └──────────────┴──────────┼──────────┘
                         ┌──────▼──────┐
-                        │ mdh-driver  │  Driver trait · android (adb / helper) · ios (later)
-                        └──────┬──────┘
-                        ┌──────▼──────┐
-                        │  mdh-core   │  types · errors · config model (no I/O)
+                        │  mdh-core   │   types · errors · config · output contract (no I/O)
                         └─────────────┘
 ```
 
 Principles:
 
-1. **CLI and MCP are thin shells.** All logic lives in `mdh-engine` and below, so both entry points behave
-   identically.
-2. **Platform-neutral logic is separated from platform specifics.** Compression, diffing, assertions and flows
-   depend only on neutral data models; adb, uiautomator and Gradle details stay inside drivers and build adapters.
-3. **Pure parsers with fixture tests.** Every parser of external tool output is `&str → struct`; CI needs no device.
-4. **Output is product.** Agent-facing text and JSON are stable interfaces with a schema version.
+1. **Entry points are thin shells.** CLI and MCP only parse input and render output; all logic lives in the
+   library crates, so both behave identically.
+2. **Domains on a shared foundation.** Each quality domain owns its logic; observation, project handling and device
+   access are shared. Dependencies only point downward.
+3. **Platform-neutral logic is separated from platform specifics.** Compression, diffing, assertions, flows, perf
+   statistics and visual comparison depend only on neutral data models; adb, uiautomator, dumpsys and Gradle details
+   stay inside the driver and project adapters.
+4. **Pure parsers with fixture tests.** Every parser of external tool output is `&str → struct`; CI needs no device.
+5. **Output is product.** Agent-facing text and JSON are stable interfaces with a schema version.
 
 ## 2. Crates
 
-| Crate | Responsibility | Depends on | Introduced |
+| Crate | Layer | Responsibility | Status |
 |---|---|---|---|
-| `mdh-core` | Neutral types (Device, AppId, Selector, Action, UiNode, …), errors, config model | — | M0 ✅ |
-| `mdh-driver` | `Driver` trait; `android::{AdbDriver, HelperDriver}`; SDK discovery; process utilities | core | M0 ✅ |
-| `mdh-ui` | Raw tree → compact tree, ref assignment, diff, opaque-region detection, image processing (resize, annotate, compare) | core | M1 |
-| `mdh-observe` | logcat parsing, per-app filtering, crash/ANR detection and reports | core, driver | M1 |
-| `mdh-engine` | `Session`, action execution with auto-observation, recording, run directories, output rendering | all of the above | M1 |
-| `mdh-mcp` | MCP server (`rmcp`, stdio) | engine | M1 |
-| `mdh-build` | `ProjectAdapter` trait; Gradle adapter: probing, building, diagnostic parsing | core | M2 |
-| `mdh-state` | Animations, permissions, appearance, resets, snapshots, deep links, test data | core, driver | M3 |
-| `mdh-verify` | Assertion model and evaluation, flow format, verdicts, JUnit output | core | M4 |
-| `mobile-dev-harness` | CLI (`mdh`), the only published binary | engine, mcp | M0 ✅ |
+| `mdh-core` | foundation | Neutral types (Device, RawNode, ScreenInfo, Input, LaunchInfo, …), errors and codes, output envelope and timings, config model | ✅ |
+| `mdh-driver` | foundation | `Driver` trait; Android: SDK discovery, adb wrapper, on-device helper client, uiautomator fallback, dumpsys/am parsers | ✅ |
+| `mdh-observe` | foundation | Compact UI trees (compression, roles, stable keys, refs, rendering, diffs, opaque regions), screenshot processing; logs and crash reports next | ✅ partly |
+| `mdh-project` | foundation | `ProjectAdapter`; Gradle probing, building, diagnostics; later RN, Expo, Flutter, Xcode | M2 |
+| `mdh-control` | domain | Device selection, observation, input, app lifecycle ✅; session engine (refs across calls, targeting, waiting, diffs), state setup, navigation | M1, M3 |
+| `mdh-verify` | domain | Assertions, verdicts, evidence, flow record/replay, JUnit | M4 |
+| `mdh-visual` | domain | Baselines, structural and pixel diffs, cross-config layout checks, rule checks, design mocks | M5, M8 |
+| `mdh-perf` | domain | Startup, frames, memory, CPU, budgets, baselines; later traces | M6 |
+| `mdh-compat` | domain | Matrices, device pool and providers, config application, scheduling, matrix reports | M7, M8 |
+| `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | M1 |
+| `mobile-dev-harness` (`crates/mdh-cli`) | entry | CLI `mdh`, the only published binary | ✅ |
 
-`mdh-mcp` is compiled into the same `mdh` binary (`mdh mcp`) rather than shipped separately, so users install one thing.
+`android-helper/` (Java) is the on-device half of `mdh-driver` (§10).
 
 ## 3. Core abstractions
 
@@ -102,31 +107,27 @@ pub enum Action {
 #[async_trait]
 pub trait Driver: Send + Sync {
     fn platform(&self) -> Platform;
-    fn capabilities(&self) -> Capabilities;   // e.g. unicode_input, fast_ui_tree, snapshots
-
     async fn devices(&self) -> Result<Vec<Device>>;
-    async fn install(&self, dev: &Device, artifact: &Artifact, opts: InstallOpts) -> Result<()>;
-    async fn launch(&self, dev: &Device, app: &AppId, opts: LaunchOpts) -> Result<LaunchInfo>;
-    async fn stop(&self, dev: &Device, app: &AppId) -> Result<()>;
-    async fn foreground(&self, dev: &Device) -> Result<ScreenInfo>;   // foreground screen, dialogs, keyboard
-    async fn ui_tree(&self, dev: &Device) -> Result<RawNode>;
-    async fn screenshot(&self, dev: &Device) -> Result<Image>;
-    async fn input(&self, dev: &Device, input: LowLevelInput) -> Result<()>;  // coordinate-level tap/swipe/text/key
-    async fn logs(&self, dev: &Device, query: LogQuery) -> Result<Vec<LogEntry>>;
-    async fn shell(&self, dev: &Device, args: &[&str]) -> Result<String>;     // escape hatch for mdh-state
+    async fn ui_tree(&self, device: &Device) -> Result<RawTree>;          // roots + windows + source
+    async fn foreground_activity(&self, device: &Device) -> Result<Option<String>>;
+    async fn input(&self, device: &Device, input: &Input) -> Result<()>;  // tap / swipe / key / set_text
+    async fn screenshot(&self, device: &Device) -> Result<Vec<u8>>;       // PNG
+    async fn install(&self, device: &Device, app: &Path, grant_permissions: bool) -> Result<()>;
+    async fn launch(&self, device: &Device, app: &str) -> Result<LaunchInfo>;
+    async fn stop(&self, device: &Device, package: &str) -> Result<()>;
 }
 ```
 
 Notes:
 
-- Drivers expose **low-level capabilities only** (coordinate input, raw trees). Ref/selector resolution, waiting
-  and auto-observation live in the engine and are shared by every backend.
-- `capabilities()` lets upper layers degrade explicitly: with `unicode_input = false`, typing Chinese fails with a
-  hint to install the helper instead of silently typing garbage.
-- Android has two implementations: `AdbDriver` (plain adb CLI, nothing to install) and `HelperDriver` (on-device
-  helper, fast and complete). Capabilities the helper lacks fall back to `AdbDriver`.
+- Drivers expose **low-level capabilities only** (coordinate input, raw trees). Ref and selector resolution,
+  waiting and auto-observation live in `mdh-control` and are shared by every backend.
+- The Android driver prefers the on-device helper (§10) and falls back to `uiautomator dump` and `adb shell input`
+  when it can't run; text input requires the helper and fails explicitly without it.
+- Logs, perf counters (`dumpsys gfxinfo`, `meminfo`) and device configuration (`settings`, `wm`, `cmd uimode`) will
+  be added as further driver capabilities when their domains start, rather than through a generic shell escape.
 
-### 3.3 ProjectAdapter (`mdh-build`)
+### 3.3 ProjectAdapter (`mdh-project`)
 
 ```rust
 #[async_trait]
@@ -146,7 +147,7 @@ pub enum BuildOutcome {
 The RN, Expo and Flutter adapters reuse the Gradle adapter internally (their Android side is a Gradle project) and
 only add the JS bundler, the Dart build and framework-specific logs.
 
-### 3.4 Session (`mdh-engine`)
+### 3.4 Session (`mdh-control`)
 
 ```rust
 pub struct Session {
@@ -200,7 +201,7 @@ Uses the same executor as 4.2, except that targets are always selectors, each st
 (with a timeout), assertions are evaluated by `mdh-verify`, and a verdict with evidence is produced at the end.
 Recording and replay share one executor so that whatever was recorded can be replayed.
 
-## 5. UI tree compression (`mdh-ui`)
+## 5. UI tree compression (`mdh-observe`)
 
 Input: a `RawNode` tree. Output: a `UiTree` of compact nodes with refs.
 
@@ -265,7 +266,7 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 > To verify during implementation on real devices across API levels: availability of `-v uid` / `--uid`, and all
 > ANR signal sources.
 
-## 8. Gradle probing and diagnostics (`mdh-build`)
+## 8. Gradle probing and diagnostics (`mdh-project`)
 
 ### 8.1 Probing with an init script, not regexes
 
@@ -342,7 +343,91 @@ can't start, mdh falls back to `uiautomator dump`.
 
 **Later (M5):** window-change event stream (push instead of poll), screenshots through `UiAutomation`.
 
-## 11. MCP server (`mdh-mcp`)
+## 11. Performance (`mdh-perf`)
+
+**Data sources** (all via adb, parsed by pure functions with fixtures):
+
+| Metric | Source |
+|---|---|
+| Startup | `am start -W` (`TotalTime`, `WaitTime`, `LaunchState`); `ActivityTaskManager: Displayed` and `Fully drawn` in logcat |
+| Frames | `dumpsys gfxinfo <pkg> reset` before, `dumpsys gfxinfo <pkg>` after (janky frames, percentiles, slow/frozen counts); `framestats` for per-frame detail |
+| Memory | `dumpsys meminfo <pkg>` (TOTAL PSS, Java heap, native heap, graphics) |
+| CPU | `/proc/<pid>/stat` sampled during the flow |
+
+**Measurement protocol.** Warm-up runs are discarded; N measured runs report median, p90 and median absolute
+deviation. Perf runs restore the device's real animation scales — control disables animations for stability, but
+jank can't be measured without them. Runs are separated by a cool-down; device, API level and build fingerprint are
+recorded with every result.
+
+**Baselines and regressions.** Baselines live in `.mdh/baselines/perf/<device-fingerprint>/<scenario>.json`. A
+regression requires both a statistical signal (new median beyond baseline median + k·MAD) and a minimum absolute
+delta, so noise on emulators doesn't produce failures. Budgets in `mdh.yaml` are absolute and meant for physical
+devices. Perf checks are also exposed as assertion kinds for `mdh-verify`.
+
+**Later:** Perfetto traces around slow steps, summarized with trace processor to the slices that explain them.
+
+## 12. Compatibility (`mdh-compat`)
+
+**Matrix model.** Axes from `mdh.yaml` expand into cells; a cell is a *device spec* (API level, form factor, vendor)
+plus a *configuration* (locale, font scale, night mode, density, size, orientation). Includes and excludes keep the
+matrix small; pairwise reduction can come later.
+
+**Device pool.**
+
+```rust
+#[async_trait]
+pub trait DeviceProvider: Send + Sync {
+    async fn candidates(&self, spec: &DeviceSpec) -> Result<Vec<DeviceOffer>>;
+    async fn acquire(&self, offer: &DeviceOffer) -> Result<DeviceLease>;   // booted, ready, exclusive
+}
+```
+
+Providers: local emulators (install the system image with `sdkmanager`, create an AVD from a hardware profile such
+as a phone, tablet or foldable with `avdmanager`, boot headless, keep a clean snapshot, reuse across runs), physical
+devices (matched by `getprop`: manufacturer, model, API level), and later cloud farms. Parallelism is bounded by host
+RAM and CPU.
+
+**Configuration without new AVDs.** A per-cell guard applies configuration on an existing device and restores it on
+drop: `settings put system font_scale`, `cmd uimode night yes|no`, `wm density` / `wm size` (and `reset`), rotation
+via `user_rotation`, and locale (per-app locales via `cmd locale` on API 33+; how to switch the system locale without
+root on older images is to be verified in M7).
+
+**Execution and report.** A scheduler runs (cell, flow) jobs on leased devices, each with its own control session,
+and collects verdicts plus the selected perf and visual results per cell. The report is a matrix with evidence;
+failures are clustered by signature (step, assertion, error code) so one bug isn't reported nine times.
+
+**Vendors.** Vendor ROM differences (background restrictions, autostart, permission dialogs) only show on physical
+devices. Leases record manufacturer and ROM version, and a small knowledge base of known quirks turns them into hints.
+
+## 13. UI consistency (`mdh-visual`)
+
+**Inputs.** The compact tree (roles, labels, bounds, stable keys), a full-resolution screenshot (not the downscaled
+agent JPEG) and the screen density (`wm density`) to convert pixels to dp.
+
+**Baselines.** `.mdh/baselines/visual/<screen-key>/<config-key>.{png,tree.json}`, where the screen key is a flow step
+or activity plus route and the config key identifies device profile and configuration. Candidates are produced by
+every check; `visual baseline approve` promotes them. Baselines are never updated automatically.
+
+**Comparison.** Structural first: match elements by stable key and report added, missing, moved or resized beyond a
+dp tolerance, and text changes — cheap, and it says what changed. Then pixels: mask the status and navigation bars,
+regions given by selectors and explicit rectangles; compare with a per-pixel tolerance plus block-wise SSIM; emit a
+diff image and map changed regions back to the elements that cover them.
+
+**Cross-config layout checks.** Overlap (bounds of two text or interactive leaves intersect, excluding ancestors),
+clipping (element partially outside the screen or its container), and elements missing compared with the default
+configuration. Truncation needs data accessibility doesn't expose; candidates are OCR of the element region compared
+with its text, or an optional hook in debug builds — decided in M5.
+
+**Rule checks.** Touch targets ≥ 48 dp for interactive elements; interactive elements without a label; text
+contrast from foreground and background colors sampled in the element's region (WCAG 4.5:1, 3:1 for large text);
+duplicate labels. Google's Accessibility Test Framework could run in an optional second helper APK later; the base
+helper stays dependency-free.
+
+**Design mocks (M8).** Figma's REST API provides rendered frames and node geometry, text and styles. Frames are mapped
+to screens, elements matched by text or layer name, geometry compared after scaling by density, and deviations in
+position, size, spacing, color and font size reported with a side-by-side diff.
+
+## 14. MCP server (`mdh-mcp`)
 
 - Built on `rmcp` over stdio; tool parameter JSON Schemas are generated from Rust types with `schemars`, so docs
   and implementation can't drift.
@@ -351,7 +436,7 @@ can't start, mdh falls back to `uiautomator dump`.
 - Long operations (builds, emulator boot) send progress notifications.
 - One MCP connection maps to one session; with multiple devices, tools take a device parameter.
 
-## 12. Claude Code plugin
+## 15. Claude Code plugin
 
 The repository doubles as a plugin marketplace:
 
@@ -367,7 +452,7 @@ integrations/claude-code/
 
 "Unverified changes" means source files under `src/` or `res/` modified after the most recent pass verdict.
 
-## 13. Error model
+## 16. Error model
 
 - Every `mdh_core::Error` variant maps to a stable `code` (`DEVICE_NOT_FOUND`, `BUILD_FAILED`,
   `ELEMENT_NOT_FOUND`, `AMBIGUOUS_TARGET`, `APP_CRASHED`, `TIMEOUT`, `CAPABILITY_MISSING`, `CONFIG_INVALID`, …)
@@ -376,7 +461,7 @@ integrations/claude-code/
 - Rule of thumb: **prefer one more piece of useful context over making the agent guess** — e.g. timeouts include
   the last observation, missing elements include candidates.
 
-## 14. Concurrency and process management
+## 17. Concurrency and process management
 
 - tokio runtime. All external processes start through one `process` module that handles timeouts, kill-on-drop
   and output size limits, so processes like logcat can't become orphans or exhaust memory.
@@ -385,7 +470,7 @@ integrations/claude-code/
 - Logs are read incrementally on demand in the first release; if real-time crash alerts are needed later, each
   session gets a background logcat task.
 
-## 15. Technical risks
+## 18. Technical risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
@@ -395,15 +480,19 @@ integrations/claude-code/
 | One UiAutomation client per device | Conflicts with mobile-mcp, Appium, Maestro on the same device | Documented; `session reset` stops the helper; clear error hint |
 | AGP version differences | Probing fails | Version-matrix tests; allow manual override in config when probing fails |
 | adb output differences across Android versions | Parse errors | Fixtures across API levels; tolerant parsers that ignore unknown fields |
+| Emulator perf numbers are noisy and unrepresentative | False perf regressions, misleading budgets | Baselines per device, statistical + absolute thresholds, variance in reports; absolute budgets for physical devices |
+| Compatibility matrices get expensive | Slow runs, CI cost | Cheap configuration axes on existing devices first; includes/excludes; reused AVD snapshots; bounded parallelism |
+| Truncation and design deviations aren't visible in accessibility data | Missed UI issues | Pixel comparison and OCR candidates; optional debug-build hook; decided in M5 |
+| Vendor coverage needs devices we don't have | Vendor bugs missed | Physical-device and cloud providers behind one interface; quirk knowledge base |
 | Rust raises the contribution barrier | Slower community growth | Clear crate boundaries, good-first-issues (e.g. adding a diagnostic parser), thorough fixture tests |
 
-## 16. Observability
+## 19. Observability
 
 - Logging via `tracing`, enabled with `-v` or `MDH_LOG=debug`; logs go to stderr so stdout JSON stays clean.
 - Every result carries per-phase `timing_ms`; the benchmark reuses these numbers.
 - No telemetry of any kind.
 
-## 17. Testing
+## 20. Testing
 
 | Level | What | When |
 |---|---|---|
@@ -417,7 +506,7 @@ integrations/claude-code/
 list, a WebView, deep links, runtime permissions, a button that crashes, a button that causes an ANR, and Chinese
 text.
 
-## 18. Release and distribution
+## 21. Release and distribution
 
 - **Versioning:** semver, 0.x for now; JSON output carries a `schema` version and changes are called out in the
   CHANGELOG.
@@ -428,7 +517,7 @@ text.
 - **Helper APK:** released with the same version as `mdh`, downloaded on demand and verified at runtime.
 - **Claude Code plugin:** distributed through the marketplace in this repository.
 
-## 19. Security
+## 22. Security
 
 - Only the target app is touched by default. Changes to other packages or global settings are either on an
   allowlist (animations, locale, dark mode) and restored at session end, or require an explicit flag.

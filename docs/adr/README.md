@@ -13,3 +13,4 @@ Superseded.
 | [0005](0005-output-envelope.md) | Uniform JSON output envelope and error codes | Accepted |
 | [0006](0006-flow-format.md) | Own YAML flow format, Maestro import later | Accepted |
 | [0007](0007-helper-in-m1.md) | Ship the on-device helper in M1 | Accepted |
+| [0008](0008-quality-domains.md) | Organize around five quality domains on a shared foundation | Accepted |

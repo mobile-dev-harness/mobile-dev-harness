@@ -1,0 +1,19 @@
+[package]
+name = "mdh-control"
+description = "Device control for mobile-dev-harness: sessions, targeting, actions, waiting, app lifecycle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+mdh-core.workspace = true
+mdh-driver.workspace = true
+mdh-observe.workspace = true
+serde.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

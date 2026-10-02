@@ -1,6 +1,6 @@
 # 01 · Functional Design
 
-> Status: draft v0.2 · Scope: the whole project (first release implements native Android; other platforms
+> Status: draft v0.3 · Scope: the whole project (first release implements native Android; other platforms
 > and frameworks are reserved at the interface level)
 
 ## 1. Users and scenarios
@@ -22,6 +22,9 @@
 | S3 | **End-to-end for a new feature** | Multi-step interaction (log in, fill a form, submit) → verify the result screen → save as a flow |
 | S4 | **Regression** | Saved flows replay locally or in CI with a JUnit report |
 | S5 | **First-time setup** | `mdh init` detects the project and writes config; `mdh doctor` points out environment problems |
+| S6 | **Catch a performance regression** | After a change, `perf` runs the startup and a scrolling flow N times → compares with the stored baseline → reports "cold start +180 ms (p50), janky frames 2% → 9%" with the traces that explain it |
+| S7 | **Check compatibility** | `compat` runs the saved flows across a matrix (API 26/30/36 × phone/tablet/foldable × default/large font/RTL) → per-cell verdicts, failures deduplicated |
+| S8 | **Check UI consistency** | `visual` compares screens with their baselines and design mocks and runs layout and accessibility rules → "button overlaps text at font scale 1.3", "icon button without label", "spacing 12 dp vs. 16 dp in design" |
 
 ## 2. Core concepts
 
@@ -43,7 +46,18 @@
 
 ## 3. Feature modules
 
-Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to.
+Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Modules map to the five quality
+domains and the shared foundation (ADR-0008):
+
+| Domain / layer | Modules |
+|---|---|
+| Control | F1 Environment and devices · F3 State setup · F5 Interaction |
+| Verify | F6 Verification · F7 Flows |
+| Performance | F11 Performance |
+| Compatibility | F12 Compatibility |
+| UI consistency | F13 UI consistency |
+| Foundation | F2 Build (`mdh-project`) · F4 Observation and F8 Cost and speed (`mdh-observe`) · F10 Platforms and frameworks |
+| Entry points | F9 Agent integration |
 
 ### F1 Environment and devices
 
@@ -109,7 +123,7 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to.
 | F6.1 | Assertions | `visible` / `not_visible` / element state (enabled, checked, text, …) / `screen` (current screen) / `no_crash` / log contains or not / screenshot match (optional) |
 | F6.2 | **Verdict** | Structured result: overall status, expected vs. observed per assertion, per-step timings, evidence paths (screenshots, log excerpts, crash report) |
 | F6.3 | Evidence | Failures always include a screenshot and relevant logs; passes keep the final screenshot for human review |
-| F6.4 | Visual regression (later) | Perceptual diff against a baseline screenshot, with masks for dynamic regions (clock, ad slots) |
+| F6.4 | Domain assertions | Perf budgets (F11.5) and UI consistency checks (F13) can be used as assertions in verdicts and flows |
 
 ### F7 Flows: record and replay
 
@@ -146,6 +160,40 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to.
 | F10.2 | Flutter | `flutter build apk`; collect Flutter logs; rely on the Flutter semantics tree |
 | F10.3 | iOS | Drive the simulator with `simctl` plus an accessibility tool; build with `xcodebuild` and parse xcresult diagnostics |
 
+### F11 Performance (`mdh-perf`)
+
+| ID | Feature | Behavior |
+|---|---|---|
+| F11.1 | Startup | Cold, warm and hot start over N runs (`am start -W` after force-stop / back / home); time to initial and full display (`Displayed`, `reportFullyDrawn`); median, p90 and spread |
+| F11.2 | Rendering | Frame timing during a flow or scroll (`dumpsys gfxinfo` reset before, read after; `framestats` for detail): janky-frame share, p50/p90/p99 frame time, slow and frozen frames |
+| F11.3 | Memory | PSS, Java and native heap (`dumpsys meminfo`) after a flow; growth across N repetitions of the same flow as a leak signal |
+| F11.4 | CPU | CPU usage of the app process sampled during a flow |
+| F11.5 | Budgets and baselines | Budgets in `mdh.yaml` (e.g. cold start p50 < 800 ms, janky < 5%) and stored baselines per device; regressions are judged relative to the baseline with a noise-aware threshold, never on a single run |
+| F11.6 | Traces (later) | Perfetto capture around a slow step, summarized to the slices that explain it |
+
+> Emulators are not representative in absolute terms. Reports name the device, compare against a baseline on the
+> same device, and show variance; absolute budgets are meant for physical devices.
+
+### F12 Compatibility (`mdh-compat`)
+
+| ID | Feature | Behavior |
+|---|---|---|
+| F12.1 | Matrix | Axes in `mdh.yaml`: Android version, form factor (phone, tablet, foldable), screen size and density, orientation, locale (including RTL), font scale, dark mode, display size, vendor; with includes/excludes to keep it small |
+| F12.2 | Device pool | Local emulators (created from system images on demand and reused), physical devices over USB or Wi-Fi, later cloud providers (F12.5); parallel runs bounded by host resources |
+| F12.3 | Cheap axes first | Configuration axes are applied to an existing device where possible (`cmd locale`, `settings put system font_scale`, `cmd uimode night`, `wm density`, `wm size`, rotation) and restored afterwards; only version and form factor need different AVDs |
+| F12.4 | Run and report | Runs flows plus selected perf and visual checks on each cell; the report is a matrix of verdicts with evidence, identical failures deduplicated across cells |
+| F12.5 | Vendors and cloud (later) | Physical vendor devices (Xiaomi, Huawei, OPPO, Samsung, …) and cloud farms; documents known vendor quirks (background restrictions, autostart, permission dialogs) |
+
+### F13 UI consistency (`mdh-visual`)
+
+| ID | Feature | Behavior |
+|---|---|---|
+| F13.1 | Baselines | Per screen (or flow step): a stored screenshot and compact tree. Comparison is structural first (elements added, missing, moved, resized, text changed — cheap and explains *what* changed), then pixels with masks for dynamic regions (status bar, clock, regions by selector). Baselines are approved explicitly |
+| F13.2 | Design mocks (later) | Imports frames from Figma (rendered image and node data), maps them to screens, and reports measured deviations of matched elements (position, size, spacing, color, font size) plus a side-by-side diff |
+| F13.3 | Cross-config layout | On each matrix cell or configuration: text truncation, overlapping interactive elements, elements clipped or pushed off-screen, missing elements compared with the default configuration |
+| F13.4 | Rule checks | On the tree and pixels: touch targets ≥ 48 dp, interactive elements without a label, text contrast (sampled from the screenshot), duplicate labels; findings reference refs and selectors |
+| F13.5 | Design tokens (later) | Colors and text styles on screen checked against the design system's tokens |
+
 ## 4. Interfaces
 
 ### 4.1 CLI command tree
@@ -164,6 +212,9 @@ mdh state animations off|restore | grant <perm> | reset data | snapshot save|loa
 mdh logs [--since last|<time>] [--level W] [--crash]
 mdh verify <assertions.yaml | -e '<inline assertion>'>
 mdh flow save <name> | list | run <name...> [--junit out.xml]
+mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
+mdh compat run [--matrix <name>] [flows...] | devices
+mdh visual check [screen|flow] | baseline save|approve | rules
 mdh session show | reset
 mdh mcp
 ```
@@ -186,6 +237,9 @@ than split into many small tools.
 | `mdh_logs` | Incremental logs, crash reports | logs |
 | `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run |
 | `mdh_flow` | Save and list flows | flow save / list |
+| `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf |
+| `mdh_compat` | Run flows across a matrix; matrix report | compat |
+| `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual |
 
 Screenshots are returned as MCP image content; long builds report via progress notifications.
 
@@ -265,6 +319,20 @@ observe:
   detail: normal
   screenshot: { maxEdge: 1024, format: jpeg }
 flows: .mdh/flows
+perf:
+  runs: 10
+  budgets:
+    coldStartP50Ms: 800
+    jankyFramesPct: 5
+compat:
+  matrices:
+    default:
+      api: [26, 30, 36]
+      form: [phone, tablet, foldable]
+      config: [default, { fontScale: 1.3 }, { locale: ar }]
+visual:
+  masks: [{ id: clock }, { region: status_bar }]
+  rules: [touch_target, label, contrast]
 ```
 
 ### 4.6 Flow files
@@ -291,7 +359,7 @@ assert:
 mdh.yaml                 # config (committed)
 .mdh/
   flows/                 # flows (committed)
-  baselines/             # visual regression baselines (committed)
+  baselines/             # visual and perf baselines (committed)
   cache/                 # project probe cache (ignored)
   session.json           # CLI session state (ignored)
   runs/<time>-<id>/      # screenshots, logs, verdicts (ignored; last N kept)

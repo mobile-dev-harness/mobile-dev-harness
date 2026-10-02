@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use mdh_core::Error;
-use mdh_core::output::Envelope;
+use mdh_core::output::{Envelope, Timings, millis};
 use serde::Serialize;
 
 /// Human-readable rendering of a command's data.
@@ -12,18 +12,11 @@ pub trait Human {
     fn human(&self) -> String;
 }
 
-/// Per-phase durations reported in `timing_ms` next to the total.
-pub type Phases = Vec<(&'static str, u64)>;
-
-pub fn millis(since: Instant) -> u64 {
-    u64::try_from(since.elapsed().as_millis()).unwrap_or(u64::MAX)
-}
-
 /// Prints the result and returns the process exit code derived from the error, if any.
 pub fn finish<T: Serialize + Human>(
     json: bool,
     started: Instant,
-    phases: Phases,
+    timings: Timings,
     data: Option<T>,
     error: Option<Error>,
 ) -> ExitCode {
@@ -31,7 +24,7 @@ pub fn finish<T: Serialize + Human>(
 
     if json {
         let mut envelope = Envelope::new(data, error.as_ref()).timing("total", millis(started));
-        for (phase, ms) in phases {
+        for (phase, ms) in timings.into_inner() {
             envelope = envelope.timing(phase, ms);
         }
         println!(

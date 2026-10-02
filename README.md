@@ -1,26 +1,29 @@
 # mobile-dev-harness
 
-**Give coding agents a real edit → run → verify loop for mobile apps.**
+**A quality harness for coding agents on mobile.**
 
-Web developers' agents can open a browser, click around, read the console and prove a change works.
-Mobile agents mostly can't. `mobile-dev-harness` (`mdh`) closes that gap: it builds and installs your
-app, prepares device state, observes UI and logs in a token-efficient form, and returns structured,
-evidence-backed verdicts — exposed as a CLI and an MCP server, with first-class Claude Code integration.
+Agents working on web apps can open a browser, click around, read the console and prove a change works. Agents
+working on mobile apps mostly can't. `mobile-dev-harness` (`mdh`) gives them five capabilities, exposed as a CLI and
+an MCP server with first-class Claude Code integration:
 
-> **Status: early development (M0).** Android first; iOS, React Native and Flutter are planned.
+| Domain | What the agent gets |
+|---|---|
+| **Control** | Drive the app: compact UI trees with stable refs, diffs after actions, fast input (incl. Unicode), app lifecycle |
+| **Verify** | Evidence-backed verdicts, assertions, flows recorded and replayed as regression tests |
+| **Performance** | Startup, jank, memory and CPU measured against baselines, not single noisy runs |
+| **Compatibility** | The same checks across Android versions, form factors, configurations and vendors |
+| **UI consistency** | Baseline and design-mock comparison, cross-config layout checks, accessibility rules |
+
+> **Status: early development (M1).** Android first; iOS, React Native and Flutter are planned.
 > See [docs/DESIGN.md](docs/DESIGN.md) for architecture and roadmap.
 
 ## Why not just a device-control MCP?
 
-Tapping and screenshotting is only one layer. Agents also need to:
-
-1. **Build & install** without rediscovering the Gradle setup every session
-2. **Follow a verification protocol** instead of declaring victory after one screenshot
-3. **Prepare state** — permissions, deep links, test data, disabled animations
-4. **Read logs & crashes** filtered to the app, with stack traces attached
-5. **Replay** verified paths as regression flows
-6. **Stay cheap & fast** — compact UI trees first, screenshots only when needed
-7. **Handle framework differences** — native, React Native, Flutter, Expo
+Device-control tools such as mobile-mcp cover the first domain — tapping, typing, screenshots. That is necessary
+but not sufficient: agents also need to know whether the change *works*, whether it made the app *slower*, whether
+it *breaks on other devices*, and whether the UI still *looks right*. Even for control, `mdh` focuses on what agents
+need: ~150-token screen descriptions instead of multi-thousand-token XML, refs that stay stable across actions,
+diffs instead of full re-reads, and a warm on-device helper that returns UI trees in ~10 ms instead of ~2 s.
 
 ## Quick start
 
@@ -41,13 +44,15 @@ mdh --json observe
 | Milestone | Scope |
 |---|---|
 | M0 | Workspace, CI, `doctor`, `devices` ✅ |
-| M1 | On-device helper, session engine, compact UI tree + diffs, screenshots, input (incl. Unicode), logcat, crash detection; MCP server; benchmark vs. mobile-mcp |
+| M1 | **Control**: on-device helper ✅, observe/screenshot/input/app lifecycle ✅, session engine, logs and crashes, MCP server; benchmark vs. mobile-mcp |
 | M2 | Gradle detection, builds with structured compiler diagnostics, `mdh run` |
 | M3 | `mdh init` / `mdh.yaml`, permissions, deep links, animations, resets, snapshots |
-| M4 | Assertions, verdicts with evidence, flow record/replay, Claude Code plugin → **0.1.0** |
-| M5 | Helper event stream, public benchmark → 0.2.0 |
-| M6 | React Native / Expo, Flutter, visual regression, Maestro import |
-| M7 | iOS |
+| M4 | **Verify**: assertions, verdicts with evidence, flow record/replay, Claude Code plugin → **0.1.0** |
+| M5 | **UI consistency** v1: baselines, cross-config layout checks, accessibility rules |
+| M6 | **Performance** v1: startup, frames, memory, CPU, baselines → 0.2.0 |
+| M7 | **Compatibility** v1: device and configuration matrices on emulators and physical devices |
+| M8 | React Native / Expo, Flutter, design-mock comparison, cloud and vendor devices, Maestro import |
+| M9 | iOS |
 
 ## License
 
