@@ -41,6 +41,25 @@ pub enum Error {
     #[error("could not launch `{target}`: {message}")]
     LaunchFailed { target: String, message: String },
 
+    #[error("no element matches `{target}`")]
+    ElementNotFound {
+        target: String,
+        /// Rendered lines of the closest elements on screen.
+        candidates: Vec<String>,
+    },
+
+    #[error("`{target}` matches {} elements", candidates.len())]
+    AmbiguousTarget {
+        target: String,
+        candidates: Vec<String>,
+    },
+
+    #[error("invalid target `{target}`: {reason}")]
+    InvalidTarget { target: String, reason: String },
+
+    #[error("timed out after {seconds}s waiting for {what}")]
+    Timeout { what: String, seconds: u64 },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -58,6 +77,10 @@ impl Error {
             Error::HelperCommand { .. } => ErrorCode::HelperError,
             Error::AppNotFound { .. } => ErrorCode::AppNotFound,
             Error::LaunchFailed { .. } => ErrorCode::LaunchFailed,
+            Error::ElementNotFound { .. } => ErrorCode::ElementNotFound,
+            Error::AmbiguousTarget { .. } => ErrorCode::AmbiguousTarget,
+            Error::InvalidTarget { .. } => ErrorCode::InvalidTarget,
+            Error::Timeout { .. } => ErrorCode::Timeout,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -90,6 +113,24 @@ impl Error {
             Error::LaunchFailed { .. } => {
                 "check the component name; activities started directly must be exported".into()
             }
+            Error::ElementNotFound { candidates, .. } if candidates.is_empty() => {
+                "observe the screen to see what is there".into()
+            }
+            Error::ElementNotFound { candidates, .. } => {
+                format!("closest matches: {}", candidates.join("; "))
+            }
+            Error::AmbiguousTarget { candidates, .. } => format!(
+                "use a ref or a more specific selector; matches: {}",
+                candidates.join("; ")
+            ),
+            Error::InvalidTarget { .. } => {
+                "use a ref (`e12`), coordinates (`100,200`), a selector (`id=…`, `text=…`, `text~=…`, \
+                 `role=…`, combined with `;`) or a label"
+                    .into()
+            }
+            Error::Timeout { .. } => {
+                "the UI didn't reach the expected state; observe to see where it is".into()
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -110,14 +151,20 @@ pub enum ErrorCode {
     HelperError,
     AppNotFound,
     LaunchFailed,
+    ElementNotFound,
+    AmbiguousTarget,
+    InvalidTarget,
+    Timeout,
     Io,
 }
 
 impl ErrorCode {
-    /// Process exit code: 1 verification failed, 3 environment, 4 build, 5 app crashed, 10 internal.
-    /// (2 is reserved for usage errors, which clap reports itself.)
+    /// Process exit code: 1 the app didn't match expectations (verification failed, element missing,
+    /// timeout), 2 usage, 3 environment, 4 build, 5 app crashed, 10 internal.
     pub fn exit_code(self) -> u8 {
         match self {
+            ErrorCode::ElementNotFound | ErrorCode::AmbiguousTarget | ErrorCode::Timeout => 1,
+            ErrorCode::InvalidTarget => 2,
             ErrorCode::ToolNotFound
             | ErrorCode::CommandFailed
             | ErrorCode::EnvironmentNotReady

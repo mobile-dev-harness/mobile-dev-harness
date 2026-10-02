@@ -301,10 +301,12 @@ version = "0.1.0"
 name = "mdh-control"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "mdh-core",
  "mdh-driver",
  "mdh-observe",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

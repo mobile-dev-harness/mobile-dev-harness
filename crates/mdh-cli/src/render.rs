@@ -1,6 +1,6 @@
 //! Human-readable forms of library results. JSON output serializes the same values.
 
-use mdh_control::{Observation, Screenshot};
+use mdh_control::{ActOutcome, Observation, Screenshot, SessionSummary};
 use mdh_core::LaunchInfo;
 use mdh_observe::render_screen;
 use serde::Serialize;
@@ -27,7 +27,13 @@ impl Human for Done {
 
 impl Human for Observation {
     fn human(&self) -> String {
-        format!("{}\n{}", render_screen(&self.screen), self.text)
+        self.text.clone()
+    }
+}
+
+impl Human for ActOutcome {
+    fn human(&self) -> String {
+        self.text.clone()
     }
 }
 
@@ -56,5 +62,26 @@ impl Human for LaunchInfo {
             );
         }
         s
+    }
+}
+
+impl Human for SessionSummary {
+    fn human(&self) -> String {
+        let mut lines = vec![format!(
+            "device {}  refs assigned: {}  steps: {}",
+            self.device,
+            self.refs_assigned,
+            self.steps.len()
+        )];
+        if let Some(screen) = &self.screen {
+            lines.push(format!("last {}", render_screen(screen)));
+        }
+        lines.extend(
+            self.steps
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("{:>3}. {s}", i + 1)),
+        );
+        lines.join("\n")
     }
 }

@@ -41,7 +41,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | Milestone | Features | Done when |
 |---|---|---|
 | **M0 Scaffold** ✅ | Workspace, CI, licenses, F1.1 `doctor`, F1.2 `devices` | CI green |
-| **M1 Control** (in progress) | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅; session engine (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions), F4.6–F4.8 logs and crashes, F9.1 core MCP tools, first `examples/android-sample` | Head-to-head benchmark against mobile-mcp on the sample app (same task set): fewer round trips and tokens at equal or better success rate; results published |
+| **M1 Control** (in progress) | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording); F4.6–F4.8 logs and crashes, F9.1 core MCP tools, first `examples/android-sample` | Head-to-head benchmark against mobile-mcp on the sample app (same task set): fewer round trips and tokens at equal or better success rate; results published |
 | **M2 Project** | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M3 State & config** | `mdh init`, `mdh.yaml`, F3.1–F3.8, F1.5 | Reach "logged in + specific screen" without manual tapping |
 | **M4 Verify** | F6.1–F6.3, F7.1–F7.4, F9.2 Claude Code plugin, F9.3 | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |

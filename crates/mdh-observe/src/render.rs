@@ -15,6 +15,14 @@ pub fn render(tree: &UiTree) -> String {
     for node in &tree.nodes {
         render_node(&mut out, node, 0);
     }
+    out.push_str(&render_opaque(tree));
+    out.truncate(out.trim_end().len());
+    out
+}
+
+/// One `!` line per region the tree can't describe.
+pub fn render_opaque(tree: &UiTree) -> String {
+    let mut out = String::new();
     for region in &tree.opaque {
         let what = match region.reason {
             OpaqueReason::Webview => "webview",
@@ -31,7 +39,13 @@ pub fn render(tree: &UiTree) -> String {
 }
 
 fn render_node(out: &mut String, node: &UiNode, depth: usize) {
-    let _ = writeln!(out, "{:indent$}{}", "", line(node), indent = depth * 2);
+    let _ = writeln!(
+        out,
+        "{:indent$}{}",
+        "",
+        render_line(node),
+        indent = depth * 2
+    );
     let shown = if node.role == Role::List {
         node.children.len().min(MAX_LIST_ITEMS)
     } else {
@@ -52,7 +66,7 @@ fn render_node(out: &mut String, node: &UiNode, depth: usize) {
 }
 
 /// One node without its children: `[e4] button "Sign in" · "detail" disabled #login`.
-pub(crate) fn line(node: &UiNode) -> String {
+pub fn render_line(node: &UiNode) -> String {
     let mut s = format!("[{}]", node.r#ref);
     // Plain text is the most common node; its role is implied by the bare label.
     if node.role != Role::Text {
@@ -120,7 +134,11 @@ pub fn render_screen(screen: &ScreenInfo) -> String {
 
 /// `+` added, `~` changed, `-` removed (refs merged into ranges).
 pub fn render_diff(d: &TreeDiff) -> String {
-    let mut lines: Vec<String> = d.added.iter().map(|n| format!("+ {}", line(n))).collect();
+    let mut lines: Vec<String> = d
+        .added
+        .iter()
+        .map(|n| format!("+ {}", render_line(n)))
+        .collect();
     for c in &d.changed {
         let mut s = format!("~ [{}] {}", c.r#ref, c.role.as_str());
         if let Some(label) = &c.label {

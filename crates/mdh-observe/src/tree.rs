@@ -42,6 +42,35 @@ impl Role {
         }
     }
 
+    pub const ALL: [Role; 14] = [
+        Role::Button,
+        Role::Item,
+        Role::Textbox,
+        Role::Checkbox,
+        Role::Switch,
+        Role::Radio,
+        Role::Slider,
+        Role::Progress,
+        Role::Image,
+        Role::List,
+        Role::Tab,
+        Role::Text,
+        Role::Webview,
+        Role::Group,
+    ];
+
+    pub fn parse(s: &str) -> Option<Role> {
+        Role::ALL.into_iter().find(|r| r.as_str() == s)
+    }
+
+    /// Something the user can operate, as opposed to content and containers.
+    pub fn is_control(self) -> bool {
+        !matches!(
+            self,
+            Role::Text | Role::Image | Role::Group | Role::Progress | Role::List | Role::Webview
+        )
+    }
+
     pub fn is_toggle(self) -> bool {
         matches!(self, Role::Checkbox | Role::Switch | Role::Radio)
     }
@@ -115,5 +144,23 @@ impl UiTree {
 
     pub fn find(&self, r#ref: &str) -> Option<&UiNode> {
         self.iter().find(|n| n.r#ref == r#ref)
+    }
+
+    /// Changes whenever anything visible changes: identity, position, content or state. Used to
+    /// decide when the UI has settled.
+    pub fn fingerprint(&self) -> u64 {
+        let mut h = crate::hash::Fnv::new();
+        for n in self.iter() {
+            h.u64(n.key);
+            for v in [n.bounds.left, n.bounds.top, n.bounds.right, n.bounds.bottom] {
+                h.u64(v as u64);
+            }
+            h.field(n.value.as_deref().unwrap_or_default());
+            h.field(n.detail.as_deref().unwrap_or_default());
+            let s = n.state;
+            h.u64(u64::from(s.disabled) | u64::from(s.focused) << 1 | u64::from(s.selected) << 2);
+            h.u64(s.checked.map_or(2, u64::from));
+        }
+        h.0
     }
 }

@@ -149,23 +149,20 @@ only add the JS bundler, the Dart build and framework-specific logs.
 
 ### 3.4 Session (`mdh-control`)
 
-```rust
-pub struct Session {
-    device: Device,
-    driver: Arc<dyn Driver>,
-    app: Option<AppId>,
-    refs: RefTable,              // stable key → ref, and ref → latest bounds and selector
-    last_tree: Option<UiTree>,   // for diffs
-    log_cursor: LogCursor,       // timestamp of the last log read
-    recording: Vec<RecordedStep>,
-    run_dir: RunDir,
-}
-```
+`Control` wraps a driver and a device with stateless operations (snapshot, input, screenshot, app lifecycle).
+`Session` adds the state that makes consecutive calls one conversation:
 
-- **MCP mode:** the session lives in memory for the lifetime of the MCP connection.
-- **CLI mode:** loaded from `.mdh/session.json` on each invocation and written back at the end (ADR-0004: no
-  resident daemon in the first release).
-- Sessions are serializable, which also makes resuming after interruption and reproducing issues easy.
+| State | Purpose |
+|---|---|
+| `refs: RefTable` | stable key → ref; the same element keeps its ref for the whole session, also across screens |
+| `last: View` | tree and screen the agent saw last; diffs are relative to it, and stale refs are re-found through it |
+| `seen` | ref → what it was and on which screen, to explain refs that are no longer on screen |
+| `steps` | every action with refs replaced by selectors (`selector_for`), replayable in another session |
+
+- **MCP mode:** one session in memory per connection.
+- **CLI mode:** loaded from `.mdh/session.json` (working directory) on each invocation and written back at the end
+  (ADR-0004: no resident daemon). A file from another device or state version is discarded.
+- `session reset` clears the state and stops the device helper, freeing UiAutomation for other tools.
 
 ## 4. Key flows
 
@@ -184,15 +181,17 @@ load config ─▶ select device (boot the AVD and wait if needed)
 ### 4.2 Action with auto-observation
 
 ```
-resolve target: ref → selector recorded in RefTable → match in the latest tree
-                0 matches   → ELEMENT_NOT_FOUND + closest candidates (by text similarity)
-                many matches → AMBIGUOUS_TARGET + candidate list
-─▶ compute the tap point (center of the visible area, avoiding occluded parts)
-─▶ driver.input()
-─▶ wait_stable()   (see §6)
-─▶ diff new tree against old + new logs + crash detection
-─▶ record a RecordedStep (selector form)
-─▶ output the diff observation
+fresh snapshot → assign session refs
+resolve target:  ref → current tree; missing → selector derived from the agent's last view → current tree
+                 selector → all matches; several matches but exactly one control → the control
+                 0 matches → ELEMENT_NOT_FOUND + closest candidates (text similarity) or where the ref was seen
+                 several → AMBIGUOUS_TARGET + candidates
+─▶ driver.input() at the center of the element's visible bounds
+─▶ settle (§6)
+─▶ report against the agent's last view:
+     activity changed, or added + removed > 60% of both trees → full tree (new screen)
+     otherwise → diff (+ added, ~ changed, - removed) or "no visible change", plus opaque regions
+─▶ record the step (selector form) → output
 ```
 
 ### 4.3 Flow replay
@@ -238,8 +237,11 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
   so this check is cheap.
 - **`waitForIdle` alone is not enough (observed):** right after an action it can return immediately, because
   accessibility events are throttled (~100 ms) and the action's events haven't been delivered yet. After an action
-  wait_stable therefore (1) waits a minimum settle time longer than the throttle, (2) calls `waitForIdle`, and
-  (3) confirms with two identical consecutive trees.
+  wait_stable therefore (1) waits a minimum settle time longer than the throttle (150 ms), (2) calls `waitForIdle`
+  (200 ms quiet, at most 2 s), and (3) confirms with two identical consecutive tree fingerprints (80 ms apart,
+  5 s overall timeout).
+- **Measured** on API 36: a whole action takes 0.8–1.4 s, of which input is ~40 ms and settling the rest — mostly
+  `waitForIdle` waiting out real transition animations, which is time the UI genuinely needs.
 - **uiautomator "could not get idle state" failures:** retry, falling back to `--compressed` if needed.
 - **System dialogs:** every observation checks whether the foreground window belongs to the system (permission,
   ANR or crash dialogs) and flags it separately so the agent deals with it first.

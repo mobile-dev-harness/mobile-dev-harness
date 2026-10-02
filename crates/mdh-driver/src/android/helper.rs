@@ -153,6 +153,13 @@ impl Helper {
     }
 }
 
+/// Stops the helper, releasing the device's UiAutomation connection.
+pub(crate) async fn stop(adb: &Adb, serial: &str) -> Result<()> {
+    adb.shell(serial, &format!("am force-stop {PACKAGE}"))
+        .await
+        .map(drop)
+}
+
 fn decode<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
     serde_json::from_value(value).map_err(|e| Error::Parse {
         tool: "mdh helper".into(),

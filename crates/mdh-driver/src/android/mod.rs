@@ -203,6 +203,26 @@ impl Driver for AndroidDriver {
         am::parse_am_start(&component, &out)
     }
 
+    async fn release(&self, device: &Device) -> Result<()> {
+        self.helpers
+            .lock()
+            .expect("not poisoned")
+            .remove(&device.id);
+        helper::stop(&self.adb, &device.id).await
+    }
+
+    async fn wait_idle(&self, device: &Device, quiet: Duration, timeout: Duration) -> Result<bool> {
+        let result = self
+            .with_helper(device, |helper| async move {
+                helper.wait_idle(quiet, timeout).await
+            })
+            .await;
+        match result {
+            Err(Error::HelperUnavailable { .. }) => Ok(false),
+            other => other,
+        }
+    }
+
     async fn stop(&self, device: &Device, package: &str) -> Result<()> {
         self.adb
             .shell(

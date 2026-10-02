@@ -4,6 +4,7 @@ pub mod android;
 mod process;
 
 use std::path::Path;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::RawTree;
@@ -33,6 +34,23 @@ pub trait Driver: Send + Sync {
     async fn launch(&self, device: &Device, app: &str) -> Result<LaunchInfo>;
 
     async fn stop(&self, device: &Device, package: &str) -> Result<()>;
+
+    /// Stops anything the driver keeps running on the device (e.g. the helper holding UiAutomation).
+    async fn release(&self, _device: &Device) -> Result<()> {
+        Ok(())
+    }
+
+    /// Waits until the UI produced no events for `quiet`; `false` if `timeout` hit first or the
+    /// backend can't tell. Not sufficient on its own right after an action (events are throttled),
+    /// see `mdh_control`'s settle logic.
+    async fn wait_idle(
+        &self,
+        _device: &Device,
+        _quiet: Duration,
+        _timeout: Duration,
+    ) -> Result<bool> {
+        Ok(false)
+    }
 }
 
 /// Picks the device to work on: the requested one, or the only online device.

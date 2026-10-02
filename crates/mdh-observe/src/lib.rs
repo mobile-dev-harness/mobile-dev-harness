@@ -7,6 +7,7 @@
 
 mod compress;
 mod diff;
+mod hash;
 mod image;
 mod refs;
 mod render;
@@ -16,5 +17,5 @@ pub use compress::compress;
 pub use diff::{Change, Field, Removed, TreeDiff, diff};
 pub use image::{Jpeg, screenshot_jpeg};
 pub use refs::RefTable;
-pub use render::{render, render_diff, render_screen};
+pub use render::{render, render_diff, render_line, render_opaque, render_screen};
 pub use tree::{OpaqueReason, OpaqueRegion, Role, State, UiNode, UiTree};

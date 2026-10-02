@@ -1,0 +1,597 @@
+//! Sessions: the state that makes consecutive calls behave like one conversation with the device.
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use mdh_core::output::{Timings, millis};
+use mdh_core::ui::{Rect, ScreenInfo, TreeSource};
+use mdh_core::{Error, Input, Result};
+use mdh_observe::{
+    RefTable, Role, TreeDiff, UiNode, UiTree, diff, render, render_diff, render_line,
+    render_opaque, render_screen,
+};
+use serde::{Deserialize, Serialize};
+
+use crate::action::{ActOutcome, Action, Direction};
+use crate::settle::{SETTLE_TIMEOUT, settle};
+use crate::target::{Resolved, Target, resolve, selector_for};
+use crate::{Control, Snapshot};
+
+/// Bump when the persisted shape changes; older files are discarded.
+const STATE_VERSION: u32 = 1;
+const MAX_SCROLLS: usize = 10;
+const FOCUS_TIMEOUT: Duration = Duration::from_secs(1);
+const WAIT_POLL: Duration = Duration::from_millis(200);
+const SCROLL_MS: u32 = 300;
+
+#[derive(Default, Serialize, Deserialize)]
+struct State {
+    version: u32,
+    device: String,
+    refs: RefTable,
+    /// What the agent saw last; diffs are relative to it and stale refs are re-found through it.
+    last: Option<View>,
+    /// Ref → what it was and where it was last seen, to explain refs that are no longer on screen.
+    #[serde(default)]
+    seen: HashMap<String, String>,
+    steps: Vec<RecordedStep>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct View {
+    tree: UiTree,
+    screen: ScreenInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordedStep {
+    /// Unix time in milliseconds.
+    pub at_ms: u64,
+    /// The action with refs replaced by selectors so it can be replayed in another session.
+    /// Text typed into password fields is recorded as `<secret>`.
+    pub action: Action,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Observation {
+    pub screen: ScreenInfo,
+    pub source: TreeSource,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff: Option<TreeDiff>,
+    pub tree: UiTree,
+    /// The compact text form agents read.
+    pub text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionSummary {
+    pub device: String,
+    pub path: Option<PathBuf>,
+    pub refs_assigned: usize,
+    pub screen: Option<ScreenInfo>,
+    pub steps: Vec<String>,
+}
+
+/// A [`Control`] plus session state. CLI invocations persist it to `path` between calls; the MCP
+/// server keeps one in memory per connection.
+pub struct Session {
+    control: Control,
+    state: State,
+    path: Option<PathBuf>,
+}
+
+impl Session {
+    /// Resumes the session stored at `path` if it belongs to the same device and version.
+    pub fn open(control: Control, path: Option<PathBuf>) -> Self {
+        let device = control.device().id.clone();
+        let state = path
+            .as_ref()
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|bytes| serde_json::from_slice::<State>(&bytes).ok())
+            .filter(|s| s.version == STATE_VERSION && s.device == device)
+            .unwrap_or_else(|| State {
+                version: STATE_VERSION,
+                device,
+                ..State::default()
+            });
+        Self {
+            control,
+            state,
+            path,
+        }
+    }
+
+    pub fn control(&self) -> &Control {
+        &self.control
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let Some(path) = &self.path else {
+            return Ok(());
+        };
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let json = serde_json::to_vec(&self.state).expect("session state is serializable");
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Forgets refs, history and recording, and stops the device helper so other tools can use
+    /// UiAutomation.
+    pub async fn reset(&mut self) -> Result<()> {
+        self.state = State {
+            version: STATE_VERSION,
+            device: self.control.device().id.clone(),
+            ..State::default()
+        };
+        if let Some(path) = &self.path {
+            match std::fs::remove_file(path) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+                _ => {}
+            }
+        }
+        self.control.release().await
+    }
+
+    pub fn summary(&self) -> SessionSummary {
+        SessionSummary {
+            device: self.state.device.clone(),
+            path: self.path.clone(),
+            refs_assigned: self.state.refs.assigned(),
+            screen: self.state.last.as_ref().map(|v| v.screen.clone()),
+            steps: self
+                .state
+                .steps
+                .iter()
+                .map(|s| s.description.clone())
+                .collect(),
+        }
+    }
+
+    pub fn steps(&self) -> &[RecordedStep] {
+        &self.state.steps
+    }
+
+    /// The current screen. With `diff_only`, only what changed since the agent last looked.
+    pub async fn observe(&mut self, diff_only: bool, timings: &mut Timings) -> Result<Observation> {
+        let started = Instant::now();
+        let snapshot = self.control.snapshot().await?;
+        timings.record("observe", started);
+        let source = snapshot.source;
+        let view = self.adopt(snapshot);
+        let previous = if diff_only {
+            self.state.last.as_ref()
+        } else {
+            None
+        };
+        let (diff, _, body) = report(previous, &view);
+        let text = format!("{}\n{body}", render_screen(&view.screen));
+        self.state.last = Some(view.clone());
+        Ok(Observation {
+            screen: view.screen,
+            source,
+            diff,
+            tree: view.tree,
+            text,
+        })
+    }
+
+    /// Performs `action`, waits for the UI to settle and reports what changed since the agent
+    /// last looked.
+    pub async fn act(&mut self, action: Action, timings: &mut Timings) -> Result<ActOutcome> {
+        let started = Instant::now();
+        let snapshot = self.control.snapshot().await?;
+        let before = self.adopt(snapshot);
+        timings.record("observe_before", started);
+        let previous = self.state.last.clone();
+
+        let acted = Instant::now();
+        let (description, recorded) = self
+            .perform(&action, &before, previous.as_ref().map(|v| &v.tree))
+            .await
+            .map_err(|e| self.explain_stale_ref(e))?;
+        timings.record("act", acted);
+
+        let settling = Instant::now();
+        let (snapshot, settled) = settle(&self.control, timings).await?;
+        timings.record("settle", settling);
+        let after = self.adopt(snapshot);
+
+        let (diff, new_screen, body) = report(Some(previous.as_ref().unwrap_or(&before)), &after);
+        let mut text = format!("{description} → ok ({} ms)", millis(started));
+        if !settled {
+            text.push_str(&format!(
+                " — UI still changing after {} s",
+                SETTLE_TIMEOUT.as_secs()
+            ));
+        }
+        text = format!("{text}\n{}\n{body}", render_screen(&after.screen));
+
+        self.state.steps.push(RecordedStep {
+            at_ms: now_ms(),
+            action: recorded,
+            description: description.clone(),
+        });
+        self.state.last = Some(after.clone());
+        Ok(ActOutcome {
+            action: description,
+            settled,
+            new_screen,
+            screen: after.screen,
+            diff,
+            tree: new_screen.then_some(after.tree),
+            text,
+        })
+    }
+
+    /// Polls until `target` is on screen (or, with `gone`, no longer is).
+    pub async fn wait(
+        &mut self,
+        target: &Target,
+        gone: bool,
+        timeout: Duration,
+        timings: &mut Timings,
+    ) -> Result<Observation> {
+        let started = Instant::now();
+        loop {
+            let snapshot = self.control.snapshot().await?;
+            let source = snapshot.source;
+            let view = self.adopt(snapshot);
+            let found = present(
+                target,
+                &view.tree,
+                self.state.last.as_ref().map(|v| &v.tree),
+            );
+            if found != gone {
+                timings.record("wait", started);
+                let (diff, _, body) = report(self.state.last.as_ref(), &view);
+                let text = format!(
+                    "wait {target} → {} after {} ms\n{}\n{body}",
+                    if gone { "gone" } else { "found" },
+                    millis(started),
+                    render_screen(&view.screen)
+                );
+                self.state.last = Some(view.clone());
+                return Ok(Observation {
+                    screen: view.screen,
+                    source,
+                    diff,
+                    tree: view.tree,
+                    text,
+                });
+            }
+            if started.elapsed() >= timeout {
+                self.state.last = Some(view);
+                return Err(Error::Timeout {
+                    what: format!("{target} to {}", if gone { "disappear" } else { "appear" }),
+                    seconds: timeout.as_secs(),
+                });
+            }
+            tokio::time::sleep(WAIT_POLL).await;
+        }
+    }
+
+    /// A ref that isn't on screen gets a reminder of what it was and where the agent saw it.
+    fn explain_stale_ref(&self, error: Error) -> Error {
+        match error {
+            Error::ElementNotFound { target, candidates } if candidates.is_empty() => {
+                match self.state.seen.get(&target) {
+                    Some(seen) => Error::ElementNotFound {
+                        target: format!("{target} ({seen}; not on the current screen)"),
+                        candidates,
+                    },
+                    None => Error::ElementNotFound { target, candidates },
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// Assigns session refs to a fresh snapshot.
+    fn adopt(&mut self, mut snapshot: Snapshot) -> View {
+        self.state.refs.assign(&mut snapshot.tree);
+        let screen = snapshot
+            .screen
+            .activity
+            .as_deref()
+            .map(|a| a.split_once('/').map_or(a, |(_, activity)| activity))
+            .unwrap_or("?");
+        for node in snapshot.tree.iter() {
+            let what = short(node);
+            let what = what.strip_prefix(&node.r#ref).unwrap_or(&what).trim_start();
+            self.state
+                .seen
+                .insert(node.r#ref.clone(), format!("{what} on {screen}"));
+        }
+        View {
+            tree: snapshot.tree,
+            screen: snapshot.screen,
+        }
+    }
+
+    /// Executes the action; returns its description and its replayable form.
+    async fn perform(
+        &mut self,
+        action: &Action,
+        before: &View,
+        previous: Option<&UiTree>,
+    ) -> Result<(String, Action)> {
+        match action {
+            Action::Tap { target } => {
+                let r = resolve(target, &before.tree, previous)?;
+                let (x, y) = r.point;
+                self.control.input(&Input::Tap { x, y }).await?;
+                Ok((
+                    format!("tap {}", describe(target, &r)),
+                    Action::Tap {
+                        target: persistable(target, &r, &before.tree),
+                    },
+                ))
+            }
+            Action::LongPress {
+                target,
+                duration_ms,
+            } => {
+                let r = resolve(target, &before.tree, previous)?;
+                self.control
+                    .input(&Input::Swipe {
+                        from: r.point,
+                        to: r.point,
+                        duration_ms: *duration_ms,
+                    })
+                    .await?;
+                Ok((
+                    format!("long-press {}", describe(target, &r)),
+                    Action::LongPress {
+                        target: persistable(target, &r, &before.tree),
+                        duration_ms: *duration_ms,
+                    },
+                ))
+            }
+            Action::Type {
+                text,
+                into,
+                append,
+                enter,
+            } => {
+                let mut view = before.clone();
+                let mut recorded_into = None;
+                if let Some(target) = into {
+                    let r = resolve(target, &view.tree, previous)?;
+                    let (x, y) = r.point;
+                    recorded_into = Some(persistable(target, &r, &view.tree));
+                    self.control.input(&Input::Tap { x, y }).await?;
+                    view = self.wait_for_focus().await?;
+                }
+                let field = view
+                    .tree
+                    .iter()
+                    .find(|n| n.role == Role::Textbox && n.state.focused)
+                    .ok_or_else(|| Error::ElementNotFound {
+                        target: "focused text field".into(),
+                        candidates: view
+                            .tree
+                            .iter()
+                            .filter(|n| n.role == Role::Textbox)
+                            .map(render_line)
+                            .collect(),
+                    })?;
+                let secret = field.state.password;
+                let value = match (append, &field.value) {
+                    (true, _) if secret => {
+                        return Err(Error::InvalidTarget {
+                            target: field.r#ref.clone(),
+                            reason: "can't append to a password field; type the whole value".into(),
+                        });
+                    }
+                    (true, Some(current)) => format!("{current}{text}"),
+                    _ => text.clone(),
+                };
+                let field_name = short(field);
+                self.control.input(&Input::SetText { text: value }).await?;
+                if *enter {
+                    self.control
+                        .input(&Input::Key {
+                            name: "ENTER".into(),
+                        })
+                        .await?;
+                }
+                let shown = if secret {
+                    "••••".to_owned()
+                } else {
+                    format!("{text:?}")
+                };
+                Ok((
+                    format!("type {shown} into {field_name}"),
+                    Action::Type {
+                        text: if secret {
+                            "<secret>".into()
+                        } else {
+                            text.clone()
+                        },
+                        into: recorded_into,
+                        append: *append,
+                        enter: *enter,
+                    },
+                ))
+            }
+            Action::Swipe {
+                from,
+                to,
+                duration_ms,
+            } => {
+                self.control
+                    .input(&Input::Swipe {
+                        from: *from,
+                        to: *to,
+                        duration_ms: *duration_ms,
+                    })
+                    .await?;
+                Ok((
+                    format!("swipe {},{} → {},{}", from.0, from.1, to.0, to.1),
+                    action.clone(),
+                ))
+            }
+            Action::Key { name } => {
+                self.control
+                    .input(&Input::Key { name: name.clone() })
+                    .await?;
+                Ok((format!("key {name}"), action.clone()))
+            }
+            Action::Scroll {
+                direction,
+                within,
+                until,
+            } => {
+                let (area, recorded_within) = match within {
+                    Some(target) => {
+                        let r = resolve(target, &before.tree, previous)?;
+                        let bounds = r.node.map_or(before.tree.screen, |n| n.bounds);
+                        (
+                            inset(bounds, 10),
+                            Some(persistable(target, &r, &before.tree)),
+                        )
+                    }
+                    // Keep clear of the status bar and the gesture navigation area.
+                    None => (inset(before.tree.screen, 15), None),
+                };
+                let gesture = scroll_gesture(*direction, area);
+                let recorded = Action::Scroll {
+                    direction: *direction,
+                    within: recorded_within,
+                    until: until.clone(),
+                };
+                let dir = format!("{direction:?}").to_lowercase();
+                let Some(goal) = until else {
+                    self.control.input(&gesture).await?;
+                    return Ok((format!("scroll {dir}"), recorded));
+                };
+                let mut view = before.clone();
+                for scrolls in 0..=MAX_SCROLLS {
+                    if present(goal, &view.tree, None) {
+                        return Ok((
+                            format!("scroll {dir} until {goal}: found after {scrolls} scrolls"),
+                            recorded,
+                        ));
+                    }
+                    if scrolls == MAX_SCROLLS {
+                        break;
+                    }
+                    self.control.input(&gesture).await?;
+                    let (snapshot, _) = settle(&self.control, &mut Timings::default()).await?;
+                    let next = self.adopt(snapshot);
+                    if next.tree.fingerprint() == view.tree.fingerprint() {
+                        break; // reached the end
+                    }
+                    view = next;
+                }
+                Err(Error::ElementNotFound {
+                    target: goal.to_string(),
+                    candidates: Vec::new(),
+                })
+            }
+        }
+    }
+
+    async fn wait_for_focus(&mut self) -> Result<View> {
+        let deadline = Instant::now() + FOCUS_TIMEOUT;
+        loop {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            let snapshot = self.control.snapshot().await?;
+            let view = self.adopt(snapshot);
+            let focused = view
+                .tree
+                .iter()
+                .any(|n| n.role == Role::Textbox && n.state.focused);
+            if focused || Instant::now() >= deadline {
+                return Ok(view);
+            }
+        }
+    }
+}
+
+/// Diff against `previous` unless the screen changed wholesale; returns (diff, new screen, body).
+fn report(previous: Option<&View>, now: &View) -> (Option<TreeDiff>, bool, String) {
+    let Some(previous) = previous else {
+        return (None, true, render(&now.tree));
+    };
+    let d = diff(&previous.tree, &now.tree);
+    let churn = d.added.len() + d.removed.len();
+    let total = previous.tree.iter().count() + now.tree.iter().count();
+    let new_screen = previous.screen.activity != now.screen.activity || churn * 10 > total * 6;
+    if new_screen {
+        return (None, true, render(&now.tree));
+    }
+    let mut body = if d.is_empty() {
+        "no visible change".to_owned()
+    } else {
+        render_diff(&d)
+    };
+    let opaque = render_opaque(&now.tree);
+    if !opaque.is_empty() {
+        body = format!("{body}\n{opaque}");
+    }
+    (Some(d), false, body)
+}
+
+fn present(target: &Target, tree: &UiTree, previous: Option<&UiTree>) -> bool {
+    !matches!(
+        resolve(target, tree, previous),
+        Err(Error::ElementNotFound { .. })
+    )
+}
+
+/// Refs only mean something within a session; recordings store a selector instead.
+fn persistable(target: &Target, resolved: &Resolved, tree: &UiTree) -> Target {
+    match (target, resolved.node) {
+        (Target::Ref(_), Some(node)) => Target::Selector(selector_for(node, tree)),
+        _ => target.clone(),
+    }
+}
+
+fn describe(target: &Target, resolved: &Resolved) -> String {
+    match resolved.node {
+        Some(node) => short(node),
+        None => target.to_string(),
+    }
+}
+
+/// `e5 item "Network & internet"`.
+fn short(node: &UiNode) -> String {
+    match &node.label {
+        Some(label) => format!("{} {} {label:?}", node.r#ref, node.role.as_str()),
+        None => format!("{} {}", node.r#ref, node.role.as_str()),
+    }
+}
+
+fn inset(r: Rect, percent: i32) -> Rect {
+    let dx = r.width() * percent / 100;
+    let dy = r.height() * percent / 100;
+    Rect::new(r.left + dx, r.top + dy, r.right - dx, r.bottom - dy)
+}
+
+/// A swipe across `area` that reveals content in `direction`: to see what is below, the finger
+/// moves up.
+fn scroll_gesture(direction: Direction, area: Rect) -> Input {
+    let (cx, cy) = area.center();
+    let (from, to) = match direction {
+        Direction::Down => ((cx, area.bottom), (cx, area.top)),
+        Direction::Up => ((cx, area.top), (cx, area.bottom)),
+        Direction::Right => ((area.right, cy), (area.left, cy)),
+        Direction::Left => ((area.left, cy), (area.right, cy)),
+    };
+    Input::Swipe {
+        from,
+        to,
+        duration_ms: SCROLL_MS,
+    }
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}

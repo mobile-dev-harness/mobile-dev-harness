@@ -32,11 +32,16 @@ cargo install --path crates/mdh-cli   # crates.io release coming later
 
 mdh doctor    # check Android SDK, adb, emulator/AVDs, JDK
 mdh devices   # list connected devices and emulators
-mdh observe   # current screen as a compact UI tree
-mdh screenshot -o shot.jpg
 mdh launch com.android.settings
-mdh tap 672 846 && mdh type "深色模式" && mdh key back
-mdh --json observe
+mdh observe                      # current screen as a compact UI tree with refs
+mdh tap "Network & internet"     # by label; prints what changed after the UI settled
+mdh tap e20                      # by ref, stable for the whole session
+mdh type "深色模式" --into "Search Settings"
+mdh scroll down --until "System"
+mdh wait "role=switch;text=Wi-Fi" --timeout 5
+mdh key back
+mdh screenshot -o shot.jpg
+mdh --json observe --diff
 ```
 
 ## Roadmap

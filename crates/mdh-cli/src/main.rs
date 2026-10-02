@@ -4,18 +4,21 @@ mod render;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use clap::{Parser, Subcommand};
-use mdh_control::Control;
+use clap::{Parser, Subcommand, ValueEnum};
+use mdh_control::{Action, Control, Direction, Session, Target};
 use mdh_core::output::Timings;
-use mdh_core::{Device, DeviceState, Input, Result};
+use mdh_core::{Device, DeviceState, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
 use serde::Serialize;
 
 use crate::output::{Human, finish};
 use crate::render::Done;
+
+/// Where CLI invocations keep session state between calls, relative to the working directory.
+const SESSION_FILE: &str = ".mdh/session.json";
 
 #[derive(Parser)]
 #[command(name = "mdh", version, about)]
@@ -32,6 +35,8 @@ struct Cli {
     command: Command,
 }
 
+/// TARGET is a ref (`e12`), coordinates (`100,200`), a selector (`id=…`, `text=…`, `text~=…`,
+/// `role=…`, `index=…`, combined with `;`) or a label.
 #[derive(Subcommand)]
 enum Command {
     /// Check that the local toolchain (SDK, adb, emulator, JDK) is ready
@@ -39,7 +44,11 @@ enum Command {
     /// List connected devices and running emulators
     Devices,
     /// Show the current screen as a compact UI tree
-    Observe,
+    Observe {
+        /// Only what changed since the last observation or action
+        #[arg(long)]
+        diff: bool,
+    },
     /// Save a downscaled JPEG screenshot
     Screenshot {
         #[arg(short, long, default_value = "screenshot.jpg")]
@@ -48,9 +57,28 @@ enum Command {
         #[arg(long, default_value_t = 1024)]
         max_edge: u32,
     },
-    /// Tap at device coordinates
-    Tap { x: i32, y: i32 },
-    /// Swipe between device coordinates
+    /// Tap an element; reports what changed
+    Tap { target: String },
+    /// Long-press an element; reports what changed
+    LongPress {
+        target: String,
+        #[arg(long, default_value_t = 800)]
+        duration_ms: u32,
+    },
+    /// Set the focused field's text (any Unicode); reports what changed
+    Type {
+        text: String,
+        /// Tap this field first
+        #[arg(long)]
+        into: Option<String>,
+        /// Append to the current text instead of replacing it
+        #[arg(long)]
+        append: bool,
+        /// Press ENTER afterwards
+        #[arg(long)]
+        enter: bool,
+    },
+    /// Swipe between device coordinates; reports what changed
     Swipe {
         x1: i32,
         y1: i32,
@@ -59,10 +87,27 @@ enum Command {
         #[arg(long, default_value_t = 300)]
         duration_ms: u32,
     },
-    /// Press a key, e.g. BACK, HOME, ENTER
+    /// Scroll to reveal content in a direction; reports what changed
+    Scroll {
+        direction: Dir,
+        /// Scroll inside this element instead of the screen
+        #[arg(long = "in")]
+        within: Option<String>,
+        /// Keep scrolling (up to 10 times) until this target is on screen
+        #[arg(long)]
+        until: Option<String>,
+    },
+    /// Press a key, e.g. BACK, HOME, ENTER; reports what changed
     Key { name: String },
-    /// Replace the focused text field's content (any Unicode text)
-    Type { text: String },
+    /// Wait until a target appears (or disappears with --gone)
+    Wait {
+        target: String,
+        #[arg(long)]
+        gone: bool,
+        /// Seconds
+        #[arg(long, default_value_t = 10)]
+        timeout: u64,
+    },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
     /// Force-stop an app
@@ -74,6 +119,38 @@ enum Command {
         #[arg(short, long)]
         grant: bool,
     },
+    /// Inspect or reset the session (refs, history, recorded steps)
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SessionCommand {
+    /// Show the session's device, last screen and recorded steps
+    Show,
+    /// Forget refs and steps and stop the device helper (frees UiAutomation for other tools)
+    Reset,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Dir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl From<Dir> for Direction {
+    fn from(d: Dir) -> Self {
+        match d {
+            Dir::Up => Direction::Up,
+            Dir::Down => Direction::Down,
+            Dir::Left => Direction::Left,
+            Dir::Right => Direction::Right,
+        }
+    }
 }
 
 #[tokio::main]
@@ -100,55 +177,132 @@ async fn main() -> ExitCode {
                 Ok(control) => control,
                 Err(e) => return finish::<Done>(json, started, timings, None, Some(e)),
             };
-            let cx = &control;
-            match command {
-                Command::Doctor | Command::Devices => unreachable!("handled above"),
-                Command::Observe => report!(cx.observe(&mut timings).await),
-                Command::Screenshot { output, max_edge } => {
-                    report!(cx.screenshot(output, max_edge, &mut timings).await)
-                }
-                Command::Tap { x, y } => report!(
-                    cx.input(&Input::Tap { x, y })
-                        .await
-                        .map(|()| Done::new(format!("tapped {x},{y}")))
-                ),
-                Command::Swipe {
-                    x1,
-                    y1,
-                    x2,
-                    y2,
-                    duration_ms,
-                } => report!(
-                    cx.input(&Input::Swipe {
-                        from: (x1, y1),
-                        to: (x2, y2),
-                        duration_ms,
-                    })
-                    .await
-                    .map(|()| Done::new(format!("swiped {x1},{y1} → {x2},{y2}")))
-                ),
-                Command::Key { name } => {
-                    let name = name.to_uppercase();
-                    let done = Done::new(format!("pressed {name}"));
-                    report!(cx.input(&Input::Key { name }).await.map(|()| done))
-                }
-                Command::Type { text } => {
-                    let done = Done::new(format!("typed {text:?}"));
-                    report!(cx.input(&Input::SetText { text }).await.map(|()| done))
-                }
-                Command::Launch { app } => report!(cx.launch(&app).await),
-                Command::Stop { package } => report!(
-                    cx.stop(&package)
-                        .await
-                        .map(|()| Done::new(format!("stopped {package}")))
-                ),
-                Command::Install { apk, grant } => report!(
-                    cx.install(&apk, grant)
-                        .await
-                        .map(|()| Done::new(format!("installed {}", apk.display())))
-                ),
+            let mut session = Session::open(control, Some(PathBuf::from(SESSION_FILE)));
+            let code = run(command, &mut session, json, started, &mut timings).await;
+            if let Err(e) = session.save() {
+                eprintln!("warning: could not save the session to {SESSION_FILE}: {e}");
             }
+            code
         }
+    }
+}
+
+async fn run(
+    command: Command,
+    session: &mut Session,
+    json: bool,
+    started: Instant,
+    timings: &mut Timings,
+) -> ExitCode {
+    macro_rules! report {
+        ($result:expr) => {{
+            let (data, error) = split($result);
+            finish(json, started, std::mem::take(timings), data, error)
+        }};
+    }
+    macro_rules! act {
+        ($action:expr) => {
+            report!(match $action {
+                Ok(action) => session.act(action, timings).await,
+                Err(e) => Err(e),
+            })
+        };
+    }
+    let target = |s: &str| Target::parse(s);
+
+    match command {
+        Command::Doctor | Command::Devices => unreachable!("handled before connecting"),
+        Command::Observe { diff } => report!(session.observe(diff, timings).await),
+        Command::Screenshot { output, max_edge } => report!(
+            session
+                .control()
+                .screenshot(output, max_edge, timings)
+                .await
+        ),
+        Command::Tap { target: t } => act!(target(&t).map(|target| Action::Tap { target })),
+        Command::LongPress {
+            target: t,
+            duration_ms,
+        } => act!(target(&t).map(|target| Action::LongPress {
+            target,
+            duration_ms
+        })),
+        Command::Type {
+            text,
+            into,
+            append,
+            enter,
+        } => act!(
+            into.as_deref()
+                .map(target)
+                .transpose()
+                .map(|into| Action::Type {
+                    text,
+                    into,
+                    append,
+                    enter,
+                })
+        ),
+        Command::Swipe {
+            x1,
+            y1,
+            x2,
+            y2,
+            duration_ms,
+        } => act!(Ok(Action::Swipe {
+            from: (x1, y1),
+            to: (x2, y2),
+            duration_ms,
+        })),
+        Command::Scroll {
+            direction,
+            within,
+            until,
+        } => act!((|| -> Result<Action> {
+            Ok(Action::Scroll {
+                direction: direction.into(),
+                within: within.as_deref().map(target).transpose()?,
+                until: until.as_deref().map(target).transpose()?,
+            })
+        })()),
+        Command::Key { name } => act!(Ok(Action::Key {
+            name: name.to_uppercase()
+        })),
+        Command::Wait {
+            target: t,
+            gone,
+            timeout,
+        } => report!(match target(&t) {
+            Ok(t) =>
+                session
+                    .wait(&t, gone, Duration::from_secs(timeout), timings)
+                    .await,
+            Err(e) => Err(e),
+        }),
+        Command::Launch { app } => report!(session.control().launch(&app).await),
+        Command::Stop { package } => report!(
+            session
+                .control()
+                .stop(&package)
+                .await
+                .map(|()| Done::new(format!("stopped {package}")))
+        ),
+        Command::Install { apk, grant } => report!(
+            session
+                .control()
+                .install(&apk, grant)
+                .await
+                .map(|()| Done::new(format!("installed {}", apk.display())))
+        ),
+        Command::Session { command } => match command {
+            SessionCommand::Show => report!(Ok(session.summary())),
+            SessionCommand::Reset => report!(
+                session
+                    .reset()
+                    .await
+                    .map(|()| Done::new("session reset; device helper stopped"))
+            ),
+        },
     }
 }
 

@@ -204,9 +204,13 @@ mdh emulator list | start [avd] | stop
 mdh init                              # probe the project, write mdh.yaml
 mdh run [--route R] [--reset data|snapshot] [--no-build]
 mdh build | install | launch
-mdh observe [--detail minimal|normal|full] [--screenshot [--annotate]]
-mdh tap <ref|selector> | type <ref|selector> <text> | swipe ... | scroll ... | back | home | key <k>
-mdh wait <selector> [--gone] [--timeout 10s]
+mdh observe [--diff] [--detail minimal|normal|full] [--screenshot [--annotate]]
+mdh screenshot [-o file] [--max-edge 1024]
+mdh tap <target> | long-press <target> | key <name> | swipe x1 y1 x2 y2
+mdh type <text> [--into <target>] [--append] [--enter]
+mdh scroll up|down|left|right [--in <target>] [--until <target>]
+mdh wait <target> [--gone] [--timeout 10]
+mdh launch <package|component> | stop <package> | install <apk> [-g]
 mdh open <route|uri>
 mdh state animations off|restore | grant <perm> | reset data | snapshot save|load <name> | locale <tag> | dark on|off
 mdh logs [--since last|<time>] [--level W] [--crash]
@@ -220,6 +224,11 @@ mdh mcp
 ```
 
 Global flags: `--json`, `--device <serial>`, `--project <dir>`, `-v`.
+
+A `<target>` is a ref (`e12`), coordinates (`100,200`), a selector (`id=…`, `text=…`, `text~=…` for contains,
+`role=…`, `index=…`, combined with `;`, e.g. `role=switch;text=Wi-Fi`) or a bare label (exact, then
+case-insensitive, then contains). Actions print what they did, wait for the UI to settle and report what changed
+since the agent last looked; CLI invocations share a session through `.mdh/session.json`.
 
 ### 4.2 MCP tools
 

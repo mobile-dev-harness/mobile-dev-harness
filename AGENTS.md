@@ -10,10 +10,11 @@ domains on a shared foundation (ADR-0008): **control**, **verify**, **performanc
 **compatibility** and **UI consistency**. Exposed as a CLI and (from M1) an MCP server. Android
 first; iOS, React Native and Flutter later.
 
-**Current state: M1 (control) in progress.** Implemented: `doctor`, `devices`, `observe` (screen
-line + compact tree via the on-device helper), `screenshot`, coordinate input (`tap`, `swipe`,
-`key`, `type`), `launch`/`stop`/`install`, the ADR-0005 output envelope. Next: the session engine in
-`mdh-control` (refs across calls, ref and selector targeting, wait-for-stable, diffs after actions).
+**Current state: M1 (control) in progress.** Implemented: the session engine in `mdh-control`
+(session-stable refs, ref/selector/label targeting, wait-for-stable, diffs after actions, recorded
+steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
+`scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, the
+on-device helper, the ADR-0005 output envelope. Next: logs and crashes (F4.6–F4.8), the MCP server.
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout
@@ -102,6 +103,13 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`), run `scripts/build-helper.sh` and commit the APK.
 - JSON field names in `Commands.node()` / `windows()` must match `mdh_core::ui::{RawNode, WindowInfo}`.
 - Inject input asynchronously; synchronous injection blocks for up to seconds while apps animate.
+
+## Session engine
+
+- Session logic is tested against the scripted `FakeDriver` in `crates/mdh-control/tests/session.rs`;
+  add a scenario there for every behavior change (no device needed).
+- Recorded steps must stay replayable: never record refs or coordinates for element targets, only
+  selectors (`selector_for`). Bump `STATE_VERSION` when the persisted session shape changes.
 - Only one UiAutomation client can run per device: while the helper runs, `uiautomator dump` fails.
   Stop it with `adb shell am force-stop dev.mdh.helper` when capturing fixtures with uiautomator.
 

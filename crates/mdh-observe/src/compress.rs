@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use mdh_core::ui::{RawNode, Rect};
 
+use crate::hash::Fnv;
 use crate::tree::{OpaqueReason, OpaqueRegion, Role, State, UiNode, UiTree};
 
 /// Clickable containers covering more than 1/LAYOUT_SHARE of the screen are layout, not controls
@@ -355,31 +356,5 @@ fn assign_keys(nodes: &mut [UiNode], parent: u64) {
         *occurrence += 1;
         node.key = h.0;
         assign_keys(&mut node.children, node.key);
-    }
-}
-
-/// FNV-1a: stable across Rust versions and platforms, unlike `DefaultHasher`, so keys survive in
-/// persisted CLI sessions.
-struct Fnv(u64);
-
-impl Fnv {
-    fn new() -> Self {
-        Self(0xcbf2_9ce4_8422_2325)
-    }
-
-    fn bytes(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.0 ^= u64::from(b);
-            self.0 = self.0.wrapping_mul(0x0100_0000_01b3);
-        }
-    }
-
-    fn field(&mut self, s: &str) {
-        self.bytes(s.as_bytes());
-        self.bytes(&[0xff]); // never occurs in UTF-8, so fields can't run into each other
-    }
-
-    fn u64(&mut self, v: u64) {
-        self.bytes(&v.to_le_bytes());
     }
 }

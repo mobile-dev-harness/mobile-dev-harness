@@ -1,19 +1,28 @@
 //! Control: drives a device for the other domains (verify, perf, compat, visual) and for agents.
 //!
-//! Owns device selection, observation of the current screen, input and the app lifecycle. The
-//! session engine (session-stable refs, ref and selector targeting, wait-for-stable, diffs after
-//! actions) lands here next.
+//! [`Control`] wraps a driver and a device with stateless operations. [`Session`] adds what agents
+//! need across calls: session-stable refs, ref and selector targeting, waiting for the UI to
+//! settle after actions, diffs against what the agent last saw, and a recording of every step.
+
+mod action;
+mod session;
+mod settle;
+mod target;
+
+pub use action::{ActOutcome, Action, Direction};
+pub use session::{Observation, RecordedStep, Session, SessionSummary};
+pub use target::{Selector, Target, TextMatch, find_all, selector_for};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use mdh_core::output::Timings;
-use mdh_core::ui::{ScreenInfo, TreeSource};
+use mdh_core::ui::{ScreenInfo, TreeSource, WindowInfo};
 use mdh_core::{Device, Input, LaunchInfo, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
-use mdh_observe::{Jpeg, RefTable, UiTree, compress, render, screenshot_jpeg};
+use mdh_observe::{Jpeg, UiTree, compress, screenshot_jpeg};
 use serde::Serialize;
 
 /// The driver and the device all control operations work on.
@@ -22,13 +31,11 @@ pub struct Control {
     device: Device,
 }
 
-#[derive(Debug, Serialize)]
-pub struct Observation {
+/// The compressed tree and screen info at one moment. Refs are not assigned yet.
+pub struct Snapshot {
+    pub tree: UiTree,
     pub screen: ScreenInfo,
     pub source: TreeSource,
-    /// The compact text form agents read.
-    pub text: String,
-    pub tree: UiTree,
 }
 
 #[derive(Debug, Serialize)]
@@ -43,33 +50,32 @@ impl Control {
     pub async fn connect(requested_device: Option<&str>) -> Result<Self> {
         let driver = AndroidDriver::new(&AndroidSdk::locate()?);
         let device = mdh_driver::select_device(driver.devices().await?, requested_device)?;
-        Ok(Self {
-            driver: Arc::new(driver),
-            device,
-        })
+        Ok(Self::new(Arc::new(driver), device))
+    }
+
+    pub fn new(driver: Arc<dyn Driver>, device: Device) -> Self {
+        Self { driver, device }
     }
 
     pub fn device(&self) -> &Device {
         &self.device
     }
 
-    pub async fn observe(&self, timings: &mut Timings) -> Result<Observation> {
-        let started = Instant::now();
-        let (raw, activity) = tokio::join!(
-            self.driver.ui_tree(&self.device),
-            self.driver.foreground_activity(&self.device)
-        );
-        let raw = raw?;
-        timings.record("observe", started);
-
-        let mut tree = compress(&raw.roots);
-        RefTable::default().assign(&mut tree);
-        Ok(Observation {
-            screen: ScreenInfo::new(activity?, tree.screen, &raw.windows),
-            source: raw.source,
-            text: render(&tree),
+    pub async fn snapshot(&self) -> Result<Snapshot> {
+        let (tree, activity) =
+            tokio::join!(self.tree(), self.driver.foreground_activity(&self.device));
+        let (tree, windows, source) = tree?;
+        Ok(Snapshot {
+            screen: ScreenInfo::new(activity?, tree.screen, &windows),
             tree,
+            source,
         })
+    }
+
+    /// Just the tree, for polling.
+    async fn tree(&self) -> Result<(UiTree, Vec<WindowInfo>, TreeSource)> {
+        let raw = self.driver.ui_tree(&self.device).await?;
+        Ok((compress(&raw.roots), raw.windows, raw.source))
     }
 
     /// Saves a JPEG downscaled to `max_edge` at `output`.
@@ -94,6 +100,10 @@ impl Control {
         self.driver.input(&self.device, input).await
     }
 
+    async fn wait_idle(&self, quiet: Duration, timeout: Duration) -> Result<bool> {
+        self.driver.wait_idle(&self.device, quiet, timeout).await
+    }
+
     pub async fn launch(&self, app: &str) -> Result<LaunchInfo> {
         self.driver.launch(&self.device, app).await
     }
@@ -106,5 +116,10 @@ impl Control {
         self.driver
             .install(&self.device, apk, grant_permissions)
             .await
+    }
+
+    /// Stops background helpers on the device so other UiAutomation clients can run.
+    pub async fn release(&self) -> Result<()> {
+        self.driver.release(&self.device).await
     }
 }

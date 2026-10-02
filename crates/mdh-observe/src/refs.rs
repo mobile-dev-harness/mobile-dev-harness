@@ -12,6 +12,11 @@ pub struct RefTable {
 }
 
 impl RefTable {
+    /// How many distinct elements have received a ref in this session.
+    pub fn assigned(&self) -> usize {
+        self.by_key.len()
+    }
+
     pub fn assign(&mut self, tree: &mut UiTree) {
         for node in &mut tree.nodes {
             self.assign_node(node);
