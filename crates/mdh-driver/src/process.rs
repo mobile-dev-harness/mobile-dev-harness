@@ -1,14 +1,35 @@
 use std::path::Path;
+use std::time::Duration;
 
 use mdh_core::{Error, Result};
 use tokio::process::Command;
 
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
+
 /// Runs `program` to completion and returns its stdout, or `CommandFailed` with stderr.
 pub(crate) async fn run(program: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new(program).args(args).output().await?;
+    run_with_timeout(program, args, DEFAULT_TIMEOUT).await
+}
+
+/// Like [`run`], killing the process if it outlives `timeout`.
+pub(crate) async fn run_with_timeout(
+    program: &Path,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<String> {
+    let command_line = || format!("{} {}", program.display(), args.join(" "));
+    let child = Command::new(program).args(args).kill_on_drop(true).output();
+    let output =
+        tokio::time::timeout(timeout, child)
+            .await
+            .map_err(|_| Error::CommandFailed {
+                command: command_line(),
+                code: None,
+                stderr: format!("timed out after {}s", timeout.as_secs()),
+            })??;
     if !output.status.success() {
         return Err(Error::CommandFailed {
-            command: format!("{} {}", program.display(), args.join(" ")),
+            command: command_line(),
             code: output.status.code(),
             stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
         });

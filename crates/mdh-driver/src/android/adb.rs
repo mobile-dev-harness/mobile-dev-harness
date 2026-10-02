@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use mdh_core::{Device, DeviceState, Platform, Result};
 
-use crate::process::run;
+use crate::process::{run, run_with_timeout};
 
 pub struct Adb {
     path: PathBuf,
@@ -26,6 +27,28 @@ impl Adb {
     pub async fn devices(&self) -> Result<Vec<Device>> {
         let out = run(&self.path, &["devices", "-l"]).await?;
         Ok(parse_devices(&out))
+    }
+
+    /// `adb -s <serial> <args...>`.
+    pub async fn on(&self, serial: &str, args: &[&str]) -> Result<String> {
+        self.on_with_timeout(serial, args, Duration::from_secs(120))
+            .await
+    }
+
+    pub async fn on_with_timeout(
+        &self,
+        serial: &str,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Result<String> {
+        let mut full = vec!["-s", serial];
+        full.extend_from_slice(args);
+        run_with_timeout(&self.path, &full, timeout).await
+    }
+
+    /// Runs one shell command line on the device. adb propagates the remote exit status.
+    pub async fn shell(&self, serial: &str, command: &str) -> Result<String> {
+        self.on(serial, &["shell", command]).await
     }
 }
 

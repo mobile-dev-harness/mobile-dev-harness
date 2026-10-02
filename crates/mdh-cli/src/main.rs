@@ -1,4 +1,5 @@
 mod doctor;
+mod observe;
 mod output;
 
 use std::process::ExitCode;
@@ -19,6 +20,10 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// Device to use (adb serial); defaults to the only online device
+    #[arg(long, global = true)]
+    device: Option<String>,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -29,6 +34,8 @@ enum Command {
     Doctor,
     /// List connected devices and running emulators
     Devices,
+    /// Show the current screen as a compact UI tree
+    Observe,
 }
 
 #[tokio::main]
@@ -38,12 +45,24 @@ async fn main() -> ExitCode {
     match cli.command {
         Command::Doctor => {
             let (checks, error) = doctor::run().await;
-            finish(cli.json, started, Some(checks), error)
+            finish(cli.json, started, Vec::new(), Some(checks), error)
         }
-        Command::Devices => match devices().await {
-            Ok(list) => finish(cli.json, started, Some(list), None),
-            Err(e) => finish::<DeviceList>(cli.json, started, None, Some(e)),
-        },
+        Command::Devices => {
+            let (data, error) = split(devices().await);
+            finish(cli.json, started, Vec::new(), data, error)
+        }
+        Command::Observe => {
+            let mut phases = Vec::new();
+            let (data, error) = split(observe::run(cli.device.as_deref(), &mut phases).await);
+            finish(cli.json, started, phases, data, error)
+        }
+    }
+}
+
+fn split<T>(result: Result<T>) -> (Option<T>, Option<mdh_core::Error>) {
+    match result {
+        Ok(data) => (Some(data), None),
+        Err(e) => (None, Some(e)),
     }
 }
 

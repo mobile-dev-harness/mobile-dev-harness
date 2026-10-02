@@ -233,8 +233,12 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 
 - **Disable animations at session start** (F3.1), removing the problem at its source.
 - **wait_stable:** the UI counts as settled when two consecutive trees have the same structural hash (volatile text
-  such as clocks excluded); polling backs off; there is an overall timeout. The helper backend uses
-  `UiAutomation.waitForIdle` instead, which is faster and more accurate.
+  such as clocks excluded); polling backs off; there is an overall timeout. With the helper a tree costs ~10 ms,
+  so this check is cheap.
+- **`waitForIdle` alone is not enough (observed):** right after an action it can return immediately, because
+  accessibility events are throttled (~100 ms) and the action's events haven't been delivered yet. After an action
+  wait_stable therefore (1) waits a minimum settle time longer than the throttle, (2) calls `waitForIdle`, and
+  (3) confirms with two identical consecutive trees.
 - **uiautomator "could not get idle state" failures:** retry, falling back to `--compressed` if needed.
 - **System dialogs:** every observation checks whether the foreground window belongs to the system (permission,
   ANR or crash dialogs) and flags it separately so the agent deals with it first.
@@ -303,34 +307,35 @@ Gradle isn't started at all.
 
 ## 10. On-device helper (Android)
 
-**Why:** `uiautomator dump` takes 1–3 s per call and fails easily; `adb shell input text` can't type Chinese or
-other non-ASCII characters; and the adb backend has no efficient way to wait for idle. These are experience
-bottlenecks, not details.
+**Why:** `uiautomator dump` costs ~2 s per call regardless of screen complexity (it starts a process and connects
+a new UiAutomation session each time), `adb shell input text` can't type non-ASCII text, and the adb backend has no
+efficient way to wait for idle. Measurements and the decision to ship it in M1 are in ADR-0007.
 
-**Shape:** an instrumentation APK (Kotlin) started with `am instrument -w`, listening on a device-local port that the
-host reaches through `adb forward`. Appium UiAutomator2 and Maestro both use this proven approach.
+**Shape:** a dependency-free Java instrumentation APK (`android-helper/`, ~10 KB) that targets itself, since
+UiAutomation is device-wide.
 
-**Capabilities:**
+- The UiAutomation connection is hosted by the `am` process, so the host starts it with
+  `nohup am instrument -w dev.mdh.helper/.HelperInstrumentation &` on the device: `-w` keeps `am` alive and `nohup`
+  lets it outlive the adb session. The instrumentation never finishes, so the connection stays warm across mdh
+  invocations.
+- It listens on the abstract Unix socket `mdh-helper` (no permission, no port). The host reaches it through
+  `adb forward tcp:0 localabstract:mdh-helper`; forwards are owned by the adb server and reused across invocations.
+- Protocol: one JSON request per line, one JSON response per line, `{"ok": true, ...}` or
+  `{"ok": false, "error": ...}`. Commands: `ping` (version code, SDK level), `tree` (field names match `RawNode`),
+  `wait_idle`, `set_text`.
+- `Helper::ensure` (host): reuse the forward → ping → on a missing or stale helper, check the installed
+  `versionCode`, (re)install the APK embedded in the binary, start it, poll until it answers. An APK signed with
+  another key is uninstalled first.
+- Releases: `scripts/build-helper.sh` rebuilds the APK into `crates/mdh-driver/assets/`. The version code lives in
+  three places (Gradle, `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`) and must be bumped together.
 
-- Accessibility tree straight from `UiAutomation`, returned as JSON (target < 200 ms)
-- `waitForIdle`
-- Unicode text input (`setText` on the focused node, or via an IME)
-- Screenshots (`UiAutomation.takeScreenshot`)
-- Window-change event stream (later, to push instead of poll)
+**Measured:** warm `mdh observe` ~23 ms end to end; cold start ~360 ms; restart after a kill ~300 ms.
 
-**Project:** `android-helper/` in this repo, a standalone Gradle project. The APK ships with each release; `mdh`
-downloads the matching version, verifies its SHA-256, and installs it automatically the first time it is needed.
-The protocol is versioned JSON over TCP, kept simple.
+**Coexistence:** only one UiAutomation client can run per device. While the helper runs, other clients'
+`uiautomator dump` is killed, so mobile-mcp, Appium or Maestro on the same device conflict with it. If the helper
+can't start, mdh falls back to `uiautomator dump`.
 
-**Timing:** the full helper is M5 on the roadmap; if M1 measurements show dump latency to be a blocker, it moves
-earlier (see §15).
-
-**Minimal input helper (M1):** Unicode input can't wait for M5 — mobile-mcp already supports it through its
-DeviceKit APK, and lacking it would be a regression for apps with Chinese users. M1 ships a tiny APK with no
-dependencies: a broadcast receiver that puts base64-decoded text on the clipboard, after which the driver sends
-`KEYCODE_PASTE` and restores the previous clipboard content. It is installed on demand, and the full helper later
-subsumes it behind the same `unicode_input` capability. Packaging (prebuilt APK checked into the repo with a
-reproducible build script, embedded into the binary) is settled when the item is implemented.
+**Later (M5):** window-change event stream (push instead of poll), screenshots through `UiAutomation`.
 
 ## 11. MCP server (`mdh-mcp`)
 
@@ -379,9 +384,10 @@ integrations/claude-code/
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| `uiautomator dump` is slow and unreliable | High observation latency, flakiness | Disable animations + retries; measure real numbers in M1 and pull the helper forward if needed |
-| No Chinese input | Form-based checks impossible for apps with Chinese users | Minimal input helper in M1 (clipboard + paste); full helper in M5 |
+| `uiautomator dump` is slow and unreliable | High observation latency, flakiness | Helper in M1 (ADR-0007); dump only as a fallback |
+| No Chinese input | Form-based checks impossible for apps with Chinese users | Helper `set_text` (M1) |
 | Incomplete semantics in Compose, RN, WebView | Content invisible in the tree | Opaque-region detection + annotated screenshot fallback; docs guide developers to add `testTag`/`contentDescription` |
+| One UiAutomation client per device | Conflicts with mobile-mcp, Appium, Maestro on the same device | Documented; `session reset` stops the helper; clear error hint |
 | AGP version differences | Probing fails | Version-matrix tests; allow manual override in config when probing fails |
 | adb output differences across Android versions | Parse errors | Fixtures across API levels; tolerant parsers that ignore unknown fields |
 | Rust raises the contribution barrier | Slower community growth | Clear crate boundaries, good-first-issues (e.g. adding a diagnostic parser), thorough fixture tests |

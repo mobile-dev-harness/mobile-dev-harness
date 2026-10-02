@@ -37,16 +37,15 @@
 | Milestone | Features | Done when |
 |---|---|---|
 | **M0 Scaffold** ✅ | Workspace, CI, licenses, F1.1 `doctor`, F1.2 `devices` | CI green |
-| **M1 Observe & act** (adb backend) | `mdh-engine`/Session, ADR-0005 output envelope, F1.3–F1.4, F4.1–F4.8, F5.1–F5.5 (F5.3 via the minimal input helper), F8.1–F8.3, F9.1 (core MCP tools), first `examples/android-sample` | Head-to-head benchmark against mobile-mcp on the sample app (same task set): fewer round trips and tokens at equal or better success rate; results published |
+| **M1 Observe & act** | `mdh-engine`/Session, ADR-0005 output envelope, on-device helper (ADR-0007), F1.3–F1.4, F4.1–F4.8, F5.1–F5.5, F8.1–F8.3, F9.1 (core MCP tools), first `examples/android-sample` | Head-to-head benchmark against mobile-mcp on the sample app (same task set): fewer round trips and tokens at equal or better success rate; results published |
 | **M2 Build** | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M3 State & config** | `mdh init`, `mdh.yaml`, F3.1–F3.8, F1.5 | Reach "logged in + specific screen" without any manual tapping |
 | **M4 Verify & flows** | F6.1–F6.3, F7.1–F7.4, F9.2 Claude Code plugin, F9.3 | Agents produce evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
-| **M5 Helper & performance** | Full `android-helper` (fast UI tree, idle waits, events), F8.4, benchmark | Observation < 300 ms; benchmark results in README → release 0.2.0 |
+| **M5 Helper & performance** | Helper event stream and screenshots, F8.4, benchmark | Benchmark results in README → release 0.2.0 |
 | **M6 Frameworks & visuals** | F10.1 RN/Expo, F10.2 Flutter, F6.4 visual regression, F7.5 Maestro import | All three example project types pass scenarios S1–S4 |
 | **M7 iOS** | F10.3 | S1–S4 pass on the iOS simulator |
 
-> If M1 measurements show `uiautomator dump` latency or the lack of Unicode input is a blocker, the M5 helper
-> moves earlier (see architecture §10 and §15).
+> The helper moved into M1 after measuring `uiautomator dump` at ~2 s per call (ADR-0007).
 
 ## Open questions
 

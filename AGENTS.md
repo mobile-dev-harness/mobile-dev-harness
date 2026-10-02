@@ -9,7 +9,8 @@ Guidance for coding agents working in this repository. Human contributors: see
 build/install, device state setup, compact UI/log observation, assertions and replayable flows,
 exposed as a CLI and (from M1) an MCP server. Android first; iOS, React Native and Flutter later.
 
-**Current state: M0 done.** Implemented: Android SDK discovery, `mdh doctor`, `mdh devices`.
+**Current state: M1 in progress.** Implemented: Android SDK discovery, `mdh doctor`, `mdh devices`,
+`mdh observe` (compact UI tree via the on-device helper), the ADR-0005 output envelope.
 Next: M1 (engine/session, output envelope, compact UI tree, diffs, screenshots, input,
 logcat, crash detection, MCP server). Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -20,6 +21,8 @@ crates/
   mdh-core/     shared types (Device, Platform, Error/Result) — no I/O
   mdh-driver/   Driver trait + android/ (SDK discovery, adb wrapper, uiautomator parser)
   mdh-ui/       compact UI tree: compression, stable refs, rendering, diffs
+android-helper/ on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
+scripts/        build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
   mdh-cli/      package `mobile-dev-harness`, binary `mdh` (clap)
 fixtures/       real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
 docs/DESIGN.md  design overview + roadmap; details in docs/design/, decisions in docs/adr/
@@ -82,6 +85,15 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - For manual checks, a headless emulator can be started with
   `$ANDROID_HOME/emulator/emulator -avd <name> -no-window -no-audio -no-snapshot-save` and stopped
   with `adb emu kill`. (macOS has no `timeout` command; poll in a loop instead.)
+
+## On-device helper
+
+- Java only, no dependencies, minSdk 26; keep the APK tiny (it is embedded in the binary).
+- After changing `android-helper/`, bump the version code in all three places (Gradle `versionCode`,
+  `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`), run `scripts/build-helper.sh` and commit the APK.
+- JSON field names in `Commands.node()` must match `mdh_core::ui::RawNode`.
+- Only one UiAutomation client can run per device: while the helper runs, `uiautomator dump` fails.
+  Stop it with `adb shell am force-stop dev.mdh.helper` when capturing fixtures with uiautomator.
 
 ## Commits and PRs
 

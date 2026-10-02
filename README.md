@@ -29,7 +29,8 @@ cargo install --path crates/mdh-cli   # crates.io release coming later
 
 mdh doctor    # check Android SDK, adb, emulator/AVDs, JDK
 mdh devices   # list connected devices and emulators
-mdh --json devices
+mdh observe   # compact UI tree of the current screen
+mdh --json observe
 ```
 
 ## Roadmap
@@ -37,11 +38,11 @@ mdh --json devices
 | Milestone | Scope |
 |---|---|
 | M0 | Workspace, CI, `doctor`, `devices` ✅ |
-| M1 | Session engine, compact UI tree + diffs, screenshots, input (incl. Unicode), logcat, crash detection; MCP server; benchmark vs. mobile-mcp |
+| M1 | On-device helper, session engine, compact UI tree + diffs, screenshots, input (incl. Unicode), logcat, crash detection; MCP server; benchmark vs. mobile-mcp |
 | M2 | Gradle detection, builds with structured compiler diagnostics, `mdh run` |
 | M3 | `mdh init` / `mdh.yaml`, permissions, deep links, animations, resets, snapshots |
 | M4 | Assertions, verdicts with evidence, flow record/replay, Claude Code plugin → **0.1.0** |
-| M5 | Full on-device helper (fast UI tree, idle waits), public benchmark → 0.2.0 |
+| M5 | Helper event stream, public benchmark → 0.2.0 |
 | M6 | React Native / Expo, Flutter, visual regression, Maestro import |
 | M7 | iOS |
 

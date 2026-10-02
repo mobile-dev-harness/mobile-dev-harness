@@ -62,6 +62,7 @@ impl Rect {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct NodeFlags {
     pub clickable: bool,
     pub long_clickable: bool,
@@ -76,6 +77,7 @@ pub struct NodeFlags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RawNode {
     /// Native class name, e.g. `android.widget.Button`.
     pub class: String,
@@ -89,4 +91,21 @@ pub struct RawNode {
     pub bounds: Rect,
     pub flags: NodeFlags,
     pub children: Vec<RawNode>,
+}
+
+/// Where a hierarchy came from; the backends differ in speed and capabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TreeSource {
+    /// The on-device helper's warm UiAutomation connection.
+    Helper,
+    /// `uiautomator dump`, ~2 s per call; the fallback when the helper can't run.
+    Uiautomator,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RawTree {
+    /// One root per window.
+    pub roots: Vec<RawNode>,
+    pub source: TreeSource,
 }

@@ -12,18 +12,28 @@ pub trait Human {
     fn human(&self) -> String;
 }
 
+/// Per-phase durations reported in `timing_ms` next to the total.
+pub type Phases = Vec<(&'static str, u64)>;
+
+pub fn millis(since: Instant) -> u64 {
+    u64::try_from(since.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
 /// Prints the result and returns the process exit code derived from the error, if any.
 pub fn finish<T: Serialize + Human>(
     json: bool,
     started: Instant,
+    phases: Phases,
     data: Option<T>,
     error: Option<Error>,
 ) -> ExitCode {
     let exit = error.as_ref().map_or(0, |e| e.code().exit_code());
 
     if json {
-        let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        let envelope = Envelope::new(data, error.as_ref()).timing("total", ms);
+        let mut envelope = Envelope::new(data, error.as_ref()).timing("total", millis(started));
+        for (phase, ms) in phases {
+            envelope = envelope.timing(phase, ms);
+        }
         println!(
             "{}",
             serde_json::to_string_pretty(&envelope).expect("envelope is always serializable")

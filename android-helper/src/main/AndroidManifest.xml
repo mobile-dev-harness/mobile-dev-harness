@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:label="mdh helper" />
+
+    <!-- Targets itself: UiAutomation is device-wide, so no app under test is needed. -->
+    <instrumentation
+        android:name=".HelperInstrumentation"
+        android:label="mdh helper"
+        android:targetPackage="dev.mdh.helper" />
+</manifest>

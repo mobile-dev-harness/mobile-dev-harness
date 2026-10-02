@@ -20,6 +20,21 @@ pub enum Error {
     #[error("environment not ready: {}", failed.join(", "))]
     EnvironmentNotReady { failed: Vec<String> },
 
+    #[error("no online device")]
+    NoDevice,
+
+    #[error("device `{id}` is not connected")]
+    DeviceNotFound { id: String },
+
+    #[error("several devices are online: {}", candidates.join(", "))]
+    AmbiguousDevice { candidates: Vec<String> },
+
+    #[error("on-device helper unavailable: {reason}")]
+    HelperUnavailable { reason: String },
+
+    #[error("helper command `{cmd}` failed: {message}")]
+    HelperCommand { cmd: String, message: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -31,6 +46,10 @@ impl Error {
             Error::CommandFailed { .. } => ErrorCode::CommandFailed,
             Error::Parse { .. } => ErrorCode::UnexpectedOutput,
             Error::EnvironmentNotReady { .. } => ErrorCode::EnvironmentNotReady,
+            Error::NoDevice | Error::DeviceNotFound { .. } => ErrorCode::DeviceNotFound,
+            Error::AmbiguousDevice { .. } => ErrorCode::AmbiguousDevice,
+            Error::HelperUnavailable { .. } => ErrorCode::HelperUnavailable,
+            Error::HelperCommand { .. } => ErrorCode::HelperError,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -47,6 +66,16 @@ impl Error {
                     .into()
             }
             Error::EnvironmentNotReady { .. } => "fix the failing checks, then rerun `mdh doctor`".into(),
+            Error::NoDevice | Error::DeviceNotFound { .. } => {
+                "start an emulator or connect a device, then check `mdh devices`".into()
+            }
+            Error::AmbiguousDevice { .. } => "pick one with `--device <id>`".into(),
+            Error::HelperUnavailable { .. } => {
+                "only one UiAutomation client can run per device; stop uiautomator, Appium, Maestro or \
+                 mobile-mcp sessions on it and retry"
+                    .into()
+            }
+            Error::HelperCommand { .. } => "check the device screen state and retry".into(),
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -61,6 +90,10 @@ pub enum ErrorCode {
     CommandFailed,
     UnexpectedOutput,
     EnvironmentNotReady,
+    DeviceNotFound,
+    AmbiguousDevice,
+    HelperUnavailable,
+    HelperError,
     Io,
 }
 
@@ -69,10 +102,13 @@ impl ErrorCode {
     /// (2 is reserved for usage errors, which clap reports itself.)
     pub fn exit_code(self) -> u8 {
         match self {
-            ErrorCode::ToolNotFound | ErrorCode::CommandFailed | ErrorCode::EnvironmentNotReady => {
-                3
-            }
-            ErrorCode::UnexpectedOutput | ErrorCode::Io => 10,
+            ErrorCode::ToolNotFound
+            | ErrorCode::CommandFailed
+            | ErrorCode::EnvironmentNotReady
+            | ErrorCode::DeviceNotFound
+            | ErrorCode::AmbiguousDevice
+            | ErrorCode::HelperUnavailable => 3,
+            ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }
 }

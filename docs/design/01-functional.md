@@ -98,7 +98,7 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to.
 |---|---|---|
 | F5.1 | Targeting | By ref (session-scoped) or selector (persistent); a stale ref is re-resolved through its selector, otherwise the error lists the closest candidates |
 | F5.2 | Actions | tap, long-press, type (with clear), swipe, scroll (including "scroll until an element appears"), back, home, key, hide keyboard |
-| F5.3 | **Unicode input** | Typing Chinese and other non-ASCII text. `adb shell input text` can't, so M1 ships a minimal input helper (clipboard + paste); the full helper replaces it in M5 (architecture §10) |
+| F5.3 | **Unicode input** | Typing Chinese and other non-ASCII text. `adb shell input text` can't; the on-device helper sets the focused field's text through accessibility (architecture §10) |
 | F5.4 | Waiting | Wait for an element to appear/disappear or for the UI to settle; every wait has a timeout; fixed sleeps are not offered |
 | F5.5 | **Auto-observe after actions** | Each action waits for the UI to settle and returns a diff observation — "act and look" in one call, fewer round trips |
 
