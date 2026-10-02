@@ -1,0 +1,27 @@
+[package]
+name = "mdh-mcp"
+description = "MCP server for mobile-dev-harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+base64 = "0.22"
+mdh-control.workspace = true
+mdh-core.workspace = true
+mdh-observe.workspace = true
+rmcp = { version = "2.2.0", features = ["server", "transport-io", "macros", "schemars"] }
+serde.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+mdh-driver.workspace = true
+rmcp = { version = "2.2.0", features = ["client"] }
+serde_json.workspace = true
+
+[lints]
+workspace = true

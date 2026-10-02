@@ -14,7 +14,8 @@ first; iOS, React Native and Flutter later.
 (session-stable refs, ref/selector/label targeting, wait-for-stable, diffs after actions, recorded
 steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
 `scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
-observation (crash → exit 5); the on-device helper; the ADR-0005 output envelope. Next: the MCP server, then the sample app and the benchmark.
+observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
+ADR-0005 output envelope. Next: the sample app and the benchmark against mobile-mcp.
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout
@@ -30,6 +31,7 @@ crates/
   mdh-visual/    domain: UI consistency                                     — empty until M5
   mdh-perf/      domain: performance                                        — empty until M6
   mdh-compat/    domain: compatibility matrices                             — empty until M7
+  mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
   mdh-cli/       entry point: package `mobile-dev-harness`, binary `mdh` (parsing + rendering only)
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
 scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
@@ -112,6 +114,14 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   selectors (`selector_for`). Bump `STATE_VERSION` when the persisted session shape changes.
 - Only one UiAutomation client can run per device: while the helper runs, `uiautomator dump` fails.
   Stop it with `adb shell am force-stop dev.mdh.helper` when capturing fixtures with uiautomator.
+
+## MCP server
+
+- Tools are thin: parse parameters, call the session, return the same text as the CLI (`text()`
+  helpers and `text` fields live in `mdh-control`, not in an entry point).
+- Every tool's parameters must be a struct (object schema at the root); `crates/mdh-mcp/tests/tools.rs`
+  checks this. Document parameters with doc comments — they become the schema descriptions agents read.
+- Keep the tool count and descriptions small; every definition costs agent context on every turn.
 
 ## Commits and PRs
 

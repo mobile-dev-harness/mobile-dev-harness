@@ -13,6 +13,8 @@ const RECENT: usize = 3;
 /// Stack frames shown before folding the rest.
 const FRAMES: usize = 6;
 const MAX_MESSAGE_CHARS: usize = 160;
+/// Digest lines are shorter: they ride along with every action, and `mdh logs` has the full text.
+const RECENT_CHARS: usize = 100;
 
 /// Which processes count as "the app" when filtering warnings and errors.
 #[derive(Debug, Clone, Default)]
@@ -101,7 +103,7 @@ fn recent_distinct(lines: &[&LogEntry]) -> Vec<String> {
             "{}/{}: {}",
             e.level.letter(),
             e.tag,
-            truncate(e.message.trim())
+            truncate_to(e.message.trim(), RECENT_CHARS)
         );
         match recent.iter().position(|(l, _)| *l == line) {
             Some(i) => recent[i].1 += 1,
@@ -347,7 +349,11 @@ fn fold_frames<'a>(
 }
 
 fn truncate(s: &str) -> String {
-    match s.char_indices().nth(MAX_MESSAGE_CHARS) {
+    truncate_to(s, MAX_MESSAGE_CHARS)
+}
+
+fn truncate_to(s: &str, max: usize) -> String {
+    match s.char_indices().nth(max) {
         Some((i, _)) => format!("{}…", &s[..i]),
         None => s.to_owned(),
     }

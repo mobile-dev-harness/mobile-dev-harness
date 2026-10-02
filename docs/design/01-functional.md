@@ -235,20 +235,22 @@ since the agent last looked; CLI invocations share a session through `.mdh/sessi
 Few, coarse tools: every tool definition costs agent context, so actions are distinguished by parameters rather
 than split into many small tools.
 
-| Tool | Purpose | CLI equivalent |
-|---|---|---|
-| `mdh_status` | Environment, devices, project, session overview | doctor / devices / session |
-| `mdh_run` | Build → install → launch → first observation | run |
-| `mdh_observe` | Observe (detail level, screenshot, annotation) | observe |
-| `mdh_act` | Run one or more actions, return a diff observation | tap / type / swipe / … / wait |
-| `mdh_navigate` | Open a route or deep link | open |
-| `mdh_state` | Permissions, reset, snapshots, appearance, animations | state |
-| `mdh_logs` | Incremental logs, crash reports | logs |
-| `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run |
-| `mdh_flow` | Save and list flows | flow save / list |
-| `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf |
-| `mdh_compat` | Run flows across a matrix; matrix report | compat |
-| `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual |
+| Tool | Purpose | CLI equivalent | Since |
+|---|---|---|---|
+| `mdh_status` | Device and session overview; switch device, reset the session | devices / session | M1 ✅ |
+| `mdh_observe` | Observe (diff, screenshot) | observe / screenshot | M1 ✅ |
+| `mdh_act` | Run one or more actions, each returning what changed | tap / type / scroll / … | M1 ✅ |
+| `mdh_wait` | Wait for a target to appear or disappear | wait | M1 ✅ |
+| `mdh_logs` | Recent logs and crash reports | logs | M1 ✅ |
+| `mdh_app` | Launch, stop, install | launch / stop / install | M1 ✅ |
+| `mdh_run` | Build → install → launch → first observation | run | M2 |
+| `mdh_navigate` | Open a route or deep link | open | M3 |
+| `mdh_state` | Permissions, reset, snapshots, appearance, animations | state | M3 |
+| `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run | M4 |
+| `mdh_flow` | Save and list flows | flow save / list | M4 |
+| `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual | M5 |
+| `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf | M6 |
+| `mdh_compat` | Run flows across a matrix; matrix report | compat | M7 |
 
 Screenshots are returned as MCP image content; long builds report via progress notifications.
 

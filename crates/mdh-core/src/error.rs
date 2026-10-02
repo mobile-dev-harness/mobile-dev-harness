@@ -167,6 +167,28 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
+    /// The stable wire form, identical to the serialized value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ErrorCode::ToolNotFound => "TOOL_NOT_FOUND",
+            ErrorCode::CommandFailed => "COMMAND_FAILED",
+            ErrorCode::UnexpectedOutput => "UNEXPECTED_OUTPUT",
+            ErrorCode::EnvironmentNotReady => "ENVIRONMENT_NOT_READY",
+            ErrorCode::DeviceNotFound => "DEVICE_NOT_FOUND",
+            ErrorCode::AmbiguousDevice => "AMBIGUOUS_DEVICE",
+            ErrorCode::HelperUnavailable => "HELPER_UNAVAILABLE",
+            ErrorCode::HelperError => "HELPER_ERROR",
+            ErrorCode::AppNotFound => "APP_NOT_FOUND",
+            ErrorCode::LaunchFailed => "LAUNCH_FAILED",
+            ErrorCode::ElementNotFound => "ELEMENT_NOT_FOUND",
+            ErrorCode::AmbiguousTarget => "AMBIGUOUS_TARGET",
+            ErrorCode::InvalidTarget => "INVALID_TARGET",
+            ErrorCode::Timeout => "TIMEOUT",
+            ErrorCode::AppCrashed => "APP_CRASHED",
+            ErrorCode::Io => "IO",
+        }
+    }
+
     /// Process exit code: 1 the app didn't match expectations (verification failed, element missing,
     /// timeout), 2 usage, 3 environment, 4 build, 5 app crashed, 10 internal.
     pub fn exit_code(self) -> u8 {

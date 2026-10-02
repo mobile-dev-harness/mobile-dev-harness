@@ -442,12 +442,22 @@ position, size, spacing, color and font size reported with a side-by-side diff.
 
 ## 14. MCP server (`mdh-mcp`)
 
-- Built on `rmcp` over stdio; tool parameter JSON Schemas are generated from Rust types with `schemars`, so docs
-  and implementation can't drift.
-- Results are primarily text (the compact format from functional design §4.4) with structured JSON alongside
-  (`structuredContent`); screenshots are returned as image content.
-- Long operations (builds, emulator boot) send progress notifications.
-- One MCP connection maps to one session; with multiple devices, tools take a device parameter.
+- Built on `rmcp` 2.x over stdio and compiled into the `mdh` binary (`mdh mcp [--device <serial>]`). Tool input
+  schemas are generated from Rust types with `schemars`, so docs and implementation can't drift.
+- **One session per connection**, in memory; the device is connected on first use (`mdh_status` can switch
+  devices or reset). Same session engine as the CLI, so behavior is identical.
+- **Tools (M1):** `mdh_status`, `mdh_observe` (optional diff and screenshot), `mdh_act` (a list of actions, stopping
+  at the first failure; each reports what changed), `mdh_wait`, `mdh_logs`, `mdh_app` (launch, stop, install).
+  Later milestones add `mdh_run`, `mdh_navigate`, `mdh_state`, `mdh_verify`, `mdh_flow` and the perf, compat and
+  visual tools. Targets are strings in the same grammar as the CLI, so agents learn one syntax.
+- **Results are the compact text the CLI prints**; screenshots are image content (JPEG, long edge 1024).
+  `structuredContent` is not sent for now: clients commonly forward it to the model next to the text, which would
+  double the tokens of every observation; machine-readable output is available through the CLI's `--json`.
+- **Errors** are tool results with `isError` and `error[CODE]: message` plus a hint, so agents can branch on the
+  stable code. A crash of the app sets `isError` while still returning the observation (the CLI's exit code 5).
+- **Every input schema must have an object at its root** (the MCP spec; rmcp panics at startup otherwise), so
+  parameters are structs — a tagged enum at the root would generate `oneOf`. A test asserts this for all tools.
+- **Measured:** tool definitions ~1,400 tokens; server instructions 645 characters.
 
 ## 15. Claude Code plugin
 

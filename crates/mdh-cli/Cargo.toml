@@ -20,6 +20,7 @@ clap.workspace = true
 mdh-control.workspace = true
 mdh-core.workspace = true
 mdh-driver.workspace = true
+mdh-mcp.workspace = true
 mdh-observe.workspace = true
 serde.workspace = true
 serde_json.workspace = true

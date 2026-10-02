@@ -79,6 +79,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn error_code_strings_match_serialization() {
+        use crate::ErrorCode::*;
+        for code in [
+            ToolNotFound,
+            CommandFailed,
+            UnexpectedOutput,
+            EnvironmentNotReady,
+            DeviceNotFound,
+            AmbiguousDevice,
+            HelperUnavailable,
+            HelperError,
+            AppNotFound,
+            LaunchFailed,
+            ElementNotFound,
+            AmbiguousTarget,
+            InvalidTarget,
+            Timeout,
+            AppCrashed,
+            Io,
+        ] {
+            assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());
+        }
+    }
+
+    #[test]
     fn error_envelope_shape() {
         let err = Error::ToolNotFound {
             name: "adb".into(),

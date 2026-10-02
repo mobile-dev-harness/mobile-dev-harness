@@ -45,12 +45,29 @@ mdh screenshot -o shot.jpg
 mdh --json observe --diff
 ```
 
+## Use it from an agent (MCP)
+
+`mdh mcp` serves the same session engine over MCP on stdio. In Claude Code:
+
+```sh
+claude mcp add mdh -- mdh mcp
+```
+
+Other clients:
+
+```json
+{ "mcpServers": { "mdh": { "command": "mdh", "args": ["mcp"] } } }
+```
+
+Tools: `mdh_status`, `mdh_observe`, `mdh_act`, `mdh_wait`, `mdh_logs`, `mdh_app`. Results are the same compact text
+the CLI prints; crashes of the app are reported as errors with the crash report and the steps that led to it.
+
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
 | M0 | Workspace, CI, `doctor`, `devices` ✅ |
-| M1 | **Control**: on-device helper ✅, observe/screenshot/input/app lifecycle ✅, session engine, logs and crashes, MCP server; benchmark vs. mobile-mcp |
+| M1 | **Control**: on-device helper ✅, observe/screenshot/input/app lifecycle ✅, session engine ✅, logs and crashes ✅, MCP server ✅; sample app and benchmark vs. mobile-mcp |
 | M2 | Gradle detection, builds with structured compiler diagnostics, `mdh run` |
 | M3 | `mdh init` / `mdh.yaml`, permissions, deep links, animations, resets, snapshots |
 | M4 | **Verify**: assertions, verdicts with evidence, flow record/replay, Claude Code plugin → **0.1.0** |

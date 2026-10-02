@@ -8,10 +8,12 @@ mod action;
 mod session;
 mod settle;
 mod target;
+mod text;
 
 pub use action::{ActOutcome, Action, Direction};
 pub use session::{LogsReport, Observation, RecordedStep, Session, SessionSummary};
 pub use target::{Selector, Target, TextMatch, find_all, selector_for};
+pub use text::launch_text;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -78,6 +80,14 @@ impl Control {
         Ok((compress(&raw.roots), raw.windows, raw.source))
     }
 
+    /// A JPEG of the screen downscaled to `max_edge`.
+    pub async fn capture(&self, max_edge: u32, timings: &mut Timings) -> Result<Jpeg> {
+        let started = Instant::now();
+        let png = self.driver.screenshot(&self.device).await?;
+        timings.record("capture", started);
+        screenshot_jpeg(&png, max_edge, 80)
+    }
+
     /// Saves a JPEG downscaled to `max_edge` at `output`.
     pub async fn screenshot(
         &self,
@@ -85,10 +95,7 @@ impl Control {
         max_edge: u32,
         timings: &mut Timings,
     ) -> Result<Screenshot> {
-        let started = Instant::now();
-        let png = self.driver.screenshot(&self.device).await?;
-        timings.record("capture", started);
-        let image = screenshot_jpeg(&png, max_edge, 80)?;
+        let image = self.capture(max_edge, timings).await?;
         std::fs::write(&output, &image.bytes)?;
         Ok(Screenshot {
             path: output,

@@ -129,6 +129,8 @@ enum Command {
         #[arg(short, long)]
         grant: bool,
     },
+    /// Serve the tools over MCP on stdin/stdout (for agents)
+    Mcp,
     /// Inspect or reset the session (refs, history, recorded steps)
     Session {
         #[command(subcommand)]
@@ -203,6 +205,13 @@ async fn main() -> ExitCode {
             finish(json, started, timings, Some(checks), error)
         }
         Command::Devices => report!(devices().await),
+        Command::Mcp => match mdh_mcp::serve_stdio(cli.device).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: MCP server stopped: {e}");
+                ExitCode::from(10)
+            }
+        },
         command => {
             let control = match Control::connect(cli.device.as_deref()).await {
                 Ok(control) => control,
@@ -250,7 +259,9 @@ async fn run(
     let target = |s: &str| Target::parse(s);
 
     match command {
-        Command::Doctor | Command::Devices => unreachable!("handled before connecting"),
+        Command::Doctor | Command::Devices | Command::Mcp => {
+            unreachable!("handled before connecting")
+        }
         Command::Observe { diff } => report_crash!(session.observe(diff, timings).await),
         Command::Screenshot { output, max_edge } => report!(
             session
