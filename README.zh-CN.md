@@ -71,11 +71,12 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。引擎按五个质量领域组织（控制已完成，校验、UI 一致性、性能和兼容性在计划中），建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
+  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（计划中）；兼容性矩阵在不同设备和配置上重复这些检查（计划中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
 </picture>
 
 - **两个入口，一套引擎**：agent 通过 MCP 接入，人、CI 和脚本使用 CLI，拿到的是同样的紧凑文本。
-- **五个质量领域，共享一套基础层**：控制已经完成，其余领域都建立在它之上（见[状态与路线图](#状态与路线图)）。
+- **先控制，再校验**：控制（已完成）负责驱动 App。在它之上，校验引擎运行 flow 和可插拔的检查类型（功能、UI 一致性、性能），
+  汇总成一份验证结论；兼容性矩阵则在不同设备和配置上重复这一切（见[状态与路线图](#状态与路线图)）。
 - **设备上的常驻 helper**：`dev.mdh.helper` 保持一个无障碍连接，所以读取屏幕和注入输入都只要几毫秒；logcat 则把
   崩溃和错误信息反馈到每一次的结果里。
 
@@ -281,16 +282,17 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、CLI 以及 MCP server。后续计划围绕五个质量领域展开：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、CLI 以及 MCP server。后续计划：把校验做成一个可插拔检查类型的引擎，再用矩阵在不同设备上重复执行：
 
-| | 领域 | 计划内容 |
+| | 层次 | 计划内容 |
 |---|---|---|
 | ✅ | **控制** | 可靠地驱动 App（已完成） |
 | ✅ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动（已完成） |
-| ⏳ | **校验** | 断言、带证据的验证结论、录制的操作流程可作为回归测试回放、Claude Code 插件 |
-| ⏳ | **UI 一致性** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
-| ⏳ | **性能** | 对照基线检查启动耗时、卡顿、内存和 CPU |
-| ⏳ | **兼容性** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行同样的检查 |
+| ⏳ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放、基线、报告、Claude Code 插件；检查类型可插拔： |
+| ⏳ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？ |
+| ⏳ | ↳ **UI 一致性检查** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
+| ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |
+| ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |
 
 详细设计（英文）：[设计总览](docs/DESIGN.md)、[功能设计](docs/design/01-functional.md)、

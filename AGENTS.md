@@ -5,9 +5,10 @@ Guidance for coding agents working in this repository. Human contributors: see
 
 ## Project
 
-`mobile-dev-harness` (`mdh`) is a quality harness for coding agents on mobile, organized around five
-domains on a shared foundation (ADR-0008): **control**, **verify**, **performance**,
-**compatibility** and **UI consistency**. Exposed as a CLI and (from M1) an MCP server. Android
+`mobile-dev-harness` (`mdh`) is a quality harness for coding agents on mobile (ADR-0009): **control**
+drives the app; the **verification engine** runs flows and pluggable **check kinds** (functional, UI
+consistency, performance) into one verdict; the **compatibility matrix** repeats flows and checks
+across devices and configurations; all on a shared foundation. Exposed as a CLI and (from M1) an MCP server. Android
 first; iOS, React Native and Flutter later.
 
 **Current state: M1 (control) in progress.** Implemented: the session engine in `mdh-control`
@@ -28,11 +29,11 @@ crates/
   mdh-driver/    foundation: Driver trait + android/ (SDK, adb, helper client, uiautomator, parsers)
   mdh-observe/   foundation: compact UI trees, stable refs, rendering, diffs, screenshots; logs next
   mdh-project/   foundation: Gradle probe (init script), builds, diagnostics, APK lookup
-  mdh-control/   domain: device selection, observation, input, app lifecycle; session engine next
-  mdh-verify/    domain: assertions, verdicts, flows                        — empty until M4
-  mdh-visual/    domain: UI consistency                                     — empty until M5
-  mdh-perf/      domain: performance                                        — empty until M6
-  mdh-compat/    domain: compatibility matrices                             — empty until M7
+  mdh-control/   control: session engine, targeting, actions, waiting, app lifecycle, `run`
+  mdh-verify/    verification engine: Check interface, verdicts, flows, functional checks — empty until M4
+  mdh-visual/    check kind: UI consistency                                 — empty until M5
+  mdh-perf/      check kind: performance                                    — empty until M6
+  mdh-compat/    matrix: compatibility across devices and configurations   — empty until M7
   mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
   mdh-cli/       entry point: package `mobile-dev-harness`, binary `mdh` (parsing + rendering only)
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
@@ -43,10 +44,12 @@ fixtures/        real tool output used by tests (e.g. android/uiautomator/<scree
 docs/DESIGN.md   design overview + roadmap; details in docs/design/, decisions in docs/adr/
 ```
 
-Dependencies point strictly downward: entry points → verify / perf / compat / visual → control →
-observe / project → driver → core. `mdh-compat` may depend on verify, perf and visual (it
-orchestrates them). Never make a lower crate depend on a higher one. Domain crates exist with their
-scope documented in `lib.rs`; keep them empty until their milestone starts. Logic belongs in library
+Dependencies point strictly downward: entry points → compat → visual / perf → verify → control →
+observe / project → driver → core. New kinds of checks (accessibility, security, …) implement the
+engine's `Check` interface in their own crate instead of growing `mdh-verify`; compatibility is not a
+check kind but runs flows and checks per matrix cell. Never make a lower crate depend on a higher one.
+Crates for later milestones exist with their scope documented in `lib.rs`; keep them empty until
+their milestone starts. Logic belongs in library
 crates — the CLI only parses arguments and renders results (`crates/mdh-cli/src/render.rs`).
 
 ## Commands

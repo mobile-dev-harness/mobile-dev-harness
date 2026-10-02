@@ -1,6 +1,7 @@
-//! Verify: decides whether the app does what it should, with evidence.
+//! Verify: the verification engine every check runs in (ADR-0009).
 //!
-//! Scope (functional design F6, F7; milestones M3–M4): assertions over observations and logs,
-//! structured verdicts with screenshots and log excerpts, recording sessions as selector-based
-//! flows, deterministic replay, JUnit reports. Performance and visual checks plug in as assertion
-//! kinds provided by `mdh-perf` and `mdh-visual`.
+//! Scope (functional design F6, F7; milestone M4): flows (recorded from sessions, replayed
+//! deterministically), the `Check` interface that check kinds implement, one verdict per run that
+//! collects their findings with evidence (screenshots, tree excerpts, logs, numbers), the baseline
+//! store, and reports (JUnit). Functional checks — assertions on screens and logs — are built in;
+//! UI consistency (`mdh-visual`) and performance (`mdh-perf`) plug in as further check kinds.

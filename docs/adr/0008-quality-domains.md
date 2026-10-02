@@ -1,6 +1,6 @@
 # ADR-0008: Organize around five quality domains on a shared foundation
 
-- Status: Accepted (2026-10-02)
+- Status: Accepted (2026-10-02); domain structure superseded by [ADR-0009](0009-verification-engine.md)
 - Amends: positioning and roadmap in DESIGN.md; crate layout in architecture §1–2
 
 ## Context

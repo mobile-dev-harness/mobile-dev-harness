@@ -46,16 +46,14 @@
 
 ## 3. Feature modules
 
-Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Modules map to the five quality
-domains and the shared foundation (ADR-0008):
+Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Modules map to the layers of ADR-0009:
 
-| Domain / layer | Modules |
+| Layer | Modules |
 |---|---|
 | Control | F1 Environment and devices · F3 State setup · F5 Interaction |
-| Verify | F6 Verification · F7 Flows |
-| Performance | F11 Performance |
-| Compatibility | F12 Compatibility |
-| UI consistency | F13 UI consistency |
+| Verification engine | F6 Verification (verdicts, evidence, functional checks) · F7 Flows |
+| ↳ Check kinds | F6.1 Functional · F13 UI consistency · F11 Performance |
+| Compatibility matrix | F12 Compatibility |
 | Foundation | F2 Build (`mdh-project`) · F4 Observation and F8 Cost and speed (`mdh-observe`) · F10 Platforms and frameworks |
 | Entry points | F9 Agent integration |
 
@@ -116,16 +114,20 @@ domains and the shared foundation (ADR-0008):
 | F5.4 | Waiting | Wait for an element to appear/disappear or for the UI to settle; every wait has a timeout; fixed sleeps are not offered |
 | F5.5 | **Auto-observe after actions** | Each action waits for the UI to settle and returns a diff observation — "act and look" in one call, fewer round trips |
 
-### F6 Verification
+### F6 Verification engine and functional checks (`mdh-verify`)
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F6.1 | Assertions | `visible` / `not_visible` / element state (enabled, checked, text, …) / `screen` (current screen) / `no_crash` / log contains or not / screenshot match (optional) |
+| F6.1 | Functional checks | `visible` / `not_visible` / element state (enabled, checked, text, …) / `screen` (current screen) / `no_crash` / log contains or not / screenshot match (optional) |
 | F6.2 | **Verdict** | Structured result: overall status, expected vs. observed per assertion, per-step timings, evidence paths (screenshots, log excerpts, crash report) |
 | F6.3 | Evidence | Failures always include a screenshot and relevant logs; passes keep the final screenshot for human review |
-| F6.4 | Domain assertions | Perf budgets (F11.5) and UI consistency checks (F13) can be used as assertions in verdicts and flows |
+| F6.4 | Check kinds | Functional checks are built in; UI consistency (F13) and performance (F11) checks implement the same check interface, run on the same flows and report into the same verdict, so one run can say "functional: pass; UI: 2 deviations; cold start +180 ms" |
 
-### F7 Flows: record and replay
+### F7 Flows: record and replay (`mdh-verify`)
+
+Flows belong to the engine because every check kind runs on them: performance measures a flow, UI consistency
+inspects the screens it passes, the compatibility matrix replays it on every cell.
+
 
 | ID | Feature | Behavior |
 |---|---|---|
@@ -160,7 +162,10 @@ domains and the shared foundation (ADR-0008):
 | F10.2 | Flutter | `flutter build apk`; collect Flutter logs; rely on the Flutter semantics tree |
 | F10.3 | iOS | Drive the simulator with `simctl` plus an accessibility tool; build with `xcodebuild` and parse xcresult diagnostics |
 
-### F11 Performance (`mdh-perf`)
+### F11 Performance checks (`mdh-perf`)
+
+A check kind of the verification engine (F6.4): its measurements and budget results are findings in a verdict.
+
 
 | ID | Feature | Behavior |
 |---|---|---|
@@ -174,7 +179,11 @@ domains and the shared foundation (ADR-0008):
 > Emulators are not representative in absolute terms. Reports name the device, compare against a baseline on the
 > same device, and show variance; absolute budgets are meant for physical devices.
 
-### F12 Compatibility (`mdh-compat`)
+### F12 Compatibility matrix (`mdh-compat`)
+
+Not a check kind: it runs flows and their functional, UI and performance checks on every cell of a device and
+configuration matrix, and aggregates the cells' verdicts.
+
 
 | ID | Feature | Behavior |
 |---|---|---|
@@ -184,7 +193,10 @@ domains and the shared foundation (ADR-0008):
 | F12.4 | Run and report | Runs flows plus selected perf and visual checks on each cell; the report is a matrix of verdicts with evidence, identical failures deduplicated across cells |
 | F12.5 | Vendors and cloud (later) | Physical vendor devices (Xiaomi, Huawei, OPPO, Samsung, …) and cloud farms; documents known vendor quirks (background restrictions, autostart, permission dialogs) |
 
-### F13 UI consistency (`mdh-visual`)
+### F13 UI consistency checks (`mdh-visual`)
+
+A check kind of the verification engine (F6.4): deviations and rule violations are findings in a verdict.
+
 
 | ID | Feature | Behavior |
 |---|---|---|

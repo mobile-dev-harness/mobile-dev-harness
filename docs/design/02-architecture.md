@@ -1,23 +1,29 @@
 # 02 · Technical Architecture
 
-> Status: draft v0.3 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
+> Status: draft v0.4 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
 
 ## 1. Overview
 
 ```
             agent ──▶ mdh-mcp            mdh-cli ◀── humans / CI / agents (shell)
                          └───────┬───────────┘
-   ┌──────────────┬──────────────┼──────────────┬──────────────┐
-   │  mdh-verify  │   mdh-perf   │  mdh-compat  │  mdh-visual  │   quality domains (ADR-0008)
-   │  assertions  │   startup    │  device and  │  baselines   │
-   │  verdicts    │   frames     │  config      │  design      │   compat orchestrates the
-   │  flows       │   memory/CPU │  matrices    │  mocks/rules │   other three across a matrix
-   └──────┬───────┴──────┬───────┴──────┬───────┴──────┬───────┘
-          └──────────────┴──────┬───────┴──────────────┘
-                         ┌──────▼───────┐
-                         │ mdh-control  │   sessions · targeting · actions · waiting · state · navigation
-                         └──┬────────┬──┘
-               ┌────────────▼─┐    ┌─▼────────────┐
+          ┌──────────────────────▼──────────────────────────────────────┐
+          │ mdh-compat   compatibility matrix: the same flows and checks │   where it is checked
+          │              across versions, sizes, configs, vendors        │
+          │  ┌──────────────────────────────────────────────────────┐   │
+          │  │ mdh-verify   verification engine                      │   │
+          │  │   flows · check interface · verdicts · evidence ·     │   │
+          │  │   baselines · reports                                 │   │
+          │  │   ┌────────────┐ ┌──────────────┐ ┌───────────────┐   │   │   what is checked
+          │  │   │ functional │ │ UI consist.  │ │ performance   │   │   │
+          │  │   │ (built in) │ │ mdh-visual   │ │ mdh-perf      │   │   │
+          │  │   └────────────┘ └──────────────┘ └───────────────┘   │   │
+          │  └──────────────────────────┬───────────────────────────┘   │
+          └─────────────────────────────┼───────────────────────────────┘
+                         ┌──────────────▼──┐
+                         │  mdh-control    │   sessions · targeting · actions · waiting · state · navigation
+                         └──┬───────────┬──┘
+               ┌────────────▼─┐    ┌────▼─────────┐
                │ mdh-observe  │    │ mdh-project  │   UI trees, logs, crashes, screenshots │ builds
                └──────┬───────┘    └──────┬───────┘
                       └────────┬──────────┘
@@ -33,8 +39,10 @@ Principles:
 
 1. **Entry points are thin shells.** CLI and MCP only parse input and render output; all logic lives in the
    library crates, so both behave identically.
-2. **Domains on a shared foundation.** Each quality domain owns its logic; observation, project handling and device
-   access are shared. Dependencies only point downward.
+2. **Control, then verification, then the matrix (ADR-0009).** Verification is an engine that owns flows and
+   verdicts; functional, UI consistency and performance checks plug into it through one interface; the
+   compatibility matrix repeats flows and checks across devices. Dependencies only point downward:
+   `mdh-compat` → `mdh-visual`, `mdh-perf` → `mdh-verify` → `mdh-control` → foundation.
 3. **Platform-neutral logic is separated from platform specifics.** Compression, diffing, assertions, flows, perf
    statistics and visual comparison depend only on neutral data models; adb, uiautomator, dumpsys and Gradle details
    stay inside the driver and project adapters.
@@ -48,13 +56,13 @@ Principles:
 | `mdh-core` | foundation | Neutral types (Device, RawNode, ScreenInfo, Input, LaunchInfo, …), errors and codes, output envelope and timings, config model | ✅ |
 | `mdh-driver` | foundation | `Driver` trait; Android: SDK discovery, adb wrapper, on-device helper client, uiautomator fallback, dumpsys/am parsers | ✅ |
 | `mdh-observe` | foundation | Compact UI trees (compression, roles, stable keys, refs, rendering, diffs, opaque regions), screenshot processing; logs and crash reports next | ✅ partly |
-| `mdh-project` | foundation | `ProjectAdapter`; Gradle probing, building, diagnostics; later RN, Expo, Flutter, Xcode | M2 |
-| `mdh-control` | domain | Device selection, observation, input, app lifecycle ✅; session engine (refs across calls, targeting, waiting, diffs), state setup, navigation | M1, M3 |
-| `mdh-verify` | domain | Assertions, verdicts, evidence, flow record/replay, JUnit | M4 |
-| `mdh-visual` | domain | Baselines, structural and pixel diffs, cross-config layout checks, rule checks, design mocks | M5, M8 |
-| `mdh-perf` | domain | Startup, frames, memory, CPU, budgets, baselines; later traces | M6 |
-| `mdh-compat` | domain | Matrices, device pool and providers, config application, scheduling, matrix reports | M7, M8 |
-| `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | M1 |
+| `mdh-project` | foundation | Gradle probing, building, diagnostics, APK selection; later RN, Expo, Flutter, Xcode | ✅ |
+| `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
+| `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, baselines, flow record/replay, reports (JUnit), functional checks | M4 |
+| `mdh-visual` | check kind | UI consistency: structural and pixel comparison with baselines, cross-config layout checks, rule checks, design mocks | M5, M8 |
+| `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
+| `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
+| `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
 | `mobile-dev-harness` (`crates/mdh-cli`) | entry | CLI `mdh`, the only published binary | ✅ |
 
 `android-helper/` (Java) is the on-device half of `mdh-driver` (§10).
@@ -429,7 +437,11 @@ can't start, mdh falls back to `uiautomator dump`.
 
 **Later (M5):** window-change event stream (push instead of poll), screenshots through `UiAutomation`.
 
-## 11. Performance (`mdh-perf`)
+## 11. Performance checks (`mdh-perf`)
+
+A check kind (ADR-0009): it implements `Check`, runs on flows from the verification engine and reports measurements
+and budget results as findings.
+
 
 **Data sources** (all via adb, parsed by pure functions with fixtures):
 
@@ -452,7 +464,11 @@ devices. Perf checks are also exposed as assertion kinds for `mdh-verify`.
 
 **Later:** Perfetto traces around slow steps, summarized with trace processor to the slices that explain them.
 
-## 12. Compatibility (`mdh-compat`)
+## 12. Compatibility matrix (`mdh-compat`)
+
+Not a check kind (ADR-0009): it schedules (cell, flow) jobs whose checks — functional, UI, performance — are run by
+the verification engine, and aggregates the cells' verdicts.
+
 
 **Matrix model.** Axes from `mdh.yaml` expand into cells; a cell is a *device spec* (API level, form factor, vendor)
 plus a *configuration* (locale, font scale, night mode, density, size, orientation). Includes and excludes keep the
@@ -485,7 +501,11 @@ failures are clustered by signature (step, assertion, error code) so one bug isn
 **Vendors.** Vendor ROM differences (background restrictions, autostart, permission dialogs) only show on physical
 devices. Leases record manufacturer and ROM version, and a small knowledge base of known quirks turns them into hints.
 
-## 13. UI consistency (`mdh-visual`)
+## 13. UI consistency checks (`mdh-visual`)
+
+A check kind (ADR-0009): it implements `Check` and reports deviations and rule violations as findings, with
+screenshots and tree excerpts as evidence; baselines come from the engine's baseline store.
+
 
 **Inputs.** The compact tree (roles, labels, bounds, stable keys), a full-resolution screenshot (not the downscaled
 agent JPEG) and the screen density (`wm density`) to convert pixels to dp.

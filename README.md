@@ -72,13 +72,14 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine, organized as five quality domains (control is done; verify, UI consistency, performance and compatibility are planned) on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
+  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional, UI consistency, performance (planned) — and the compatibility matrix repeats them across devices and configurations (planned); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
 </picture>
 
 - **Two entry points, one engine.** Agents connect over MCP, people, CI and scripts use the CLI; both get the same
   compact text.
-- **Five quality domains on a shared foundation.** Control is done; the others build on it (see
-  [Status and roadmap](#status-and-roadmap)).
+- **Control, then verification.** Control (done) drives the app. On top of it, a verification engine runs flows
+  and pluggable check kinds — functional, UI consistency, performance — into one verdict, and the compatibility
+  matrix repeats all of it across devices and configurations (see [Status and roadmap](#status-and-roadmap)).
 - **A warm helper on the device.** `dev.mdh.helper` keeps an accessibility connection open, so reading the screen
   and injecting input take milliseconds; logcat feeds crash and error reports back into every result.
 
@@ -295,16 +296,18 @@ Test account: `alice@example.com` / `correct-horse`.
 ## Status and roadmap
 
 Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
-crash reports, the CLI and the MCP server. Planned, organized around five quality domains:
+crash reports, the CLI and the MCP server. Planned: verification as an engine with pluggable check kinds, and a
+matrix that repeats it across devices:
 
-| | Domain | What's planned |
+| | Layer | What's planned |
 |---|---|---|
 | ✅ | **Control** | Drive the app reliably (done) |
 | ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
-| ⏳ | **Verify** | Assertions, evidence-backed verdicts, recorded flows replayed as regression tests, Claude Code plugin |
-| ⏳ | **UI consistency** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
-| ⏳ | **Performance** | Startup time, jank, memory and CPU against baselines |
-| ⏳ | **Compatibility** | The same checks across Android versions, screen sizes, configurations and vendors |
+| ⏳ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests, baselines, reports, Claude Code plugin — with pluggable check kinds: |
+| ⏳ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? |
+| ⏳ | ↳ **UI consistency checks** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
+| ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
+| ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
 
 Details: [design overview](docs/DESIGN.md), [functional design](docs/design/01-functional.md),
