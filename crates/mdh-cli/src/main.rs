@@ -138,6 +138,9 @@ enum Command {
         /// Grant all runtime permissions on install
         #[arg(short, long)]
         grant: bool,
+        /// Uninstall first (replaces an app signed with another key; clears its data)
+        #[arg(long)]
+        reinstall: bool,
     },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
@@ -357,6 +360,7 @@ async fn run(
             variant,
             no_build,
             grant,
+            reinstall,
         } => {
             let options = RunOptions {
                 project,
@@ -364,14 +368,15 @@ async fn run(
                 variant,
                 build: !no_build,
                 grant,
+                reinstall,
             };
             let report = session.run(options, timings, show_task).await;
             if std::io::stderr().is_terminal() {
                 eprint!("\r\x1b[2K");
             }
-            let (data, error) = split(report);
+            let (mut data, error) = split(report);
             let error = error
-                .or_else(|| data.as_ref().and_then(RunReport::build_error))
+                .or_else(|| data.as_mut().and_then(RunReport::take_failure))
                 .or_else(|| data.as_ref().and_then(crash_error));
             finish(json, started, std::mem::take(timings), data, error)
         }

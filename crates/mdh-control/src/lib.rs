@@ -134,8 +134,20 @@ impl Control {
         self.driver.stop(&self.device, package).await
     }
 
-    pub async fn is_installed(&self, package: &str) -> Result<bool> {
-        self.driver.is_installed(&self.device, package).await
+    pub async fn uninstall(&self, package: &str) -> Result<()> {
+        self.driver.uninstall(&self.device, package).await
+    }
+
+    pub async fn abis(&self) -> Result<Vec<String>> {
+        self.driver.abis(&self.device).await
+    }
+
+    pub fn sdk_root(&self) -> Option<PathBuf> {
+        self.driver.sdk_root()
+    }
+
+    pub async fn installed_path(&self, package: &str) -> Result<Option<String>> {
+        self.driver.installed_path(&self.device, package).await
     }
 
     pub async fn install(&self, apk: &Path, grant_permissions: bool) -> Result<()> {

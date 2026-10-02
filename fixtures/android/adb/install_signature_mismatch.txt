@@ -1,0 +1,7 @@
+Serving...
+All files should be loaded. Notifying the device.
+Performing Incremental Install
+Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package dev.mdh.sample signatures do not match newer version; ignoring!]
+Performing Streamed Install
+adb: failed to install resigned.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package dev.mdh.sample signatures do not match newer version; ignoring!]
+

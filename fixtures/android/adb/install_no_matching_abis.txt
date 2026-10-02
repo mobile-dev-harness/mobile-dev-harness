@@ -1,0 +1,2 @@
+Performing Streamed Install
+adb: failed to install /work/mm/app/build/outputs/apk/free/debug/app-free-x86_64-debug.apk: Failure [INSTALL_FAILED_NO_MATCHING_ABIS: INSTALL_FAILED_NO_MATCHING_ABIS: Failed to extract native libraries, res=-113]

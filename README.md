@@ -207,7 +207,7 @@ Agents that only have a shell can use the CLI directly — every command takes `
 | Command | Description |
 |---|---|
 | `mdh doctor` | Check the toolchain and devices |
-| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]` | Build with Gradle, install if changed, restart the app, show its first screen |
+| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | Build with Gradle, install if changed (the right ABI split), restart the app, show its first screen; `--reinstall` replaces an app signed with another key |
 | `mdh devices` | List connected devices and emulators |
 | `mdh observe [--diff]` | The current screen; `--diff` shows only what changed since you last looked |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | Save a downscaled JPEG |

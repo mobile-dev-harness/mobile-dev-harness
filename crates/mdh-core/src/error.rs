@@ -90,8 +90,15 @@ pub enum Error {
     #[error("`{task}` failed with {errors} error(s)")]
     BuildFailed { task: String, errors: usize },
 
-    #[error("no built APK for variant `{variant}`")]
-    NoApk { variant: String },
+    #[error("no installable APK for `{variant}`: {reason}")]
+    NoApk { variant: String, reason: String },
+
+    #[error("install failed: {reason}{}", if detail.is_empty() { String::new() } else { format!(" ({detail})") })]
+    InstallFailed {
+        /// Android's code, e.g. `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+        reason: String,
+        detail: String,
+    },
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -122,6 +129,7 @@ impl Error {
             Error::UnknownBuildTarget { .. } => ErrorCode::UnknownBuildTarget,
             Error::BuildFailed { .. } => ErrorCode::BuildFailed,
             Error::NoApk { .. } => ErrorCode::NoApk,
+            Error::InstallFailed { .. } => ErrorCode::InstallFailed,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -191,7 +199,8 @@ impl Error {
             Error::BuildFailed { .. } => {
                 "fix the diagnostics in the output; the full Gradle log is listed there too".into()
             }
-            Error::NoApk { .. } => "build it first: run without --no-build".into(),
+            Error::NoApk { .. } => "build it first (run without --no-build), or build an APK for this device".into(),
+            Error::InstallFailed { reason, .. } => install_hint(reason).into(),
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -224,6 +233,7 @@ pub enum ErrorCode {
     UnknownBuildTarget,
     BuildFailed,
     NoApk,
+    InstallFailed,
     Io,
 }
 
@@ -253,6 +263,7 @@ impl ErrorCode {
             ErrorCode::UnknownBuildTarget => "UNKNOWN_BUILD_TARGET",
             ErrorCode::BuildFailed => "BUILD_FAILED",
             ErrorCode::NoApk => "NO_APK",
+            ErrorCode::InstallFailed => "INSTALL_FAILED",
             ErrorCode::Io => "IO",
         }
     }
@@ -278,8 +289,40 @@ impl ErrorCode {
             | ErrorCode::HelperUnavailable
             | ErrorCode::AppNotFound
             | ErrorCode::LaunchFailed
-            | ErrorCode::ProjectNotFound => 3,
+            | ErrorCode::ProjectNotFound
+            | ErrorCode::InstallFailed => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
+    }
+}
+
+/// What fixes Android's install failure codes (`pm` / `adb install`).
+fn install_hint(reason: &str) -> &'static str {
+    match reason {
+        "INSTALL_FAILED_UPDATE_INCOMPATIBLE" | "INSTALL_FAILED_SHARED_USER_INCOMPATIBLE" => {
+            "the installed app is signed with another key (built on another machine, or from a store); \
+             uninstall it first: `mdh run --reinstall` does that (and clears the app's data)"
+        }
+        "INSTALL_FAILED_VERSION_DOWNGRADE" => {
+            "a newer version is installed; `mdh run --reinstall` replaces it (and clears the app's data)"
+        }
+        "INSTALL_FAILED_NO_MATCHING_ABIS" => {
+            "the APK has no native code for this device's CPU (`adb shell getprop ro.product.cpu.abilist`); \
+             build that ABI or a universal APK"
+        }
+        "INSTALL_FAILED_OLDER_SDK" => {
+            "the app's minSdk is higher than this device's Android version; use a newer emulator or device"
+        }
+        "INSTALL_FAILED_INSUFFICIENT_STORAGE" => {
+            "the device is out of space; free some or wipe the emulator's data"
+        }
+        "INSTALL_FAILED_USER_RESTRICTED" | "INSTALL_FAILED_ABORTED" => {
+            "the device blocked or asked to confirm the install; on Xiaomi, OPPO, vivo and similar ROMs \
+             enable \"Install via USB\" in Developer options and accept the prompt on the device"
+        }
+        r if r.starts_with("INSTALL_PARSE_FAILED") => {
+            "the APK is unsigned or damaged; build a debug variant or configure signing"
+        }
+        _ => "see Android's PackageManager failure codes for this reason",
     }
 }

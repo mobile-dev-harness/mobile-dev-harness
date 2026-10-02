@@ -104,6 +104,7 @@ mod tests {
             UnknownBuildTarget,
             BuildFailed,
             NoApk,
+            InstallFailed,
             Io,
         ] {
             assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());

@@ -3,6 +3,7 @@
 mod adb;
 mod am;
 mod helper;
+mod install;
 mod logcat;
 mod sdk;
 mod uiautomator;
@@ -14,7 +15,8 @@ pub use sdk::AndroidSdk;
 pub use uiautomator::parse_hierarchy;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,6 +31,7 @@ const MAX_LOG_LINES: usize = 5000;
 
 pub struct AndroidDriver {
     adb: Adb,
+    sdk_root: Option<PathBuf>,
     /// Helpers already verified in this process, by device serial.
     helpers: Mutex<HashMap<String, Arc<Helper>>>,
 }
@@ -37,6 +40,7 @@ impl AndroidDriver {
     pub fn new(sdk: &AndroidSdk) -> Self {
         Self {
             adb: Adb::new(sdk.adb.clone()),
+            sdk_root: sdk.root.clone(),
             helpers: Mutex::default(),
         }
     }
@@ -181,15 +185,48 @@ impl Driver for AndroidDriver {
 
     async fn install(&self, device: &Device, apk: &Path, grant_permissions: bool) -> Result<()> {
         let apk = apk.to_string_lossy();
-        let mut args = vec!["install", "-r", "-t"];
+        // -d: debug builds may go back in version (e.g. after switching branches).
+        let mut args = vec!["install", "-r", "-t", "-d"];
         if grant_permissions {
             args.push("-g");
         }
         args.push(&apk);
-        self.adb
+        match self
+            .adb
             .on_with_timeout(&device.id, &args, Duration::from_secs(300))
             .await
-            .map(drop)
+        {
+            Err(Error::CommandFailed { stderr, .. })
+                if install::parse_failure(&stderr).is_some() =>
+            {
+                let (reason, detail) = install::parse_failure(&stderr).expect("checked");
+                Err(Error::InstallFailed { reason, detail })
+            }
+            other => other.map(drop),
+        }
+    }
+
+    async fn uninstall(&self, device: &Device, package: &str) -> Result<()> {
+        // Fails when the package isn't installed, which is fine here.
+        let _ = self.adb.on(&device.id, &["uninstall", package]).await;
+        Ok(())
+    }
+
+    async fn abis(&self, device: &Device) -> Result<Vec<String>> {
+        let out = self
+            .adb
+            .shell(&device.id, "getprop ro.product.cpu.abilist")
+            .await?;
+        Ok(out
+            .trim()
+            .split(',')
+            .filter(|a| !a.is_empty())
+            .map(str::to_owned)
+            .collect())
+    }
+
+    fn sdk_root(&self) -> Option<PathBuf> {
+        self.sdk_root.clone()
     }
 
     async fn launch(&self, device: &Device, app: &str) -> Result<LaunchInfo> {
@@ -221,13 +258,17 @@ impl Driver for AndroidDriver {
         am::parse_am_start(&component, &out)
     }
 
-    async fn is_installed(&self, device: &Device, package: &str) -> Result<bool> {
-        // `pm path` prints `package:/data/app/…` and exits with 1 when the package is unknown.
+    async fn installed_path(&self, device: &Device, package: &str) -> Result<Option<String>> {
+        // `pm path` prints `package:/data/app/~~…==/pkg-…==/base.apk` (plus split APKs) and exits
+        // with 1 when the package is unknown.
         let out = self
             .adb
             .shell_stdout(&device.id, &format!("pm path {}", shell_quote(package)))
             .await?;
-        Ok(out.lines().any(|l| l.starts_with("package:")))
+        Ok(out
+            .lines()
+            .find_map(|l| l.strip_prefix("package:"))
+            .map(|p| p.trim().to_owned()))
     }
 
     async fn clock_ms(&self, device: &Device) -> Result<u64> {

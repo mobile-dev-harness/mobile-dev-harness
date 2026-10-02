@@ -38,6 +38,8 @@ pub struct Diagnostic {
     pub notes: Vec<String>,
     /// The offending source line, when known (read from disk later for Kotlin).
     pub source: Option<String>,
+    /// What usually fixes this kind of failure, for well-known ones.
+    pub hint: Option<String>,
 }
 
 impl Diagnostic {
@@ -51,6 +53,7 @@ impl Diagnostic {
             message: message.into(),
             notes: Vec::new(),
             source: None,
+            hint: None,
         }
     }
 }
@@ -78,6 +81,7 @@ pub fn parse(output: &str) -> Vec<Diagnostic> {
         i += consumed.max(1);
     }
     out.extend(dependencies(output));
+    out.extend(duplicate_classes(output));
     if !out.iter().any(|d| d.severity == Severity::Error) {
         out.extend(what_went_wrong(output));
     }
@@ -95,6 +99,11 @@ fn kotlin(line: &str) -> Option<Diagnostic> {
         Some(r) => (Severity::Error, r),
         None => (Severity::Warning, line.strip_prefix("w: ")?),
     };
+    // Annotation processors prefix their messages: `e: [ksp] /…/Foo.kt:12: message`.
+    let rest = rest
+        .strip_prefix("[ksp] ")
+        .or_else(|| rest.strip_prefix("[kapt] "))
+        .unwrap_or(rest);
     let rest = rest.strip_prefix("file://").unwrap_or(rest);
     let (location, message) = rest.split_once(' ')?;
     let mut parts = location.rsplitn(3, ':');
@@ -265,7 +274,80 @@ fn what_went_wrong(output: &str) -> Option<Diagnostic> {
         .map(|l| l.trim_start_matches("> ").to_owned())
         .take(6)
         .collect();
+    d.hint = known_fix(&output[start..end]);
     Some(d)
+}
+
+/// Fixes for failures whose cause is the environment rather than the code.
+fn known_fix(text: &str) -> Option<String> {
+    let fix = if text.contains("SDK location not found") {
+        "point ANDROID_HOME, or sdk.dir in local.properties, at the Android SDK"
+    } else if text.contains("requires Java")
+        || text.contains("Unsupported class file major version")
+        || text.contains("incompatible with the Java")
+    {
+        "the build needs another JDK: set JAVA_HOME (or org.gradle.java.home in gradle.properties) to the version the message names"
+    } else if text.contains("licences have not been accepted")
+        || text.contains("licenses have not been accepted")
+    {
+        "accept the SDK licenses: `sdkmanager --licenses`"
+    } else if text.contains("Could not GET")
+        || text.contains("Connection refused")
+        || text.contains("UnknownHostException")
+        || text.contains("Read timed out")
+    {
+        "a repository was unreachable: check the network or proxy, or build with --offline if the cache is warm"
+    } else {
+        return None;
+    };
+    Some(fix.to_owned())
+}
+
+/// `Duplicate class X found in modules a.aar -> a-runtime (g:a:1) and b.aar -> b-runtime (g:b:2)`,
+/// once per class (dozens per conflict): one diagnostic per pair of artifacts.
+fn duplicate_classes(output: &str) -> Vec<Diagnostic> {
+    let mut pairs: Vec<((String, String), String, usize)> = Vec::new();
+    for line in output.lines() {
+        let Some(rest) = line
+            .trim_start_matches([' ', '>'])
+            .strip_prefix("Duplicate class ")
+        else {
+            continue;
+        };
+        let Some((class, modules)) = rest.split_once(" found in modules ") else {
+            continue;
+        };
+        let coordinates: Vec<&str> = modules
+            .split('(')
+            .skip(1)
+            .filter_map(|p| p.split_once(')').map(|(c, _)| c))
+            .collect();
+        let [a, b] = coordinates[..] else { continue };
+        let key = (a.to_owned(), b.to_owned());
+        match pairs.iter_mut().find(|(k, ..)| *k == key) {
+            Some((_, _, n)) => *n += 1,
+            None => pairs.push((key, class.to_owned(), 1)),
+        }
+    }
+    pairs
+        .into_iter()
+        .map(|((a, b), example, n)| {
+            let mut d = Diagnostic::new(
+                DiagnosticKind::Dependency,
+                Severity::Error,
+                format!("{n} duplicate classes in {a} and {b}, e.g. {example}"),
+            );
+            d.hint = Some(
+                if a.starts_with("com.android.support:") || b.starts_with("com.android.support:") {
+                    "a dependency still uses the old Android Support Library: set android.enableJetifier=true in gradle.properties, or replace it with its AndroidX version"
+                } else {
+                    "two dependencies ship the same classes: exclude one of them or align their versions"
+                }
+                .to_owned(),
+            );
+            d
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -353,6 +435,48 @@ mod tests {
         assert_eq!(d.len(), 1, "{d:#?}");
         assert_eq!(d[0].message, "could not find androidx.core:core-ktx:99.0.0");
         assert_eq!(d[0].notes, ["required by root project 'mdh-sample'"]);
+    }
+
+    #[test]
+    fn duplicate_classes_are_grouped_per_pair() {
+        // 27 "Duplicate class" lines, from two pairs of artifacts.
+        let d = errors("duplicate_classes");
+        assert_eq!(d.len(), 2, "{d:#?}");
+        assert!(d[0].message.starts_with("13 duplicate classes in androidx.core:core:1.16.0 and com.android.support:support-compat:28.0.0"));
+        assert!(
+            d[1].message
+                .starts_with("14 duplicate classes in androidx.versionedparcelable")
+        );
+        assert!(
+            d.iter()
+                .all(|x| x.hint.as_deref().unwrap().contains("enableJetifier"))
+        );
+    }
+
+    #[test]
+    fn sdk_not_found_gets_a_fix() {
+        let d = errors("sdk_not_found");
+        assert_eq!(d.len(), 1, "{d:#?}");
+        assert_eq!(d[0].kind, DiagnosticKind::Gradle);
+        assert!(d[0].notes[0].starts_with("SDK location not found"));
+        assert!(d[0].hint.as_deref().unwrap().contains("ANDROID_HOME"));
+    }
+
+    #[test]
+    fn annotation_processor_and_jdk_failures() {
+        // Synthetic: shapes of KSP output and of AGP's JDK check.
+        let ksp = parse("e: [ksp] /work/app/src/main/kotlin/Dao.kt:12: Missing @Query on getAll\n");
+        assert_eq!(
+            ksp[0].file.as_deref(),
+            Some("/work/app/src/main/kotlin/Dao.kt")
+        );
+        assert_eq!(ksp[0].line, Some(12));
+        assert_eq!(ksp[0].message, "Missing @Query on getAll");
+
+        let jdk = parse(
+            "* What went wrong:\nAn exception occurred applying plugin request [id: 'com.android.application']\n> Android Gradle plugin requires Java 17 to run. You are currently using Java 11.\n\n* Try:\n",
+        );
+        assert!(jdk[0].hint.as_deref().unwrap().contains("JAVA_HOME"));
     }
 
     #[test]

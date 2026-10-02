@@ -24,6 +24,7 @@ const SKIPPED_DIRS: &[&str] = &["build", ".gradle", ".git", ".idea", ".mdh", "no
 pub struct GradleProject {
     root: PathBuf,
     gradle: PathBuf,
+    env: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,11 +50,64 @@ pub struct Variant {
     pub build_type: Option<String>,
 }
 
+/// The APKs AGP wrote for one variant: a single one, or one per ABI split plus maybe a
+/// universal one.
+#[derive(Debug, Clone, Serialize)]
+pub struct ApkSet {
+    pub application_id: String,
+    pub outputs: Vec<ApkOutput>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ApkOutput {
+    pub path: PathBuf,
+    /// Empty for a single or universal APK.
+    pub abis: Vec<String>,
+    pub version_name: Option<String>,
+}
+
+/// The APK chosen for a device.
 #[derive(Debug, Clone, Serialize)]
 pub struct Apk {
     pub path: PathBuf,
     pub application_id: String,
     pub version_name: Option<String>,
+    pub abi: Option<String>,
+}
+
+impl ApkSet {
+    /// The APK for a device supporting `device_abis` (preferred first): its ABI split, else a
+    /// universal APK. An empty list (unknown device) takes the universal or first APK.
+    pub fn select(&self, device_abis: &[String]) -> Result<Apk> {
+        let pick = |o: &ApkOutput, abi: Option<&String>| Apk {
+            path: o.path.clone(),
+            application_id: self.application_id.clone(),
+            version_name: o.version_name.clone(),
+            abi: abi.cloned(),
+        };
+        for abi in device_abis {
+            if let Some(o) = self.outputs.iter().find(|o| o.abis.contains(abi)) {
+                return Ok(pick(o, Some(abi)));
+            }
+        }
+        if let Some(o) = self.outputs.iter().find(|o| o.abis.is_empty()) {
+            return Ok(pick(o, None));
+        }
+        if device_abis.is_empty() {
+            if let Some(o) = self.outputs.first() {
+                return Ok(pick(o, None));
+            }
+        }
+        let built: Vec<String> = self.outputs.iter().flat_map(|o| o.abis.clone()).collect();
+        Err(Error::NoApk {
+            variant: self.application_id.clone(),
+            reason: format!(
+                "the device supports {} but the build only has {}; add its ABI or enable a universal APK",
+                device_abis.join(", "),
+                built.join(", ")
+            ),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,7 +117,7 @@ pub struct BuildOutcome {
     pub duration_ms: u64,
     /// Every task was up to date: nothing changed since the last build.
     pub up_to_date: bool,
-    pub apk: Option<Apk>,
+    pub apks: Option<ApkSet>,
     pub errors: usize,
     pub warnings: usize,
     /// Errors first, in order of appearance; paths relative to the project root.
@@ -96,7 +150,23 @@ impl GradleProject {
         } else {
             PathBuf::from("gradle")
         };
-        Ok(Self { root, gradle })
+        Ok(Self {
+            root,
+            gradle,
+            env: Vec::new(),
+        })
+    }
+
+    /// Points Gradle at `sdk` when the environment doesn't name one, so a missing `local.properties`
+    /// doesn't fail the build (`sdk.dir` there still wins).
+    pub fn with_android_sdk(mut self, sdk: &Path) -> Self {
+        if std::env::var_os("ANDROID_HOME").is_none()
+            && std::env::var_os("ANDROID_SDK_ROOT").is_none()
+        {
+            self.env
+                .push(("ANDROID_HOME".into(), sdk.display().to_string()));
+        }
+        self
     }
 
     pub fn root(&self) -> &Path {
@@ -132,6 +202,7 @@ impl GradleProject {
         ];
         let output = Command::new(&self.gradle)
             .args(args)
+            .envs(self.env.iter().cloned())
             .current_dir(&self.root)
             .kill_on_drop(true)
             .output()
@@ -172,6 +243,7 @@ impl GradleProject {
         let mut log_file = tokio::fs::File::create(log).await?;
         let mut child = Command::new(&self.gradle)
             .args([task.as_str(), "--console=plain"])
+            .envs(self.env.iter().cloned())
             .current_dir(&self.root)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -237,8 +309,8 @@ impl GradleProject {
             .count();
         let ok = status.success();
         Ok(BuildOutcome {
-            apk: if ok {
-                find_apk(&app.dir, &variant.name)
+            apks: if ok {
+                find_apks(&app.dir, &variant.name)
             } else {
                 None
             },
@@ -437,8 +509,9 @@ fn all_up_to_date(output: &str) -> bool {
     })
 }
 
-/// The APK AGP wrote for `variant`, from its `output-metadata.json`.
-pub fn find_apk(module_dir: &Path, variant: &str) -> Option<Apk> {
+/// The APKs AGP wrote for `variant`, from its `output-metadata.json` (the same format, version 3,
+/// on AGP 7.4, 8.7 and 9.2).
+pub fn find_apks(module_dir: &Path, variant: &str) -> Option<ApkSet> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Metadata {
@@ -451,6 +524,14 @@ pub fn find_apk(module_dir: &Path, variant: &str) -> Option<Apk> {
     struct Element {
         output_file: String,
         version_name: Option<String>,
+        #[serde(default)]
+        filters: Vec<Filter>,
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Filter {
+        filter_type: String,
+        value: String,
     }
 
     let mut stack = vec![module_dir.join("build/outputs/apk")];
@@ -470,11 +551,23 @@ pub fn find_apk(module_dir: &Path, variant: &str) -> Option<Apk> {
                     continue;
                 };
                 if meta.variant_name == variant {
-                    let element = meta.elements.into_iter().next()?;
-                    return Some(Apk {
-                        path: dir.join(element.output_file),
+                    let outputs = meta
+                        .elements
+                        .into_iter()
+                        .map(|e| ApkOutput {
+                            path: dir.join(&e.output_file),
+                            abis: e
+                                .filters
+                                .into_iter()
+                                .filter(|f| f.filter_type == "ABI")
+                                .map(|f| f.value)
+                                .collect(),
+                            version_name: e.version_name,
+                        })
+                        .collect();
+                    return Some(ApkSet {
                         application_id: meta.application_id,
-                        version_name: element.version_name,
+                        outputs,
                     });
                 }
             }
@@ -532,6 +625,48 @@ mod tests {
         );
         let err = m.select(Some(":lib"), None).unwrap_err();
         assert!(matches!(err, Error::UnknownBuildTarget { .. }));
+    }
+
+    #[test]
+    fn abi_splits_pick_the_device_abi_then_universal() {
+        let dir = std::env::temp_dir().join(format!("mdh-apks-{}", std::process::id()));
+        let out = dir.join("build/outputs/apk/free/debug");
+        std::fs::create_dir_all(&out).unwrap();
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fixtures/android/gradle/output_metadata_abi_splits.json"
+        );
+        std::fs::copy(fixture, out.join("output-metadata.json")).unwrap();
+
+        let set = find_apks(&dir, "freeDebug").expect("metadata found");
+        assert_eq!(set.outputs.len(), 3);
+        let arm = set.select(&["arm64-v8a".into()]).unwrap();
+        assert!(
+            arm.path.ends_with("app-free-arm64-v8a-debug.apk"),
+            "{:?}",
+            arm.path
+        );
+        let other = set.select(&["riscv64".into()]).unwrap();
+        assert!(
+            other.path.ends_with("app-free-universal-debug.apk"),
+            "{:?}",
+            other.path
+        );
+
+        let splits_only = ApkSet {
+            outputs: set
+                .outputs
+                .iter()
+                .filter(|o| !o.abis.is_empty())
+                .cloned()
+                .collect(),
+            ..set.clone()
+        };
+        assert!(matches!(
+            splits_only.select(&["riscv64".into()]),
+            Err(Error::NoApk { .. })
+        ));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

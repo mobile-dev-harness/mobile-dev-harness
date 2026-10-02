@@ -2,7 +2,7 @@
 //!
 //! Gradle today (functional design F2): find the build, probe its application modules and
 //! variants with an injected init script (cached per build-file hash), build incrementally, parse
-//! failures into structured diagnostics and locate the APK. React Native, Expo, Flutter and Xcode
+//! failures into structured diagnostics and locate the APKs. React Native, Expo, Flutter and Xcode
 //! adapters come later; a common trait is introduced with the second one.
 
 pub mod diagnostics;
@@ -11,6 +11,7 @@ mod render;
 
 pub use diagnostics::{Diagnostic, DiagnosticKind, Severity};
 pub use gradle::{
-    Apk, AppModule, BuildOutcome, GradleProject, ProjectModel, Variant, assemble_task, find_apk,
+    Apk, ApkOutput, ApkSet, AppModule, BuildOutcome, GradleProject, ProjectModel, Variant,
+    assemble_task, find_apks,
 };
 pub use render::render_build;

@@ -1,0 +1,64 @@
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :generateDebugResources UP-TO-DATE
+> Task :packageDebugResources UP-TO-DATE
+> Task :processDebugNavigationResources UP-TO-DATE
+> Task :parseDebugLocalResources UP-TO-DATE
+> Task :generateDebugRFile UP-TO-DATE
+> Task :javaPreCompileDebug UP-TO-DATE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :mergeDebugAssets UP-TO-DATE
+> Task :compressDebugAssets UP-TO-DATE
+> Task :generateDebugGlobalSynthetics UP-TO-DATE
+> Task :desugarDebugFileDependencies UP-TO-DATE
+> Task :checkDebugAarMetadata UP-TO-DATE
+> Task :mapDebugSourceSetPaths UP-TO-DATE
+> Task :compileDebugNavigationResources UP-TO-DATE
+> Task :checkDebugDuplicateClasses FAILED
+> Task :mergeDebugResources
+> Task :compileDebugKotlin
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':checkDebugDuplicateClasses'.
+> A failure occurred while executing com.android.build.gradle.internal.tasks.CheckDuplicatesRunnable
+   > Duplicate class android.support.v4.app.INotificationSideChannel found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.app.INotificationSideChannel$Stub found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.app.INotificationSideChannel$Stub$Proxy found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.graphics.drawable.IconCompatParcelizer found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.IResultReceiver found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.IResultReceiver$Stub found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.IResultReceiver$Stub$Proxy found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.ResultReceiver found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.ResultReceiver$1 found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.ResultReceiver$MyResultReceiver found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class android.support.v4.os.ResultReceiver$MyRunnable found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class androidx.core.graphics.drawable.IconCompatParcelizer found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class androidx.core.internal.package-info found in modules core-1.16.0.aar -> core-1.16.0-runtime (androidx.core:core:1.16.0) and support-compat-28.0.0.aar -> support-compat-28.0.0-runtime (com.android.support:support-compat:28.0.0)
+     Duplicate class androidx.versionedparcelable.CustomVersionedParcelable found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.NonParcelField found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.ParcelField found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.ParcelImpl found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.ParcelImpl$1 found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.ParcelUtils found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcel found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcel$1 found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcel$ParcelException found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcelParcel found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcelStream found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcelStream$FieldBuffer found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcelable found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     Duplicate class androidx.versionedparcelable.VersionedParcelize found in modules versionedparcelable-1.1.1.aar -> versionedparcelable-1.1.1-runtime (androidx.versionedparcelable:versionedparcelable:1.1.1) and versionedparcelable-28.0.0.aar -> versionedparcelable-28.0.0-runtime (com.android.support:versionedparcelable:28.0.0)
+     
+     Learn how to fix dependency resolution errors at https://d.android.com/r/tools/classpath-sync-errors
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 7s
+16 actionable tasks: 3 executed, 13 up-to-date

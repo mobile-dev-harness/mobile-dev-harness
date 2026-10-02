@@ -199,7 +199,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | 命令 | 说明 |
 |---|---|
 | `mdh doctor` | 检查工具链和设备 |
-| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]` | 用 Gradle 构建，有变化才安装，重启 App 并显示第一个界面 |
+| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | 用 Gradle 构建，有变化才安装（自动选择匹配设备 ABI 的 APK），重启 App 并显示第一个界面；`--reinstall` 用于替换由另一把密钥签名的旧版本 |
 | `mdh devices` | 列出已连接的设备和模拟器 |
 | `mdh observe [--diff]` | 当前屏幕；`--diff` 只显示自上次查看以来的变化 |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | 保存一张缩小后的 JPEG 截图 |

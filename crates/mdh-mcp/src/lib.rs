@@ -169,6 +169,8 @@ pub struct RunParams {
     pub build: Option<bool>,
     /// Grant all runtime permissions on install.
     pub grant: Option<bool>,
+    /// Uninstall first: replaces an app signed with another key or a newer version; clears its data.
+    pub reinstall: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -344,6 +346,7 @@ impl MdhServer {
             variant: p.variant,
             build: p.build.unwrap_or(true),
             grant: p.grant.unwrap_or(false),
+            reinstall: p.reinstall.unwrap_or(false),
         };
         // Gradle task lines become progress notifications, at most two per second.
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -375,7 +378,7 @@ impl MdhServer {
             let _ = progress.await;
         }
         Ok(match result {
-            Ok(report) => match report.build_error() {
+            Ok(mut report) => match report.take_failure() {
                 Some(e) => CallToolResult::error(vec![ContentBlock::text(format!(
                     "{}\n\n{}",
                     report.text,

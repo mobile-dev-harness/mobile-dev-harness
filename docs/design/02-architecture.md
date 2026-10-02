@@ -324,8 +324,9 @@ configure-on-demand are turned off for the probe so every module is configured. 
 `.mdh/cache/gradle-model.json`, keyed by a hash of every settings, build, `gradle.properties`, version catalog and
 wrapper file, so Gradle only runs when one of them changes.
 
-Verified on AGP 9.2.1 with a single-module app and a two-module build with product flavors (library modules are
-skipped; `applicationIdSuffix` is applied). Older AGP versions still need a test matrix.
+Verified on AGP 7.4.2, 8.7.3 and 9.2.1 (Gradle 7.6.4, 8.9, 9.4.1) with a single-module app and a two-module build
+with product flavors: library modules are skipped and `applicationIdSuffix` is applied. AGP before 7.0 has no
+`androidComponents` and isn't supported.
 
 Selection: the only application module, or `--module`; the `debug` variant, or the only variant of build type
 debug, or `--variant`. Several candidates are an `AMBIGUOUS_BUILD_TARGET` listing them (exit 2).
@@ -336,8 +337,13 @@ debug, or `--variant`. Several candidates are an `AMBIGUOUS_BUILD_TARGET` listin
   line by line into `.mdh/runs/<time>-build/build.log` (the latest 20 are kept). `> Task` lines feed progress:
   the CLI shows the running task on a terminal, the MCP server sends progress notifications (at most two per
   second) when the client provides a progress token.
-- The APK and its application id come from AGP's `output-metadata.json` under `<module>/build/outputs/apk/`, not
-  from guessing output paths.
+- The APKs and their application id come from AGP's `output-metadata.json` under `<module>/build/outputs/apk/`
+  (format version 3 on all three AGP versions), not from guessing output paths. With ABI splits there is one APK
+  per ABI plus maybe a universal one; `run` installs the split for the device's preferred ABI
+  (`ro.product.cpu.abilist`), else the universal APK, else fails with `NO_APK` naming both sides. Taking the first
+  element would install an x86_64 split on an arm64 device (`INSTALL_FAILED_NO_MATCHING_ABIS`, observed).
+- When neither `ANDROID_HOME` nor `ANDROID_SDK_ROOT` is set, Gradle gets the SDK mdh found as `ANDROID_HOME`, so a
+  project without `local.properties` still builds (`sdk.dir` still wins when present).
 - "Up to date" means Gradle's summary reports every task up to date.
 
 ### 8.3 Diagnostics
@@ -352,17 +358,25 @@ Parsers are pure functions over the captured output, tested with real failures o
 | Resources | `dev.mdh.sample-main-38:/layout/x.xml:33: error: …` | the prefix is a resource set (`<package>-<source set>-<n>`), mapped back to `src/<source set>/res/…` |
 | Manifest | `/…/AndroidManifest.xml Error:` then tab-indented message and suggestions | suggestions are kept as notes |
 | Dependencies | `Could not find group:artifact:version.`, repeated once per dependency path | reported once, with the first `Required by` |
-| Anything else | the `* What went wrong:` paragraph | only when nothing more specific explains the failure |
+| Duplicate classes | `Duplicate class X found in modules a (g:a:1) and b (g:b:2)`, once per class | one diagnostic per pair of artifacts with a count; Jetifier hint when one side is the old Support Library |
+| KSP / kapt | `e: [ksp] /…/Foo.kt:12: message` | the prefix is stripped, then parsed like Kotlin |
+| Anything else | the `* What went wrong:` paragraph | only when nothing more specific explains the failure; a hint for known environment causes (SDK location, JDK version, SDK licenses, unreachable repositories) |
 
 Gradle repeats compiler output under `* What went wrong:`; duplicates are dropped. Paths are reported relative to
 the project root. The report shows up to eight errors, each with its source line, and points to the full log.
 
 ### 8.4 `run`
 
-Probe (cached) → select → build → install when the APK's hash differs from the last install or the package is
-missing (`pm path`) → force-stop and launch, with the log cursor started first so a crash during startup is
+Probe (cached) → select → build → choose the APK for the device's ABI → install with `-r -t -d` (`-d` lets debug
+builds go back in version) unless this exact APK is what `run` installed last *and* the device still has that
+install (`pm path` changes with every install, so an install by someone else is noticed) → force-stop and launch, with the log cursor started first so a crash during startup is
 reported → settle (splash screens, first loads) → observe. A failed build stops after the build report and
-returns `BUILD_FAILED` (exit 4) next to it.
+returns `BUILD_FAILED` (exit 4) next to it; a later failure reports the steps that succeeded and then the error.
+
+Install failures are parsed from `Failure [INSTALL_FAILED_…: detail]` (adb may print a failed incremental attempt
+first; the last failure counts) into `INSTALL_FAILED` (exit 3) with a fix per code: another signing key or a
+newer version → `--reinstall` (uninstalls first, clearing the app's data, so never implicit); missing ABI;
+minSdk too high; no space; installs blocked or awaiting confirmation on vendor ROMs; unsigned APKs.
 
 Measured on the sample app: first run 6.3 s (probe 0.9, build 2.7, install 0.8, launch 1.5); nothing changed:
 build "up to date" in 0.8 s and the install skipped; a one-line edit to the visible screen 3.2 s end to end.

@@ -6,10 +6,10 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use mdh_core::output::{Timings, millis};
 use mdh_core::{Error, LaunchInfo, Result};
-use mdh_project::{BuildOutcome, GradleProject, find_apk, render_build};
+use mdh_project::{ApkSet, BuildOutcome, GradleProject, find_apks, render_build};
 use serde::Serialize;
 
-use crate::session::{Observation, Session};
+use crate::session::{Installed, Observation, Session};
 use crate::settle::settle;
 use crate::text::launch_text;
 
@@ -28,9 +28,14 @@ pub struct RunOptions {
     pub build: bool,
     /// Grant all runtime permissions on install.
     pub grant: bool,
+    /// Uninstall first: replaces an app signed with another key or a newer version, and clears
+    /// its data.
+    pub reinstall: bool,
 }
 
-#[derive(Debug, Serialize)]
+/// What `run` did, step by step. When a step fails, the steps before it are still reported and
+/// the error is in `failure`.
+#[derive(Debug, Default, Serialize)]
 pub struct RunReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build: Option<BuildOutcome>,
@@ -42,16 +47,22 @@ pub struct RunReport {
     pub observation: Option<Observation>,
     /// The compact text form agents read.
     pub text: String,
+    /// The failed step's error; reported through the output envelope, not serialized here.
+    #[serde(skip)]
+    pub failure: Option<Error>,
 }
 
 impl RunReport {
-    /// Set when the build failed; the report then stops after the build.
-    pub fn build_error(&self) -> Option<Error> {
-        let b = self.build.as_ref()?;
-        (!b.ok).then(|| Error::BuildFailed {
-            task: b.task.clone(),
-            errors: b.errors,
-        })
+    /// Takes the error of the step that failed, if any (a failed build included).
+    pub fn take_failure(&mut self) -> Option<Error> {
+        self.failure.take()
+    }
+
+    fn push(&mut self, line: impl AsRef<str>) {
+        if !self.text.is_empty() {
+            self.text.push('\n');
+        }
+        self.text.push_str(line.as_ref());
     }
 }
 
@@ -59,6 +70,8 @@ impl RunReport {
 pub struct InstallReport {
     pub package: String,
     pub apk: PathBuf,
+    /// The ABI split installed, when the build has splits.
+    pub abi: Option<String>,
     /// False when the same APK was already installed.
     pub installed: bool,
     pub duration_ms: u64,
@@ -66,69 +79,115 @@ pub struct InstallReport {
 
 impl Session {
     /// Builds the app, installs it if it changed, restarts it and reports its first settled
-    /// screen. `on_task` receives Gradle's `> Task` lines as they happen.
+    /// screen. `on_task` receives Gradle's `> Task` lines as they happen. Errors before anything
+    /// ran (no project, ambiguous variant, …) are returned as `Err`; later ones in the report.
     pub async fn run(
         &mut self,
         options: RunOptions,
         timings: &mut Timings,
         on_task: impl FnMut(&str),
     ) -> Result<RunReport> {
-        let project = GradleProject::find(&options.project)?;
+        let mut project = GradleProject::find(&options.project)?;
+        if let Some(sdk) = self.control.sdk_root() {
+            project = project.with_android_sdk(&sdk);
+        }
         let mdh_dir = project.root().join(".mdh");
         let probing = Instant::now();
         let model = project.model(&mdh_dir.join("cache")).await?;
         timings.record("probe", probing);
         let (app, variant) = model.select(options.module.as_deref(), options.variant.as_deref())?;
 
-        let mut text = Vec::new();
-        let (build, apk) = if options.build {
+        let mut report = RunReport::default();
+        let apks = if options.build {
             let building = Instant::now();
             let log = new_run_dir(&mdh_dir.join("runs"))?.join("build.log");
             let outcome = project.build(app, variant, &log, on_task).await?;
             timings.record("build", building);
-            text.push(render_build(&outcome, project.root()));
+            report.push(render_build(&outcome, project.root()));
             if !outcome.ok {
-                return Ok(RunReport {
-                    build: Some(outcome),
-                    install: None,
-                    launch: None,
-                    observation: None,
-                    text: text.join("\n"),
+                report.failure = Some(Error::BuildFailed {
+                    task: outcome.task.clone(),
+                    errors: outcome.errors,
                 });
+                report.build = Some(outcome);
+                return Ok(report);
             }
-            let apk = outcome.apk.clone();
-            (Some(outcome), apk)
+            let apks = outcome.apks.clone();
+            report.build = Some(outcome);
+            apks
         } else {
-            (None, find_apk(&app.dir, &variant.name))
+            find_apks(&app.dir, &variant.name)
         };
-        let apk = apk.ok_or_else(|| Error::NoApk {
+
+        let apks = apks.ok_or_else(|| Error::NoApk {
             variant: variant.name.clone(),
-        })?;
+            reason: "no build output found".into(),
+        });
+        if let Err(e) = async { self.deploy(apks?, &options, &mut report, timings).await }.await {
+            report.failure = Some(e);
+        }
+        Ok(report)
+    }
+
+    /// Install (when changed), restart, settle, observe; each step lands in `report` as it ends.
+    async fn deploy(
+        &mut self,
+        apks: ApkSet,
+        options: &RunOptions,
+        report: &mut RunReport,
+        timings: &mut Timings,
+    ) -> Result<()> {
+        let apk = apks.select(&self.control.abis().await?)?;
+        let package = apk.application_id.clone();
 
         let installing = Instant::now();
-        let package = apk.application_id.clone();
+        if options.reinstall {
+            self.control.uninstall(&package).await?;
+            self.state.installed.remove(&package);
+        }
         let hash = file_hash(&apk.path)?;
-        let unchanged = self.state.installed.get(&package) == Some(&hash)
-            && self.control.is_installed(&package).await?;
+        // Unchanged only if this exact APK is what we installed and nobody reinstalled since.
+        let on_device = self.control.installed_path(&package).await?;
+        let unchanged = matches!(
+            (self.state.installed.get(&package), &on_device),
+            (Some(last), Some(path)) if last.apk_hash == hash && last.device_path == *path
+        );
         if !unchanged {
-            self.control.install(&apk.path, options.grant).await?;
-            self.state.installed.insert(package.clone(), hash);
+            if let Err(e) = self.control.install(&apk.path, options.grant).await {
+                report.push(format!("install {package} → failed"));
+                return Err(e);
+            }
+            if let Some(device_path) = self.control.installed_path(&package).await? {
+                self.state.installed.insert(
+                    package.clone(),
+                    Installed {
+                        apk_hash: hash,
+                        device_path,
+                    },
+                );
+            }
         }
         timings.record("install", installing);
-        text.push(if unchanged {
-            format!("install {package} → skipped, unchanged")
+        let abi = apk
+            .abi
+            .as_deref()
+            .map(|a| format!(" [{a}]"))
+            .unwrap_or_default();
+        report.push(if unchanged {
+            format!("install {package}{abi} → skipped, unchanged")
         } else {
             format!(
-                "install {package} → ok ({:.1} s)",
+                "install {package}{abi} → ok ({:.1} s)",
                 millis(installing) as f64 / 1000.0
             )
         });
-        let install = InstallReport {
+        report.install = Some(InstallReport {
             package: package.clone(),
             apk: apk.path.clone(),
+            abi: apk.abi.clone(),
             installed: !unchanged,
             duration_ms: millis(installing),
-        };
+        });
 
         // A fresh start, like an IDE's Run, with the log cursor set first so a crash during
         // startup is reported.
@@ -137,7 +196,8 @@ impl Session {
         self.control.stop(&package).await?;
         let launch = self.launch(&package).await?;
         timings.record("launch", launching);
-        text.push(launch_text(&launch));
+        report.push(launch_text(&launch));
+        report.launch = Some(launch);
 
         // Splash screens and first loads: wait until the app's first screen has settled.
         let settled = settle(&self.control, timings, None).await?;
@@ -145,15 +205,9 @@ impl Session {
         let observation = self
             .observation_from(settled.snapshot, entries, false)
             .await?;
-        text.push(observation.text.clone());
-
-        Ok(RunReport {
-            build,
-            install: Some(install),
-            launch: Some(launch),
-            observation: Some(observation),
-            text: text.join("\n"),
-        })
+        report.push(&observation.text);
+        report.observation = Some(observation);
+        Ok(())
     }
 }
 

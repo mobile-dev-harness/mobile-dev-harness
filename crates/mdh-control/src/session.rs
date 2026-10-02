@@ -19,7 +19,7 @@ use crate::target::{Resolved, Target, resolve, selector_for};
 use crate::{Control, Snapshot};
 
 /// Bump when the persisted shape changes; older files are discarded.
-const STATE_VERSION: u32 = 1;
+const STATE_VERSION: u32 = 2;
 const MAX_SCROLLS: usize = 10;
 const FOCUS_TIMEOUT: Duration = Duration::from_secs(1);
 const WAIT_POLL: Duration = Duration::from_millis(200);
@@ -50,9 +50,16 @@ pub(crate) struct State {
     /// even when another app or the launcher is in front.
     #[serde(default)]
     app: Option<String>,
-    /// Package → hash of the APK `run` last installed, to skip unchanged installs.
+    /// Package → what `run` last installed, to skip unchanged installs.
     #[serde(default)]
-    pub(crate) installed: HashMap<String, u64>,
+    pub(crate) installed: HashMap<String, Installed>,
+}
+
+/// An install made by `run`: the APK's hash and where it landed on the device.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Installed {
+    pub(crate) apk_hash: u64,
+    pub(crate) device_path: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

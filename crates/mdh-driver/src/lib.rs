@@ -3,7 +3,8 @@
 pub mod android;
 mod process;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -35,9 +36,24 @@ pub trait Driver: Send + Sync {
 
     async fn stop(&self, device: &Device, package: &str) -> Result<()>;
 
-    /// Whether `package` is installed on the device.
-    async fn is_installed(&self, _device: &Device, _package: &str) -> Result<bool> {
-        Ok(false)
+    /// Where `package`'s APK lives on the device, `None` when it isn't installed. Every install
+    /// gets a new path, so it also tells whether someone else reinstalled the app.
+    async fn installed_path(&self, _device: &Device, _package: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
+    async fn uninstall(&self, _device: &Device, _package: &str) -> Result<()> {
+        Ok(())
+    }
+
+    /// Supported ABIs, preferred first (e.g. `arm64-v8a`); empty when unknown.
+    async fn abis(&self, _device: &Device) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// The platform SDK the driver uses, so builds can be pointed at the same one.
+    fn sdk_root(&self) -> Option<PathBuf> {
+        None
     }
 
     /// The device clock in Unix milliseconds. Log cursors use it, never the host clock.
