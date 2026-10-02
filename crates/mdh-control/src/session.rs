@@ -6,10 +6,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mdh_core::output::{Timings, millis};
 use mdh_core::ui::{Rect, ScreenInfo, TreeSource};
-use mdh_core::{Error, Input, Result};
+use mdh_core::{Error, Input, LaunchInfo, LogEntry, LogLevel, Result};
 use mdh_observe::{
-    RefTable, Role, TreeDiff, UiNode, UiTree, diff, render, render_diff, render_line,
-    render_opaque, render_screen,
+    AppFilter, CrashReport, LogDigest, RefTable, Role, TreeDiff, UiNode, UiTree, diff, digest,
+    render, render_diff, render_line, render_logs, render_opaque, render_screen,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +24,10 @@ const MAX_SCROLLS: usize = 10;
 const FOCUS_TIMEOUT: Duration = Duration::from_secs(1);
 const WAIT_POLL: Duration = Duration::from_millis(200);
 const SCROLL_MS: u32 = 300;
+/// Steps listed under a crash, so the agent sees what led to it.
+const STEPS_BEFORE_CRASH: usize = 3;
+/// How far back `logs` looks, independent of the session's cursor.
+const LOGS_WINDOW_MS: u64 = 10 * 60 * 1000;
 
 #[derive(Default, Serialize, Deserialize)]
 struct State {
@@ -36,6 +40,13 @@ struct State {
     #[serde(default)]
     seen: HashMap<String, String>,
     steps: Vec<RecordedStep>,
+    /// Device time of the newest log entry already reported.
+    #[serde(default)]
+    log_cursor_ms: Option<u64>,
+    /// The app the agent works on (set by `launch`); its logs and crashes are always watched,
+    /// even when another app or the launcher is in front.
+    #[serde(default)]
+    app: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -61,8 +72,21 @@ pub struct Observation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub diff: Option<TreeDiff>,
     pub tree: UiTree,
+    /// Logs since the agent last looked: crashes, warning and error counts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logs: Option<LogDigest>,
     /// The compact text form agents read.
     pub text: String,
+}
+
+/// Recent logs of the app in front, independent of what was already reported.
+#[derive(Debug, Serialize)]
+pub struct LogsReport {
+    /// Packages whose processes were included.
+    pub packages: Vec<String>,
+    /// `-12.3s E/Tag: message`, oldest first, relative to the device clock.
+    pub lines: Vec<String>,
+    pub crashes: Vec<CrashReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -158,29 +182,33 @@ impl Session {
     /// The current screen. With `diff_only`, only what changed since the agent last looked.
     pub async fn observe(&mut self, diff_only: bool, timings: &mut Timings) -> Result<Observation> {
         let started = Instant::now();
-        let snapshot = self.control.snapshot().await?;
+        let cursor = self.state.log_cursor_ms;
+        let (snapshot, entries) = tokio::join!(self.control.snapshot(), self.logs_since(cursor));
+        let snapshot = snapshot?;
         timings.record("observe", started);
         let source = snapshot.source;
         let view = self.adopt(snapshot);
+        let logs = self.digest_logs(entries?, &view).await?;
         let previous = if diff_only {
             self.state.last.as_ref()
         } else {
             None
         };
         let (diff, _, body) = report(previous, &view);
-        let text = format!("{}\n{body}", render_screen(&view.screen));
+        let text = self.compose(None, &view, &body, logs.as_ref());
         self.state.last = Some(view.clone());
         Ok(Observation {
             screen: view.screen,
             source,
             diff,
             tree: view.tree,
+            logs,
             text,
         })
     }
 
     /// Performs `action`, waits for the UI to settle and reports what changed since the agent
-    /// last looked.
+    /// last looked, including logs and crashes.
     pub async fn act(&mut self, action: Action, timings: &mut Timings) -> Result<ActOutcome> {
         let started = Instant::now();
         let snapshot = self.control.snapshot().await?;
@@ -199,22 +227,26 @@ impl Session {
         let (snapshot, settled) = settle(&self.control, timings).await?;
         timings.record("settle", settling);
         let after = self.adopt(snapshot);
-
-        let (diff, new_screen, body) = report(Some(previous.as_ref().unwrap_or(&before)), &after);
-        let mut text = format!("{description} → ok ({} ms)", millis(started));
-        if !settled {
-            text.push_str(&format!(
-                " — UI still changing after {} s",
-                SETTLE_TIMEOUT.as_secs()
-            ));
-        }
-        text = format!("{text}\n{}\n{body}", render_screen(&after.screen));
-
         self.state.steps.push(RecordedStep {
             at_ms: now_ms(),
             action: recorded,
             description: description.clone(),
         });
+
+        let reading = Instant::now();
+        let entries = self.logs_since(self.state.log_cursor_ms).await?;
+        let logs = self.digest_logs(entries, &before).await?;
+        timings.record("logs", reading);
+
+        let (diff, new_screen, body) = report(Some(previous.as_ref().unwrap_or(&before)), &after);
+        let mut header = format!("{description} → ok ({} ms)", millis(started));
+        if !settled {
+            header.push_str(&format!(
+                " — UI still changing after {} s",
+                SETTLE_TIMEOUT.as_secs()
+            ));
+        }
+        let text = self.compose(Some(&header), &after, &body, logs.as_ref());
         self.state.last = Some(after.clone());
         Ok(ActOutcome {
             action: description,
@@ -223,6 +255,7 @@ impl Session {
             screen: after.screen,
             diff,
             tree: new_screen.then_some(after.tree),
+            logs,
             text,
         })
     }
@@ -247,19 +280,22 @@ impl Session {
             );
             if found != gone {
                 timings.record("wait", started);
+                let entries = self.logs_since(self.state.log_cursor_ms).await?;
+                let logs = self.digest_logs(entries, &view).await?;
                 let (diff, _, body) = report(self.state.last.as_ref(), &view);
-                let text = format!(
-                    "wait {target} → {} after {} ms\n{}\n{body}",
+                let header = format!(
+                    "wait {target} → {} after {} ms",
                     if gone { "gone" } else { "found" },
                     millis(started),
-                    render_screen(&view.screen)
                 );
+                let text = self.compose(Some(&header), &view, &body, logs.as_ref());
                 self.state.last = Some(view.clone());
                 return Ok(Observation {
                     screen: view.screen,
                     source,
                     diff,
                     tree: view.tree,
+                    logs,
                     text,
                 });
             }
@@ -272,6 +308,118 @@ impl Session {
             }
             tokio::time::sleep(WAIT_POLL).await;
         }
+    }
+
+    /// Launches `app` (package or component) and makes it the session's app.
+    pub async fn launch(&mut self, app: &str) -> Result<LaunchInfo> {
+        let info = self.control.launch(app).await?;
+        let package = app.split_once('/').map_or(app, |(package, _)| package);
+        self.state.app = Some(package.to_owned());
+        Ok(info)
+    }
+
+    /// Recent logs of the app in front (and of the last seen screen's app), at least `level`;
+    /// independent of what the session already reported.
+    pub async fn logs(&mut self, level: LogLevel, lines: usize) -> Result<LogsReport> {
+        let now = self.control.clock_ms().await?;
+        let since = now.saturating_sub(LOGS_WINDOW_MS);
+        let (snapshot, entries) = tokio::join!(self.control.snapshot(), self.control.logs(since));
+        let view = self.adopt(snapshot?);
+        let entries = entries?;
+        let mut screens = vec![&view.screen];
+        screens.extend(self.state.last.as_ref().map(|v| &v.screen));
+        let packages = packages_of(self.state.app.as_deref(), &screens);
+        let filter = AppFilter {
+            pids: self.control.pids(&packages).await?.into_iter().collect(),
+            packages: packages.clone(),
+        };
+        let crashes = digest(&entries, &filter).crashes;
+        let mut shown: Vec<String> = entries
+            .iter()
+            .filter(|e| filter.pids.contains(&e.pid) && e.level >= level)
+            .map(|e| {
+                format!(
+                    "{:>7.1}s {}/{}: {}",
+                    (e.time_ms as f64 - now as f64) / 1000.0,
+                    e.level.letter(),
+                    e.tag,
+                    e.message.trim_end()
+                )
+            })
+            .collect();
+        shown.drain(..shown.len().saturating_sub(lines));
+        Ok(LogsReport {
+            packages,
+            lines: shown,
+            crashes,
+        })
+    }
+
+    /// Entries after the cursor; `None` before the first read, which only starts the cursor so a
+    /// session doesn't report the device's whole history.
+    async fn logs_since(&self, cursor: Option<u64>) -> Result<Option<Vec<LogEntry>>> {
+        match cursor {
+            Some(since) => self.control.logs(since).await.map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// Digests new entries for the app the agent was working with (`before`, the last view) and
+    /// advances the cursor. `None` when there's nothing to report.
+    async fn digest_logs(
+        &mut self,
+        entries: Option<Vec<LogEntry>>,
+        before: &View,
+    ) -> Result<Option<LogDigest>> {
+        let Some(entries) = entries else {
+            self.state.log_cursor_ms = Some(self.control.clock_ms().await?);
+            return Ok(None);
+        };
+        if let Some(newest) = entries.last() {
+            self.state.log_cursor_ms = Some(newest.time_ms);
+        }
+        let mut screens = vec![&before.screen];
+        screens.extend(self.state.last.as_ref().map(|v| &v.screen));
+        let packages = packages_of(self.state.app.as_deref(), &screens);
+        let filter = AppFilter {
+            pids: self.control.pids(&packages).await?.into_iter().collect(),
+            packages,
+        };
+        let d = digest(&entries, &filter);
+        Ok((!d.is_empty()).then_some(d))
+    }
+
+    /// Header, screen line, crash block with the steps that led to it, body, log line.
+    fn compose(
+        &self,
+        header: Option<&str>,
+        view: &View,
+        body: &str,
+        logs: Option<&LogDigest>,
+    ) -> String {
+        let mut parts: Vec<String> = header.map(str::to_owned).into_iter().collect();
+        parts.push(render_screen(&view.screen));
+        let rendered = logs.map(render_logs).unwrap_or_default();
+        let (log_line, crash): (Vec<&str>, Vec<&str>) =
+            rendered.lines().partition(|l| l.starts_with("logs: "));
+        if !crash.is_empty() {
+            parts.push(crash.join("\n"));
+            let recent: Vec<&str> = self
+                .state
+                .steps
+                .iter()
+                .rev()
+                .take(STEPS_BEFORE_CRASH)
+                .rev()
+                .map(|s| s.description.as_str())
+                .collect();
+            if !recent.is_empty() {
+                parts.push(format!("   after: {}", recent.join(" → ")));
+            }
+        }
+        parts.push(body.to_owned());
+        parts.extend(log_line.into_iter().map(str::to_owned));
+        parts.join("\n")
     }
 
     /// A ref that isn't on screen gets a reminder of what it was and where the agent saw it.
@@ -535,6 +683,22 @@ fn report(previous: Option<&View>, now: &View) -> (Option<TreeDiff>, bool, Strin
         body = format!("{body}\n{opaque}");
     }
     (Some(d), false, body)
+}
+
+/// The session's app and the distinct packages of the screens' activities.
+fn packages_of(app: Option<&str>, screens: &[&ScreenInfo]) -> Vec<String> {
+    let mut packages: Vec<String> = Vec::new();
+    for package in app.map(str::to_owned).into_iter().chain(
+        screens
+            .iter()
+            .filter_map(|s| s.activity.as_deref()?.split_once('/'))
+            .map(|(package, _)| package.to_owned()),
+    ) {
+        if !packages.contains(&package) {
+            packages.push(package);
+        }
+    }
+    packages
 }
 
 fn present(target: &Target, tree: &UiTree, previous: Option<&UiTree>) -> bool {

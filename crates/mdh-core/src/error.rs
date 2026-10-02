@@ -60,6 +60,9 @@ pub enum Error {
     #[error("timed out after {seconds}s waiting for {what}")]
     Timeout { what: String, seconds: u64 },
 
+    #[error("{package} crashed: {summary}")]
+    AppCrashed { package: String, summary: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -81,6 +84,7 @@ impl Error {
             Error::AmbiguousTarget { .. } => ErrorCode::AmbiguousTarget,
             Error::InvalidTarget { .. } => ErrorCode::InvalidTarget,
             Error::Timeout { .. } => ErrorCode::Timeout,
+            Error::AppCrashed { .. } => ErrorCode::AppCrashed,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -131,6 +135,9 @@ impl Error {
             Error::Timeout { .. } => {
                 "the UI didn't reach the expected state; observe to see where it is".into()
             }
+            Error::AppCrashed { .. } => {
+                "the crash report is in the output; fix the cause, then relaunch the app".into()
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -155,6 +162,7 @@ pub enum ErrorCode {
     AmbiguousTarget,
     InvalidTarget,
     Timeout,
+    AppCrashed,
     Io,
 }
 
@@ -165,6 +173,7 @@ impl ErrorCode {
         match self {
             ErrorCode::ElementNotFound | ErrorCode::AmbiguousTarget | ErrorCode::Timeout => 1,
             ErrorCode::InvalidTarget => 2,
+            ErrorCode::AppCrashed => 5,
             ErrorCode::ToolNotFound
             | ErrorCode::CommandFailed
             | ErrorCode::EnvironmentNotReady

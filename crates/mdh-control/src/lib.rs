@@ -10,7 +10,7 @@ mod settle;
 mod target;
 
 pub use action::{ActOutcome, Action, Direction};
-pub use session::{Observation, RecordedStep, Session, SessionSummary};
+pub use session::{LogsReport, Observation, RecordedStep, Session, SessionSummary};
 pub use target::{Selector, Target, TextMatch, find_all, selector_for};
 
 use std::path::{Path, PathBuf};
@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use mdh_core::output::Timings;
 use mdh_core::ui::{ScreenInfo, TreeSource, WindowInfo};
-use mdh_core::{Device, Input, LaunchInfo, Result};
+use mdh_core::{Device, Input, LaunchInfo, LogEntry, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
 use mdh_observe::{Jpeg, UiTree, compress, screenshot_jpeg};
@@ -116,6 +116,18 @@ impl Control {
         self.driver
             .install(&self.device, apk, grant_permissions)
             .await
+    }
+
+    pub async fn clock_ms(&self) -> Result<u64> {
+        self.driver.clock_ms(&self.device).await
+    }
+
+    pub async fn logs(&self, since_ms: u64) -> Result<Vec<LogEntry>> {
+        self.driver.logs(&self.device, since_ms).await
+    }
+
+    pub async fn pids(&self, packages: &[String]) -> Result<Vec<u32>> {
+        self.driver.pids(&self.device, packages).await
     }
 
     /// Stops background helpers on the device so other UiAutomation clients can run.

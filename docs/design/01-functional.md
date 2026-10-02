@@ -213,7 +213,7 @@ mdh wait <target> [--gone] [--timeout 10]
 mdh launch <package|component> | stop <package> | install <apk> [-g]
 mdh open <route|uri>
 mdh state animations off|restore | grant <perm> | reset data | snapshot save|load <name> | locale <tag> | dark on|off
-mdh logs [--since last|<time>] [--level W] [--crash]
+mdh logs [--level warn] [--lines 50]
 mdh verify <assertions.yaml | -e '<inline assertion>'>
 mdh flow save <name> | list | run <name...> [--junit out.xml]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show

@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use mdh_control::{Action, Control, Session, Target};
 use mdh_core::output::Timings;
 use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
-use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, Platform, Result};
+use mdh_core::{
+    Device, DeviceState, Error, Input, LaunchInfo, LogEntry, LogLevel, Platform, Result,
+};
 use mdh_driver::Driver;
 
 /// Serves scripted trees in order (repeating the last one) and records input.
@@ -16,6 +18,8 @@ use mdh_driver::Driver;
 struct FakeDriver {
     trees: Mutex<VecDeque<Vec<RawNode>>>,
     inputs: Mutex<Vec<Input>>,
+    /// Handed out by the next `logs` call.
+    logs: Mutex<Vec<LogEntry>>,
 }
 
 impl FakeDriver {
@@ -47,6 +51,19 @@ impl Driver for FakeDriver {
     }
     async fn foreground_activity(&self, _: &Device) -> Result<Option<String>> {
         Ok(Some("com.example/.Settings".into()))
+    }
+    async fn clock_ms(&self, _: &Device) -> Result<u64> {
+        Ok(1_000)
+    }
+    async fn logs(&self, _: &Device, since_ms: u64) -> Result<Vec<LogEntry>> {
+        let mut logs = self.logs.lock().unwrap();
+        Ok(std::mem::take(&mut *logs)
+            .into_iter()
+            .filter(|e| e.time_ms > since_ms)
+            .collect())
+    }
+    async fn pids(&self, _: &Device, _: &[String]) -> Result<Vec<u32>> {
+        Ok(vec![4321])
     }
     async fn input(&self, _: &Device, input: &Input) -> Result<()> {
         self.inputs.lock().unwrap().push(input.clone());
@@ -208,4 +225,88 @@ async fn missing_targets_fail_without_input() {
         .unwrap_err();
     assert!(matches!(err, Error::ElementNotFound { .. }), "{err}");
     assert!(driver.inputs.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_crash_during_an_action_is_reported_with_the_steps_before_it() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([screen(false, 0)]);
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let mut timings = Timings::default();
+    session.observe(false, &mut timings).await.unwrap(); // starts the log cursor at 1000
+
+    let entry = |ms, level, tag: &str, message: &str| LogEntry {
+        time_ms: ms,
+        pid: 4321,
+        tid: 4321,
+        level,
+        tag: tag.into(),
+        message: message.into(),
+    };
+    *driver.logs.lock().unwrap() = vec![
+        entry(
+            900,
+            LogLevel::Error,
+            "Old",
+            "before the session; not reported",
+        ),
+        entry(
+            2_000,
+            LogLevel::Error,
+            "AndroidRuntime",
+            "FATAL EXCEPTION: main",
+        ),
+        entry(
+            2_000,
+            LogLevel::Error,
+            "AndroidRuntime",
+            "Process: com.example, PID: 4321",
+        ),
+        entry(
+            2_000,
+            LogLevel::Error,
+            "AndroidRuntime",
+            "java.lang.IllegalStateException: boom",
+        ),
+        entry(
+            2_000,
+            LogLevel::Error,
+            "AndroidRuntime",
+            "\tat com.example.Settings.onToggle(Settings.kt:42)",
+        ),
+    ];
+    let outcome = session
+        .act(
+            Action::Tap {
+                target: Target::parse("Wi-Fi").unwrap(),
+            },
+            &mut timings,
+        )
+        .await
+        .unwrap();
+
+    let logs = outcome.logs.expect("a crash is reported");
+    assert_eq!(
+        logs.errors, 0,
+        "crash lines are not double-counted as errors"
+    );
+    assert_eq!(logs.crashes.len(), 1);
+    assert!(logs.crashes[0].of_app);
+    assert!(
+        outcome
+            .text
+            .contains("!! CRASH com.example (pid 4321): java.lang.IllegalStateException: boom"),
+        "{}",
+        outcome.text
+    );
+    assert!(
+        outcome
+            .text
+            .contains("at com.example.Settings.onToggle(Settings.kt:42)")
+    );
+    assert!(
+        outcome.text.contains(r#"after: tap e1 switch "Wi-Fi""#),
+        "{}",
+        outcome.text
+    );
 }

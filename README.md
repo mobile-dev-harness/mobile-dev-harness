@@ -40,6 +40,7 @@ mdh type "深色模式" --into "Search Settings"
 mdh scroll down --until "System"
 mdh wait "role=switch;text=Wi-Fi" --timeout 5
 mdh key back
+mdh logs                         # recent warnings/errors and crash reports of the app
 mdh screenshot -o shot.jpg
 mdh --json observe --diff
 ```

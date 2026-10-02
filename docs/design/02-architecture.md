@@ -253,20 +253,31 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 
 ## 7. Logs and crashes (`mdh-observe`)
 
-- Collection: read incrementally with `logcat -v epoch,uid -T <cursor>` and filter by the app's uid. Filtering by
-  uid rather than pid keeps up across process restarts; on older systems without uid support, fall back to pid
-  and re-resolve it when the process restarts.
-- Crash detection:
-  - Java/Kotlin: `FATAL EXCEPTION` in the `crash` buffer, plus the `AndroidRuntime` tag;
-  - Native: tombstone headers (`*** *** ***`) under the `DEBUG` tag;
-  - ANR: `am_anr` in the `events` buffer, plus `ANR in <pkg>` from `ActivityManager`.
-- Crash report: exception type and message, stack (app frames marked, framework frames folded), the `Caused by`
-  chain, and the last N actions before the crash (from the session recording).
-- Bounded output: an observation only carries counts and a few of the latest warning/error summaries; full logs
-  go to the run directory.
+- **Collection:** `logcat -d -v epoch -v uid -b main,system,crash -T <cursor>` (capped to the newest 5,000 lines),
+  parsed by a pure function in the driver. Short tags are padded (`CCodec  :`), and messages keep their leading tab
+  (stack frames).
+- **Cursor:** device clock (`date +%s.%N`), never the host clock; the first observation of a session only starts
+  it, so a session never reports the device's history. Each observation, action and wait reports what arrived
+  since the previous one and advances the cursor, so every crash is reported exactly once.
+- **Whose logs:** filtered by **pid, not uid** — system apps such as Settings run as uid 1000 together with
+  system_server (observed), so a uid filter would include the whole system. Pids come from `pidof` of the
+  session's app (set by `launch`), the app in front before the action and the app in front now, plus pids
+  announced in the logs (`ActivityManager: Start proc <pid>:<package>`), so restarts are followed.
+- **Crash detection** (any app, flagged `of_app` when it is one of the watched packages):
+  - Java/Kotlin: an `AndroidRuntime` block starting with `FATAL EXCEPTION` (`Process: <pkg>, PID: <n>`, the
+    exception, frames, `Caused by:` chain);
+  - native: crash_dump's `DEBUG` block (`*** *** ***`, `pid: … >>> <pkg> <<<`, `signal …`, `#NN pc …` frames);
+  - ANR: `ActivityManager: ANR in <pkg>` followed by `PID:` and `Reason:`;
+  - unexplained death: `Process <pkg> (pid <n>) has died` without a crash for that pid.
+- **Report:** kind, package, pid, summary, the app's own frames (framework frames folded; the first frames when
+  the stack has none of the app's), cause chain, and the last three session steps. A crash or ANR of the app makes
+  the command fail with `APP_CRASHED` (exit 5) while still returning the observation.
+- **Bounded output:** observations carry warning/error counts and the latest three distinct lines (repeats counted
+  as `(×N)`); `mdh logs` shows the last N lines of the watched apps over ten minutes.
+- **Measured:** reading and digesting logs adds ~80 ms to an action.
 
-> To verify during implementation on real devices across API levels: availability of `-v uid` / `--uid`, and all
-> ANR signal sources.
+> Verified on API 36 with `am crash` (Java). Native crashes and ANRs are covered by synthetic fixtures until the
+> sample app can produce real ones.
 
 ## 8. Gradle probing and diagnostics (`mdh-project`)
 

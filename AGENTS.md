@@ -13,8 +13,8 @@ first; iOS, React Native and Flutter later.
 **Current state: M1 (control) in progress.** Implemented: the session engine in `mdh-control`
 (session-stable refs, ref/selector/label targeting, wait-for-stable, diffs after actions, recorded
 steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
-`scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, the
-on-device helper, the ADR-0005 output envelope. Next: logs and crashes (F4.6–F4.8), the MCP server.
+`scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
+observation (crash → exit 5); the on-device helper; the ADR-0005 output envelope. Next: the MCP server, then the sample app and the benchmark.
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout

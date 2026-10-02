@@ -1,0 +1,278 @@
+--------- beginning of main
+         1790939484.918 10187   927 15958 D RingtonePlayer: player.start piid:143
+         1790939484.918 media   584 15960 I GenericSource: start
+         1790939484.918 10187   927   927 D MediaRouter: onRestoreRoute() : route=RouteInfo{ name=Phone, description=null, status=null, category=RouteCategory{ name=System types=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO  groupable=false }, supportedTypes=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO , presentationDisplay=null }
+         1790939484.918 10187   927   927 V MediaRouter: Selecting route: RouteInfo{ name=Phone, description=null, status=null, category=RouteCategory{ name=System types=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO  groupable=false }, supportedTypes=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO , presentationDisplay=null }
+         1790939484.921 media   584 15975 D CCodec  : allocate(c2.android.vorbis.decoder)
+         1790939484.922 media   584 15975 I CCodec  : setting up 'default' as default (vendor) store
+         1790939484.931 media   584 12375 D BufferPoolAccessor2.0: bufferpool2 0xb400007921e18758 : 0(0 size) total buffers - 0(0 size) used buffers - 94/102 (recycle/alloc) - 8/198 (fetch/transfer)
+         1790939484.931 media   584 12375 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007921e18758 cached: 0/0M, 0/0% in use; allocs: 102, 92% recycled; transfers: 198, 96% unfetched
+         1790939484.932 media   584 15975 I CCodec  : Created component [c2.android.vorbis.decoder] for [c2.android.vorbis.decoder]
+         1790939484.933 media   584 15975 D CCodecConfig: read media type: audio/vorbis
+         1790939484.936  1000 15922 15922 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+         1790939484.936  1000 15922 15922 E AndroidRuntime: FATAL EXCEPTION: main
+         1790939484.936  1000 15922 15922 E AndroidRuntime: Process: com.android.settings, PID: 15922
+         1790939484.936  1000 15922 15922 E AndroidRuntime: android.app.RemoteServiceException$CrashedByAdbException: shell-induced crash
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.app.ActivityThread.throwRemoteServiceException(ActivityThread.java:2377)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.app.ActivityThread.-$$Nest$mthrowRemoteServiceException(Unknown Source:0)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2741)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:248)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:338)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+         1790939484.936  1000 15922 15922 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+         1790939484.937 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.max-count.values
+         1790939484.937 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: output.subscribed-indices.values
+         1790939484.938 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: input.buffers.allocator-ids.values
+         1790939484.938 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.allocator-ids.values
+--------- beginning of system
+         1790939484.938  1000   667 15980 I DropBoxManagerService: add tag=system_app_crash isTagEnabled=true flags=0x2
+         1790939484.938 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.allocator-ids.values
+         1790939484.939 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.pool-ids.values
+         1790939484.939 media   584 15975 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.pool-ids.values
+         1790939484.940  1000   667  1279 W ActivityTaskManager:   Force finishing activity com.android.settings/.homepage.SettingsHomepageActivity
+         1790939484.941 10187   927  1002 V WindowManagerShell: Transition requested (#100): android.os.BinderProxy@507b621 TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=23 effectiveUid=1000 displayId=0 isRunning=true baseIntent=Intent { act=android.settings.SETTINGS flg=0x10000000 cmp=com.android.settings/.homepage.SettingsHomepageActivity } baseActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} topActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} origActivity=null realActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} numActivities=1 lastActiveTime=11239942 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@c4cca46} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{a77a407 com.android.settings.homepage.SettingsHomepageActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 100 }
+         1790939484.941 media   584 15975 I CCodecConfig: query failed after returning 8 values (BAD_INDEX)
+         1790939484.941 media   584 15975 D CCodecConfig: c2 config diff is Dict {
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 coded.bitrate.value = 64000
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 input.buffers.max-size.value = 32768
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 input.delay.value = 0
+         1790939484.941 media   584 15975 D CCodecConfig:   string input.media-type.value = "audio/vorbis"
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 output.large-frame.max-size = 0
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 output.large-frame.threshold-size = 0
+         1790939484.941 media   584 15975 D CCodecConfig:   string output.media-type.value = "audio/raw"
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 raw.channel-count.value = 1
+         1790939484.941 media   584 15975 D CCodecConfig:   c2::u32 raw.sample-rate.value = 48000
+         1790939484.941 media   584 15975 D CCodecConfig: }
+         1790939484.942  1000   516   614 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790939484.943 media   584 15974 W ServiceManagerCppClient: Failed to get isDeclared for media_quality: Status(-1, EX_SECURITY): 'SELinux denied for service.'
+         1790939484.943 media   584 15974 E MediaCodec: Media Quality Service not found.
+         1790939484.944  1000 15922 15922 I Process : Sending signal. PID: 15922 SIG: 9
+         1790939484.944 media   584 15975 D CCodec  : [c2.android.vorbis.decoder] buffers are bound to CCodec for this session
+         1790939484.944 media   584 15975 D CCodecConfig: no c2 equivalents for durationUs
+         1790939484.944 media   584 15975 D CCodecConfig: no c2 equivalents for csd-1
+         1790939484.944 media   584 15975 D CCodecConfig: no c2 equivalents for flags
+         1790939484.945 media   584 15975 D CCodecConfig: c2 config diff is   c2::u32 coded.bitrate.value = 70000
+         1790939484.945 media   584 15975 W Codec2Client: query -- param skipped: index = 1107298332.
+         1790939484.945 media   584 15975 D CCodec  : encoding statistics level = 0
+         1790939484.945 media   584 15975 D CCodec  : setup formats input: AMessage(what = 0x00000000) = {
+         1790939484.945 media   584 15975 D CCodec  :   int32_t bitrate = 70000
+         1790939484.945 media   584 15975 D CCodec  :   int32_t channel-count = 1
+         1790939484.945 media   584 15975 D CCodec  :   int32_t max-input-size = 32768
+         1790939484.945 media   584 15975 D CCodec  :   string mime = "audio/vorbis"
+         1790939484.945 media   584 15975 D CCodec  :   int32_t sample-rate = 48000
+         1790939484.945 media   584 15975 D CCodec  : }
+         1790939484.945 media   584 15975 D CCodec  : setup formats output: AMessage(what = 0x00000000) = {
+         1790939484.945 media   584 15975 D CCodec  :   int32_t buffer-batch-max-output-size = 0
+         1790939484.945 media   584 15975 D CCodec  :   int32_t buffer-batch-threshold-output-size = 0
+         1790939484.945 media   584 15975 D CCodec  :   int32_t channel-count = 1
+         1790939484.945 media   584 15975 D CCodec  :   string mime = "audio/raw"
+         1790939484.945 media   584 15975 D CCodec  :   int32_t sample-rate = 48000
+         1790939484.945 media   584 15975 D CCodec  :   int32_t channel-mask = 1
+         1790939484.945 media   584 15975 D CCodec  :   int32_t android._config-pcm-encoding = 2
+         1790939484.945 media   584 15975 D CCodec  : }
+         1790939484.945 media   584 15975 I CCodecConfig: query failed after returning 8 values (BAD_INDEX)
+         1790939484.945 media   584 15975 E mediaserver: Failed to query component interface for required system resources: 6
+         1790939484.946 media   584 15975 I MediaCodec: MediaCodec will operate in async mode
+         1790939484.946 media   584 15974 D MediaCodec: keep callback message for reclaim
+         1790939484.946 media   584 15975 W Codec2Client: query -- param skipped: index = 1342179345.
+         1790939484.946 media   584 15975 W Codec2Client: query -- param skipped: index = 2415921170.
+         1790939484.947 media   584 15975 D CCodecBufferChannel: [c2.android.vorbis.decoder#419] Created input block pool with allocatorID 16 => poolID 26 - OK (0)
+         1790939484.947  1046   590   638 D BufferPoolAccessor2.0: bufferpool2 0xb400007104aa3348 : 0(0 size) total buffers - 0(0 size) used buffers - 93/97 (recycle/alloc) - 4/96 (fetch/transfer)
+         1790939484.947  1046   590   638 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007104aa3348 cached: 0/0M, 0/0% in use; allocs: 97, 96% recycled; transfers: 96, 96% unfetched
+         1790939484.948 media   584 15975 I CCodecBufferChannel: [c2.android.vorbis.decoder#419] Created output block pool with allocatorID 16 => poolID 54 - OK
+         1790939484.948 media   584 15975 D CCodecBufferChannel: [c2.android.vorbis.decoder#419] Configured output block pool ids 54 => OK
+         1790939484.948  1046   590   638 E Codec2-ComponentInterface: We have a failed config
+         1790939484.950  1046   590 15977 D SimpleC2Component: Using output block pool with poolID 54 => got 54 - 0
+         1790939484.953  1000   667   790 W InputDispatcher: channel '1782748 com.android.settings/com.android.settings.homepage.SettingsHomepageActivity' ~ Consumer closed input channel or an error occurred.  events=0x9
+         1790939484.953  1000   667   790 E InputDispatcher: channel '1782748 com.android.settings/com.android.settings.homepage.SettingsHomepageActivity' ~ Channel is unrecoverably broken and will be disposed!
+         1790939484.953  1000   667   790 I WindowManager: WINDOW DIED Window{1782748 u0 com.android.settings/com.android.settings.homepage.SettingsHomepageActivity}
+         1790939484.954  1000   667  1806 I ActivityManager: Process com.android.settings (pid 15922) has died: fg  TOP 
+         1790939484.954  1000   667  1283 I WindowManager: WIN DEATH: Window{1782748 u0 com.android.settings/com.android.settings.homepage.SettingsHomepageActivity EXITING}
+         1790939484.954  root   451   451 I Zygote  : Process 15922 exited due to signal 9 (Killed)
+         1790939484.955  1000   667  1282 I ImeTracker: com.android.settings:8461e63c: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+         1790939484.955  1000   667  1282 I ImeTracker: com.android.settings:8461e63c: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790939484.955  1000   667   720 I libprocessgroup: Removed cgroup /sys/fs/cgroup/system/uid_1000/pid_15922
+         1790939484.955 10159 10989 10989 I SubtypeOperator: SubtypeOperator$1.onUnbindInput():43 
+         1790939484.959  1041   499   756 D AudioFlinger: Client defaulted notificationFrames to 12512 for frameCount 25024
+         1790939484.959  1041   499   756 I AF::PthrPatchRecord: creating track with enforcement level 0
+         1790939484.960  1000   516   516 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790939484.972  1000   667   712 W ActivityManager: setHasOverlayUi called on unknown pid: 15922
+         1790939484.972  1000   667   712 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+         1790939484.973  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790939484.973  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790939484.973  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790939484.974  1000   667  1798 E AppOps  : attributionTag  not declared in manifest of com.android.systemui
+         1790939484.978  1000   667  1798 E AppOps  : attributionTag  not declared in manifest of com.android.systemui
+         1790939484.979 10182  1075  1075 D ViewRootImpl: Skipping stats log for color mode
+         1790939484.980 media   584 15972 D AudioTrack: getTimestamp_l(24): device stall time corrected using current time 11241784991651
+         1790939484.980 10182  1075  1075 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+         1790939484.981 media   584  2478 D MediaPlayerService: onAudioDeviceUpdate deviceIds: 2
+         1790939484.984 10187   927  1002 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=true, height=603
+         1790939484.990 10182  1075  1075 D BaseDepthController: setSurface:
+         1790939484.990 10182  1075  1075 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+         1790939484.990 10182  1075  1075 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x7c2cfea
+         1790939485.001 10182  1075  1075 D StatsLog: LAUNCHER_ONRESUME
+         1790939485.002 10140  1672  1840 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+         1790939485.003 10140  1672  1840 I AiAiEcho: EchoTargets: 
+         1790939485.003 10140  1672  1840 I AiAiEcho: Filtered by AiAi flag check: 
+         1790939485.003 10140  1672  1840 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790939485.003 10140  1672  1840 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+         1790939485.004 10182  1075  1130 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+         1790939485.004 10182  1075  1075 I NotificationListener: Handling notification state refresh for android#0
+         1790939485.004 10182  1075  1075 I NotificationListener: Handling notification state refresh for com.android.vending#0
+         1790939485.004 10182  1075  1075 I NotificationListener: Handling notification state refresh for com.android.systemui#0
+         1790939485.006 10187   927  2671 V WindowManagerShell: onTransitionReady(transaction=2864743191139)
+         1790939485.006 10140  1672  1840 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+         1790939485.006 10187   927  1002 V WindowManagerShell: onTransitionReady (#100) android.os.BinderProxy@507b621: {id=100 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790939485.006 10187   927  1002 V WindowManagerShell:         {m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0xd552934 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},
+         1790939485.006 10187   927  1002 V WindowManagerShell:         {m=CLOSE f=NONE leash=Surface(name=Task=23)/@0x208935d sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},
+         1790939485.006 10187   927  1002 V WindowManagerShell:         {m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{95ee2 showWhenLocked=false})/@0x17b44d2 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0}
+         1790939485.006 10187   927  1002 V WindowManagerShell:     ]}
+         1790939485.006 10187   927  1002 V WindowManagerShell: Playing animation for (#100) android.os.BinderProxy@507b621@0
+         1790939485.006 10187   927  1002 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790939485.006 10187   927  1002 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=100 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0xd552934 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},{m=CLOSE f=NONE leash=Surface(name=Task=23)/@0x208935d sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},{m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{95ee2 showWhenLocked=false})/@0x17b44d2 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0}]}
+         1790939485.006 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@2e7720c windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2936755, appThread = android.app.IApplicationThread$Stub$Proxy@2fd156a, debugName = overlayBackTransition }}
+         1790939485.006 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@c449a5b, appThread = android.app.IApplicationThread$Stub$Proxy@d9fa2f8, debugName = LauncherToDream }}
+         1790939485.006 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null windowingMode=undefined},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{NOT atype=undefined independent=true modes=[] flags=NONE mustBeTask=true order=ANY topActivity=null launchCookie=null customAnim=true windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@47023d1, appThread = android.app.IApplicationThread$Stub$Proxy@34f1e36, debugName = QuickstepLaunchHome }}
+         1790939485.006 10187   927  1002 D RemoteTransitionHandler: Found filterPair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null windowingMode=undefined},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{NOT atype=undefined independent=true modes=[] flags=NONE mustBeTask=true order=ANY topActivity=null launchCookie=null customAnim=true windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@47023d1, appThread = android.app.IApplicationThread$Stub$Proxy@34f1e36, debugName = QuickstepLaunchHome }}
+         1790939485.007 10187   927  1002 V WindowManagerShell:  Delegate animation for (#100) to RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@47023d1, appThread = android.app.IApplicationThread$Stub$Proxy@34f1e36, debugName = QuickstepLaunchHome }
+         1790939485.013 10182  1075  1075 D SsBaseTemplateCard: No text view can be set up
+         1790939485.013 10182  1075  1075 D SsBaseTemplateCard: Passed-in item info is null
+         1790939485.013 10182  1075  1075 D SsBaseTemplateCard: Passed-in item info is null
+         1790939485.013 10182  1075  1075 D SsBaseTemplateCard: Passed-in item info is null
+         1790939485.013 10182  1075  1075 I SsBaseTemplateCard: Secondary card pane is null
+         1790939485.015 10182  1075  1075 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+         1790939485.015 10182  1075  1075 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:22)
+         1790939485.015 10182  1075  1075 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:11)
+         1790939485.015 10182  1075  1075 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:339)
+         1790939485.016 10182  1075  1075 D b/311077782: LauncherAnimationRunner.setAnimation
+         1790939485.016 10182  1075  1075 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+         1790939485.071  1000   667   709 V WindowManager: Sent Transition (#100) createdAt=10-02 19:11:24.940 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=23 effectiveUid=1000 displayId=0 isRunning=true baseIntent=Intent { act=android.settings.SETTINGS flg=0x10000000 cmp=com.android.settings/.homepage.SettingsHomepageActivity } baseActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} topActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} origActivity=null realActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} numActivities=1 lastActiveTime=11239942 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{d12d791 Task{eb2f6d4 #23 type=standard A=1000:com.android.settings.root}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{9da26f6 com.android.settings.homepage.SettingsHomepageActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 100 }
+         1790939485.071  1000   667   709 V WindowManager:     startWCT=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790939485.071  1000   667   709 V WindowManager:     info={id=100 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790939485.071  1000   667   709 V WindowManager:         {WCT{RemoteToken{79f938d Task{b5d10cb #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x13076ea sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},
+         1790939485.071  1000   667   709 V WindowManager:         {WCT{RemoteToken{d12d791 Task{eb2f6d4 #23 type=standard A=1000:com.android.settings.root}}} m=CLOSE f=NONE leash=Surface(name=Task=23)/@0x5cdb81b sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 taskParent=-1},
+         1790939485.071  1000   667   709 V WindowManager:         {m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{95ee2 showWhenLocked=false})/@0xec33e1f sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0}
+         1790939485.071  1000   667   709 V WindowManager:     ]}
+         1790939485.073 10187   927  1002 V WindowManagerShell:  animated by com.android.wm.shell.transition.RemoteTransitionHandler@b6c330e
+         1790939485.073 10187   927  1002 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#100) android.os.BinderProxy@507b621@0
+         1790939485.074  1000   667   709 V WindowManager: Finish Transition (#100): created at 10-02 19:11:24.940 collect-started=0.03ms request-sent=0.124ms started=2.643ms ready=24.452ms sent=63.954ms commit=40.562ms finished=134.246ms
+         1790939485.074  1000   667  2279 E IPCThreadState: Binder transaction failure. id: 2272507, BR_*: 29189, error: -22 (Invalid argument)
+         1790939485.074  1000   667  2279 W ActivityManager: pid 667 system sent binder code 7 with flags 1 to frozen apps and got error -32
+         1790939485.075  1000   667  2279 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+         1790939485.075  1000   667  2279 W WindowManager: Exception thrown during dispatchAppVisibility Window{1782748 u0 com.android.settings/com.android.settings.homepage.SettingsHomepageActivity EXITING}
+         1790939485.075  1000   667  2279 W WindowManager: android.os.DeadObjectException
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:592)
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:557)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3151)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1311)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:389)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6650)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5561)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1391)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:1029)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:496)
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:261)
+         1790939485.075  1000   667  2279 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:223)
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1426)
+         1790939485.075  1000   667  2279 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1365)
+         1790939485.075  1000   667  2279 W Process : Unable to open /proc/15922/status
+         1790939485.076  1000   667   798 I ImeTracker: com.google.android.apps.nexuslauncher:270017d0: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+         1790939485.076  1000   667  2279 I ImeTracker: system_server:f9329f7: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+         1790939485.076 10182  1075  1075 D InsetsController: hide(ime(), fromIme=false)
+         1790939485.076 10182  1075  1075 I ImeTracker: com.google.android.apps.nexuslauncher:270017d0: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790939485.076 10159 10989 10989 I SubtypeOperator: SubtypeOperator$1.onBindInput():33 
+         1790939485.077 10187   927  1002 V WindowManagerShell: Track 0 became idle
+         1790939485.077 10187   927  1002 V WindowManagerShell: All active transition animations finished
+         1790939485.080 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2361 
+         1790939485.081 10159 10989 15920 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 0, locked = false
+         1790939485.081 10159 10989 15918 I SystemSettingsModule: SystemSettingsModule$inputSessionListener$<anonymous>.onFinishInput():34 Settings app closed, reloading all system settings
+         1790939485.081 10159 10989 15918 I SystemSettings: SystemSettings.reloadAllSettings():322 Reload all system settings
+         1790939485.081 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_high_text_contrast_enabled = false
+         1790939485.081 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1532 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790939485.081 10159 10989 10989 I LatinIMEBase: LatinIMEBase.updateInputViewCoverNavigation():317 Update input view padding, isNavbarOverInputWindow=true, bottom inset=144
+         1790939485.084  1000   667   813 W PackageConfigPersister: App-specific configuration not found for packageName: com.google.android.apps.nexuslauncher and userId: 0
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_accessibility_display_magnification_enabled = false
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_user_setup_complete = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_navigation_mode = 2
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_global_device_provisioned = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_stylus_handwriting_enabled = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_system_device_font_scale = 1.0
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_system_haptic_feedback_enabled = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_system_font_scale = 1.0
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_accessibility_shortcut_target_service = 
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_ime_switcher_in_navbar_enabled = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_system_keyboard_vibration_enabled = true
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_secure_accessibility_button_targets = 
+         1790939485.084 10159 10989 15918 I SystemSettings: SystemSettings.updateFlagValue():372 Update flag: system_setting_system_vibrate_on = true
+         1790939485.090 10159 10989 15916 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 1, locked = false
+         1790939485.090  1000   667  1806 I ImeTracker: system_server:5548898f: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+         1790939485.090  1041   499   613 D AudioFlinger: mixer(0xb4000072c5fc5770) throttle end: throttle time(41)
+         1790939485.091  1000   667   712 I ImeTracker: system_server:f9329f7: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790939485.096  1000   667   712 I ImeTracker: system_server:5548898f: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790939485.119 10182  1075  1075 D RecentsView: onTaskRemoved: 23, not handling task stack changes
+         1790939485.119 10182  1075  1075 D RecentsView: onTaskRemoved: 23, not handling task stack changes
+         1790939485.144  1000   516   516 E BpTransactionCompletedListener: Failed to transact (-32)
+         1790939485.169  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.169  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.280  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.280  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.383  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.383  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.443  1000   667   712 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{148612135 u0 com.android.settings/.homepage.SettingsHomepageActivity t-1 f}}
+         1790939485.459 10148  6695 15986 I DropBoxUtil: (REDACTED) Reading dropbox entry with tag %s and timestamp %d
+         1790939485.500  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.500  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.608  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.608  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.711  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.711  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.815  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.815  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939485.921  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939485.921  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.023  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.023  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.128  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.129  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.232  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.232  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.335  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.335  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.402 media   584 15975 D CCodecBufferChannel: [c2.android.vorbis.decoder#419] buffers after EOS ignored (0 us)
+         1790939486.402 media   584 15975 D CCodecBufferChannel: [c2.android.vorbis.decoder#419] buffers after EOS ignored (0 us)
+         1790939486.403 media   584 15972 D AudioTrack: stop(24): called with 82980 frames delivered
+         1790939486.404  1000   667  1806 E AppOps  : attributionTag  not declared in manifest of com.android.systemui
+         1790939486.404  1000   667  1806 E AppOps  : attributionTag  not declared in manifest of com.android.systemui
+         1790939486.440  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.440  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.544  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.544  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.648  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.648  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.738  1000   667  1711 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+         1790939486.752  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.752  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.856  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.856  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1
+         1790939486.860 10187   927 15958 D RingtonePlayer: onCompletion() abandoning AudioFocus
+         1790939486.860  1000   667  2279 I MediaFocusControl: abandonAudioFocus() from uid/pid 10187/927 clientId=android.media.AudioManager@5f8765a callingPack=com.android.systemui
+         1790939486.860 10187   927 15958 D RingtonePlayer: onCompletion queue size=0
+         1790939486.860 10187   927 15958 D RingtonePlayer: in onCompletion quitting looper Looper (Thread-12, tid 123) {d153a9b}
+         1790939486.860 10187   927 15958 I NotificationPlayer: About to release MediaPlayer piid:143 due to onCompletion
+         1790939486.860 10187   927 15958 V MediaPlayer: resetDrmState:  mDrmInfo=null mDrmProvisioningThread=null mPrepareDrmInProgress=false mActiveDrmScheme=false
+         1790939486.860 10187   927 15958 V MediaPlayer: cleanDrmObj: mDrmObj=null mDrmSessionId=null
+         1790939486.860 media   584  2478 D NuPlayerDriver: reset(0xb400007901e17310) at state 6
+         1790939486.863 media   584 15975 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+         1790939486.863  1046   590   638 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+         1790939486.863  1046   590   638 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+         1790939486.863  1046   590   638 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007104aa12e8 cached: 0/0M, 0/0% in use; allocs: 0, 0% recycled; transfers: 0, 0% unfetched
+         1790939486.865 media   584 15960 D NuPlayerDriver: notifyResetComplete(0xb400007901e17310)
+         1790939486.865 media   584  2478 W AMessage: failed to post message as target looper for handler 0 is gone.
+         1790939486.960  1041   454 15981 W android.hardware.audio@7.1-impl.ranchu: pcmWrite:259 pcm_writei failed with 'cannot read/write stream data: I/O error' (-1)
+         1790939486.960  1041   454 15981 E android.hardware.audio@7.1-impl.ranchu: pcmWrite:260 failure: -1

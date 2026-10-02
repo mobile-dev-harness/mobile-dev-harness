@@ -1,5 +1,5 @@
 use mdh_core::ui::ScreenInfo;
-use mdh_observe::{TreeDiff, UiTree};
+use mdh_observe::{LogDigest, TreeDiff, UiTree};
 use serde::{Deserialize, Serialize};
 
 use crate::target::Target;
@@ -66,6 +66,9 @@ pub struct ActOutcome {
     pub diff: Option<TreeDiff>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tree: Option<UiTree>,
+    /// Logs since the agent last looked: crashes, warning and error counts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logs: Option<LogDigest>,
     /// The compact text form agents read.
     pub text: String,
 }

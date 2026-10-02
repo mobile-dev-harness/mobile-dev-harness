@@ -3,11 +3,13 @@
 mod adb;
 mod am;
 mod helper;
+mod logcat;
 mod sdk;
 mod uiautomator;
 
 pub use adb::{Adb, shell_quote};
 pub use helper::{HELPER_VERSION_CODE, Helper};
+pub use logcat::parse_logcat;
 pub use sdk::AndroidSdk;
 pub use uiautomator::parse_hierarchy;
 
@@ -18,9 +20,12 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::{RawTree, TreeSource};
-use mdh_core::{Device, Error, Input, LaunchInfo, Platform, Result};
+use mdh_core::{Device, Error, Input, LaunchInfo, LogEntry, Platform, Result};
 
 use crate::Driver;
+
+/// Upper bound on log lines fetched per read, so a long pause between calls can't flood memory.
+const MAX_LOG_LINES: usize = 5000;
 
 pub struct AndroidDriver {
     adb: Adb,
@@ -201,6 +206,40 @@ impl Driver for AndroidDriver {
             )
             .await?;
         am::parse_am_start(&component, &out)
+    }
+
+    async fn clock_ms(&self, device: &Device) -> Result<u64> {
+        let out = self.adb.shell(&device.id, "date +%s.%N").await?;
+        logcat::parse_device_time(&out).ok_or(Error::Parse {
+            tool: "date".into(),
+            detail: out,
+        })
+    }
+
+    async fn logs(&self, device: &Device, since_ms: u64) -> Result<Vec<LogEntry>> {
+        // `-T` takes `seconds.millis` on the device clock and is inclusive, hence the filter.
+        let command = format!(
+            "logcat -d -v epoch -v uid -b main,system,crash -T {}.{:03} | tail -n {MAX_LOG_LINES}",
+            since_ms / 1000,
+            since_ms % 1000
+        );
+        let out = self.adb.shell_stdout(&device.id, &command).await?;
+        let mut entries = logcat::parse_logcat(&out);
+        entries.retain(|e| e.time_ms > since_ms);
+        Ok(entries)
+    }
+
+    async fn pids(&self, device: &Device, packages: &[String]) -> Result<Vec<u32>> {
+        if packages.is_empty() {
+            return Ok(Vec::new());
+        }
+        let quoted: Vec<String> = packages.iter().map(|p| shell_quote(p)).collect();
+        // `pidof` exits with 1 when nothing runs, which is not an error here.
+        let out = self
+            .adb
+            .shell_stdout(&device.id, &format!("pidof {}", quoted.join(" ")))
+            .await?;
+        Ok(logcat::parse_pids(&out))
     }
 
     async fn release(&self, device: &Device) -> Result<()> {

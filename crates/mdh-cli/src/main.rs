@@ -7,11 +7,12 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use mdh_control::{Action, Control, Direction, Session, Target};
+use mdh_control::{ActOutcome, Action, Control, Direction, Observation, Session, Target};
 use mdh_core::output::Timings;
-use mdh_core::{Device, DeviceState, Result};
+use mdh_core::{Device, DeviceState, Error, LogLevel, Result};
 use mdh_driver::Driver;
 use mdh_driver::android::{AndroidDriver, AndroidSdk};
+use mdh_observe::{CrashKind, LogDigest};
 use serde::Serialize;
 
 use crate::output::{Human, finish};
@@ -108,6 +109,15 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         timeout: u64,
     },
+    /// Recent logs and crash reports of the app in front
+    Logs {
+        /// Minimum level
+        #[arg(long, value_enum, default_value_t = Level::Warn)]
+        level: Level,
+        /// Most recent lines to show
+        #[arg(long, default_value_t = 50)]
+        lines: usize,
+    },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
     /// Force-stop an app
@@ -132,6 +142,27 @@ enum SessionCommand {
     Show,
     /// Forget refs and steps and stop the device helper (frees UiAutomation for other tools)
     Reset,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Level {
+    Verbose,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<Level> for LogLevel {
+    fn from(l: Level) -> Self {
+        match l {
+            Level::Verbose => LogLevel::Verbose,
+            Level::Debug => LogLevel::Debug,
+            Level::Info => LogLevel::Info,
+            Level::Warn => LogLevel::Warn,
+            Level::Error => LogLevel::Error,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -200,9 +231,17 @@ async fn run(
             finish(json, started, std::mem::take(timings), data, error)
         }};
     }
+    // Like `report!`, but a crash of the app turns into APP_CRASHED (exit 5) next to the data.
+    macro_rules! report_crash {
+        ($result:expr) => {{
+            let (data, error) = split($result);
+            let error = error.or_else(|| data.as_ref().and_then(crash_error));
+            finish(json, started, std::mem::take(timings), data, error)
+        }};
+    }
     macro_rules! act {
         ($action:expr) => {
-            report!(match $action {
+            report_crash!(match $action {
                 Ok(action) => session.act(action, timings).await,
                 Err(e) => Err(e),
             })
@@ -212,7 +251,7 @@ async fn run(
 
     match command {
         Command::Doctor | Command::Devices => unreachable!("handled before connecting"),
-        Command::Observe { diff } => report!(session.observe(diff, timings).await),
+        Command::Observe { diff } => report_crash!(session.observe(diff, timings).await),
         Command::Screenshot { output, max_edge } => report!(
             session
                 .control()
@@ -272,14 +311,15 @@ async fn run(
             target: t,
             gone,
             timeout,
-        } => report!(match target(&t) {
+        } => report_crash!(match target(&t) {
             Ok(t) =>
                 session
                     .wait(&t, gone, Duration::from_secs(timeout), timings)
                     .await,
             Err(e) => Err(e),
         }),
-        Command::Launch { app } => report!(session.control().launch(&app).await),
+        Command::Logs { level, lines } => report!(session.logs(level.into(), lines).await),
+        Command::Launch { app } => report!(session.launch(&app).await),
         Command::Stop { package } => report!(
             session
                 .control()
@@ -304,6 +344,35 @@ async fn run(
             ),
         },
     }
+}
+
+trait HasLogs {
+    fn logs(&self) -> Option<&LogDigest>;
+}
+
+impl HasLogs for Observation {
+    fn logs(&self) -> Option<&LogDigest> {
+        self.logs.as_ref()
+    }
+}
+
+impl HasLogs for ActOutcome {
+    fn logs(&self) -> Option<&LogDigest> {
+        self.logs.as_ref()
+    }
+}
+
+/// The first crash or ANR of the app itself; deaths without a report and other apps' crashes
+/// are shown but don't fail the command.
+fn crash_error(data: &impl HasLogs) -> Option<Error> {
+    data.logs()?
+        .crashes
+        .iter()
+        .find(|c| c.of_app && c.kind != CrashKind::Died)
+        .map(|c| Error::AppCrashed {
+            package: c.package.clone().unwrap_or_else(|| "the app".into()),
+            summary: c.summary.clone(),
+        })
 }
 
 fn split<T>(result: Result<T>) -> (Option<T>, Option<mdh_core::Error>) {

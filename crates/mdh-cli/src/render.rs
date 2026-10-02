@@ -1,8 +1,8 @@
 //! Human-readable forms of library results. JSON output serializes the same values.
 
-use mdh_control::{ActOutcome, Observation, Screenshot, SessionSummary};
+use mdh_control::{ActOutcome, LogsReport, Observation, Screenshot, SessionSummary};
 use mdh_core::LaunchInfo;
-use mdh_observe::render_screen;
+use mdh_observe::{LogDigest, render_logs, render_screen};
 use serde::Serialize;
 
 use crate::output::Human;
@@ -62,6 +62,23 @@ impl Human for LaunchInfo {
             );
         }
         s
+    }
+}
+
+impl Human for LogsReport {
+    fn human(&self) -> String {
+        let mut out = vec![format!("logs of {}", self.packages.join(", "))];
+        if !self.crashes.is_empty() {
+            out.push(render_logs(&LogDigest {
+                crashes: self.crashes.clone(),
+                ..LogDigest::default()
+            }));
+        }
+        if self.lines.is_empty() {
+            out.push("(no matching lines in the last 10 minutes)".into());
+        }
+        out.extend(self.lines.iter().cloned());
+        out.join("\n")
     }
 }
 

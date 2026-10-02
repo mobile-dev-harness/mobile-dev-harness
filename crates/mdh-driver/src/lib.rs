@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::RawTree;
-use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, Platform, Result};
+use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, LogEntry, Platform, Result};
 
 /// A platform backend: low-level device capabilities only. Element targeting, waiting and
 /// observation live above it and are shared by all backends.
@@ -34,6 +34,22 @@ pub trait Driver: Send + Sync {
     async fn launch(&self, device: &Device, app: &str) -> Result<LaunchInfo>;
 
     async fn stop(&self, device: &Device, package: &str) -> Result<()>;
+
+    /// The device clock in Unix milliseconds. Log cursors use it, never the host clock.
+    async fn clock_ms(&self, _device: &Device) -> Result<u64> {
+        Ok(0)
+    }
+
+    /// Log entries newer than `since_ms` (device clock), oldest first; capped to the most recent
+    /// few thousand.
+    async fn logs(&self, _device: &Device, _since_ms: u64) -> Result<Vec<LogEntry>> {
+        Ok(Vec::new())
+    }
+
+    /// Running process ids of the given packages.
+    async fn pids(&self, _device: &Device, _packages: &[String]) -> Result<Vec<u32>> {
+        Ok(Vec::new())
+    }
 
     /// Stops anything the driver keeps running on the device (e.g. the helper holding UiAutomation).
     async fn release(&self, _device: &Device) -> Result<()> {
