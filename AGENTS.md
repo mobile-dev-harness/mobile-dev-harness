@@ -140,4 +140,6 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   No trailers.
 - Keep changes scoped to one milestone item; update the milestone table in `docs/DESIGN.md` and
   `README.md` when a milestone item lands.
+- `README.md` (English) and `README.zh-CN.md` (Simplified Chinese) are user-facing and must say the same
+  thing: update both in the same change. Everything else in the repo is English only.
 - Significant design decisions get an ADR in `docs/adr/` (never edit an accepted ADR; supersede it).
