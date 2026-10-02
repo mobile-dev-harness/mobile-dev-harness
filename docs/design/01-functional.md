@@ -83,12 +83,12 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F3.1 | Disable animations | Sets the three global animation scales to 0; restores original values when the session ends |
-| F3.2 | Permissions | Grants or revokes runtime permissions; sets `appops` |
+| F3.1 | Disable animations ✅ | Sets the three global animation scales to 0 (`mdh state animations off`, `mdh_status`), and does so for every flow run; restores the original values on `animations on`, session reset, the end of a flow run and when the MCP connection closes |
+| F3.2 | Permissions ✅ (grant, revoke) | Grants or revokes runtime permissions (`mdh state grant|revoke`, `mdh_app`, flow `setup.permissions`); `appops` later |
 | F3.3 | System appearance | Locale, dark mode, font scale (for localization and accessibility checks) |
-| F3.4 | Reset | Three levels: `none` / `data` (clear app data) / `snapshot` (load an emulator snapshot) |
+| F3.4 | Reset (`none`, `data` ✅) | Three levels: `none` / `data` (clear app data: `mdh state clear-data`, flow `setup.reset`) / `snapshot` (load an emulator snapshot) |
 | F3.5 | Snapshots | Save/load emulator snapshots to restore "logged in with test data" in seconds |
-| F3.6 | Navigation | Opens a deep link by route name or URI |
+| F3.6 | Navigation ✅ (URIs) | Opens a deep link (`mdh open`, `mdh_app` `open`, flow `setup.open` and `open` steps); named routes come with `mdh.yaml` |
 | F3.7 | Test data | Pushes files via `run-as` for debuggable builds, or sends an agreed broadcast to the app (optional cooperation; the app is never required to change) |
 | F3.8 | Secrets | Config only holds `${env:NAME}` references; values never hit disk, output or recorded flows |
 
@@ -122,7 +122,7 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 | F6.1 | Functional checks ✅ | `visible` / `not visible` / element state (`enabled`, `disabled`, `checked`, `unchecked`, `focused`) / `text` equals or contains / `screen` (current activity) / `no crash` (always checked, over the whole session or flow, including crashes already shown) / `log` and `no log`. Screen checks are re-read until they hold or a timeout (default 3 s) passes, so a result that is still loading isn't a false fail. Screenshot match comes with F13 |
 | F6.2 | **Verdict** ✅ | Structured result: overall status (pass, fail, error), one line per check with what was observed when it failed, steps completed, duration, the run directory |
 | F6.3 | Evidence ✅ | Every verdict writes `screenshot.jpg`, `tree.txt`, `logs.txt` and `verdict.json` to `.mdh/runs/<time>-verify/` (or `-flow-<name>/`); crash reports go into the verdict itself |
-| F6.4 | Check kinds | Functional checks are built in; UI consistency (F13) and performance (F11) checks implement the same check interface, run on the same flows and report into the same verdict, so one run can say "functional: pass; UI: 2 deviations; cold start +180 ms" |
+| F6.4 | Check kinds ✅ (interface) | Functional checks are built in; UI consistency (F13) and performance (F11) checks implement the same check interface, run on the same flows and report into the same verdict, so one run can say "functional: pass; UI: 2 deviations; cold start +180 ms" |
 
 ### F7 Flows: record and replay (`mdh-verify`)
 
@@ -152,8 +152,8 @@ inspects the screens it passes, the compatibility matrix replays it on every cel
 | ID | Feature | Behavior |
 |---|---|---|
 | F9.1 | MCP server | `mdh mcp` (stdio); tool set in §4.2 |
-| F9.2 | Claude Code plugin | MCP config, a `verify` skill (the verification protocol), hooks (inject environment status at session start; remind about unverified changes before stopping) |
-| F9.3 | Other agents | `mdh init` can add a "how to verify this project" section to `AGENTS.md` for Codex, Cursor and others |
+| F9.2 | Claude Code plugin ✅ | `integrations/claude-code`, installable from this repository's marketplace: the MCP server, `verify` and `debug-crash` skills, and hooks — at session start the devices online and the saved flows; before stopping, a reminder (once) when app files changed during the session have no passing verdict since |
+| F9.3 | Other agents ✅ | `mdh init` sets up `.mdh/` (flows committed, state ignored) and keeps a "how to verify this project" section in `AGENTS.md` for Codex, Cursor and others |
 
 ### F10 Platform and framework extensions (after the first release)
 
@@ -219,7 +219,7 @@ just the one it was editing. Static and syntax-level: no device, no build, works
 | F14.3 | Before → after | Calls, navigation edges (`Intent(…, X::class.java)`, class literals of screens) and resource references gained or lost by the changed code |
 | F14.4 | Callers and users | Reverse references across the project, resolved by name with receiver types, imports, package and scope; each with a confidence (`exact`, `likely`, `ambiguous`) and a location. Users of removed declarations are flagged |
 | F14.5 | Affected screens | Callers followed up to activities, fragments and composables hosted by an activity, with the path (`padForSystemBars ← LoginActivity.onCreate`); how to reach each screen: deep links from the manifest, or the taps from the launcher screen (button labels from layouts) |
-| F14.6 | What to verify | Functional: the affected screens. UI: changed layouts, resources, composables or themes. Performance: changes in list adapters, lazy lists, drawing, `Application`/launcher startup. Compatibility: manifest changes, qualified resources (`values-zh`, `layout-land`), `SDK_INT` branches. Tests: unit and instrumented tests that reference changed code. With M4's flows: the flows that pass the affected screens |
+| F14.6 | What to verify | Functional: the affected screens. UI: changed layouts, resources, composables or themes. Performance: changes in list adapters, lazy lists, drawing, `Application`/launcher startup. Compatibility: manifest changes, qualified resources (`values-zh`, `layout-land`), `SDK_INT` branches. Tests: unit and instrumented tests that reference changed code. Flows ✅: the saved flows whose recorded `screens` include an affected screen or its host activity (all of them when the build configuration changed); `mdh flow run --changed` replays them |
 | F14.7 | Honest limits | Lists what syntax can't see (reflection, dependency injection, generated code, routes built at run time) and changed files it doesn't analyze (build scripts are reported as "build configuration changed: verify the whole app") |
 | F14.8 | Budgets | Each section has a line budget and reports what it folded; `--json` returns everything |
 
@@ -230,7 +230,7 @@ just the one it was editing. Static and syntax-level: no device, no build, works
 ```
 mdh doctor | devices
 mdh emulator list | start [avd] | stop
-mdh init                              # probe the project, write mdh.yaml
+mdh init [--project DIR] [--no-agents-md]   # .mdh/ and the AGENTS.md section; mdh.yaml with the config track
 mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]   # --route/--reset with M3
 mdh build | install | launch
 mdh observe [--diff] [--detail minimal|normal|full] [--screenshot [--annotate]]
@@ -240,13 +240,14 @@ mdh type <text> [--into <target>] [--append] [--enter]
 mdh scroll up|down|left|right [--in <target>] [--until <target>]
 mdh wait <target> [--gone] [--timeout 10]
 mdh launch <package|component> | stop <package> | install <apk> [-g]
-mdh open <route|uri>
-mdh state animations off|restore | grant <perm> | reset data | snapshot save|load <name> | locale <tag> | dark on|off
+mdh open <uri> [--package P]                # routes with mdh.yaml
+mdh state animations on|off | grant <perm> [--package P] | revoke <perm> | clear-data [package]
+                                      # later: snapshot save|load <name> | locale <tag> | dark on|off
 mdh logs [--level warn] [--lines 50]
 mdh impact [--base REF] [--project DIR]   # what the change reaches; no device needed
 mdh verify CHECK... [--timeout 3]     # e.g. 'visible "Sign in"' 'enabled id=sign_in' 'screen .LoginActivity'
 mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name>
-mdh flow run <name...> [--junit out.xml] [--step-timeout 10]
+mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
 mdh compat run [--matrix <name>] [flows...] | devices
 mdh visual check [screen|flow] | baseline save|approve | rules
@@ -268,17 +269,16 @@ than split into many small tools.
 
 | Tool | Purpose | CLI equivalent | Since |
 |---|---|---|---|
-| `mdh_status` | Device and session overview; switch device, reset the session | devices / session | M1 ✅ |
+| `mdh_status` | Device and session overview; switch device, reset the session, animations on/off | devices / session / state animations | M1 ✅ |
 | `mdh_observe` | Observe (diff, screenshot) | observe / screenshot | M1 ✅ |
 | `mdh_act` | Run one or more actions, each returning what changed | tap / type / scroll / … | M1 ✅ |
 | `mdh_wait` | Wait for a target to appear or disappear | wait | M1 ✅ |
 | `mdh_logs` | Recent logs and crash reports | logs | M1 ✅ |
-| `mdh_app` | Launch, stop, install | launch / stop / install | M1 ✅ |
+| `mdh_app` | Launch, stop, install, open a deep link, clear data, grant/revoke permissions | launch / stop / install / open / state | M1 ✅, M4 ✅ |
 | `mdh_run` | Build → install → launch → first observation, with progress | run | M2 ✅ |
-| `mdh_navigate` | Open a route or deep link | open | M3 |
-| `mdh_state` | Permissions, reset, snapshots, appearance, animations | state | M3 |
+| `mdh_state` | Snapshots, appearance (locale, dark mode, font scale) | state | M5, M7 |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches and what to verify | impact | M4 |
-| `mdh_verify` | Run checks or replay flows, return a verdict | verify / flow run | M4 ✅ |
+| `mdh_verify` | Run checks or replay flows (named, or those the uncommitted change needs), return a verdict | verify / flow run | M4 ✅ |
 | `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
 | `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual | M5 |
 | `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf | M6 |
@@ -389,6 +389,8 @@ setup:
   reset: data                  # none (default) | data: clear the app's data first
   permissions: [android.permission.POST_NOTIFICATIONS]
   open: mdhsample://login      # start from a deep link instead of the launcher activity
+  animations: true             # keep system animations; by default they're off during the run, then restored
+screens: [LoginActivity, MessagesActivity]   # recorded on save; picks the flows a change needs
 steps:
   - tap: "Log in"                                   # targets as on the CLI: label, id=…, text~=…, role=…
   - type: { into: id=email, text: alice@example.com }

@@ -558,19 +558,32 @@ position, size, spacing, color and font size reported with a side-by-side diff.
 
 ## 15. Claude Code plugin
 
-The repository doubles as a plugin marketplace:
+The repository doubles as a plugin marketplace (`/plugin marketplace add qkmaosjtu/mobile-dev-harness`, then
+`/plugin install mobile-dev-harness@mobile-dev-harness`):
 
 ```
+.claude-plugin/marketplace.json  # at the repo root; one plugin, source ./integrations/claude-code
 integrations/claude-code/
   .claude-plugin/plugin.json
-  .mcp.json                     # { "mdh": { "command": "mdh", "args": ["mcp"] } }
-  skills/verify/SKILL.md        # protocol: run → navigate → observe → act → verify; not done without a pass verdict
-  skills/debug-crash/SKILL.md   # crash triage protocol
-  hooks/hooks.json              # SessionStart: inject `mdh status`; Stop: remind about unverified changes
-.claude-plugin/marketplace.json # at the repo root, so users can add it directly with /plugin
+  .mcp.json                      # { "mcpServers": { "mdh": { "command": "mdh", "args": ["mcp"] } } }
+  skills/verify/SKILL.md         # impact → run → drive each affected screen → verify → flows; done = passing verdict
+  skills/debug-crash/SKILL.md    # read the report, find the root cause, reproduce, fix, prove, save a flow
+  hooks/hooks.json               # SessionStart → `mdh hook session-start`; Stop → `mdh hook stop`
 ```
 
-"Unverified changes" means source files under `src/` or `res/` modified after the most recent pass verdict.
+The plugin carries no code of its own: hooks call `mdh hook <event>` (guarded with `command -v mdh`, so a
+missing binary is silent), which reads the hook's JSON from stdin and stays silent outside Gradle projects.
+
+- **SessionStart** returns `additionalContext`: that the project is verified with mdh, the devices online and the
+  number of saved flows.
+- **Stop** blocks once (never when `stop_hook_active` is set) when app files — sources, resources, manifests,
+  build scripts, as `git` sees them, `.mdh/` excluded — were modified after both the session started (the
+  transcript's creation time) and the newest passing `verdict.json` under `.mdh/runs/`. The reason lists the files
+  and the protocol, and says to state explicitly what couldn't be verified. Work that was already uncommitted
+  before the session doesn't trigger it.
+
+`mdh init` gives other agents the same protocol as a section of `AGENTS.md` (between `<!-- mdh:begin -->` and
+`<!-- mdh:end -->`, replaced in place on later runs) and sets up `.mdh/` with a `.gitignore` that keeps `flows/`.
 
 ## 16. Error model
 
@@ -630,7 +643,8 @@ text.
 
 - **Versioning:** semver, 0.x for now; JSON output carries a `schema` version and changes are called out in the
   CHANGELOG.
-- **Binaries:** GitHub Releases built with `cargo-dist` (macOS arm64/x64, Linux x64/arm64, Windows x64), with shell
+- **Binaries:** GitHub Releases built with `cargo-dist` on `v*` tags (macOS arm64/x64, Linux x64/arm64 ✅ since
+  0.1.0; Windows x64 once mdh runs there), with shell
   and PowerShell installers.
 - **Channels:** crates.io (`cargo install mobile-dev-harness`), a Homebrew tap; later an npm wrapper
   (`npx mobile-dev-harness mcp`, convenient in MCP configs).
@@ -780,14 +794,25 @@ replaced by selectors when they were recorded, typed passwords (recorded as `<se
 Replay (`run_flow`):
 
 1. Every `${env:…}` the flow uses must be set, or the run fails with `MISSING_SECRET` before touching the app.
-2. Setup: `reset: data` (`pm clear`), `permissions` (`pm grant`), then a clean start: the app is stopped and
-   launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`).
+2. Setup: system animations off (unless `setup.animations: true`; restored at the end, and only if the run
+   turned them off), `reset: data` (`pm clear`), `permissions` (`pm grant`), then a clean start: the app is stopped
+   and launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`).
 3. Steps run in order. A step aimed at an element first waits for it (`--step-timeout`, 10 s); an element that
    never shows fails the step with what was on screen instead (closest elements, current activity). An app crash
    during a step fails it. The first failing step stops the flow; the remaining steps and the final checks are
    skipped, `no crash` still runs, and the verdict says how many steps completed.
 4. `assert` steps and the final `assert` run `Functional` with the step number.
 
+**Which flows a change needs.** Saving records `screens`, the activities the steps ran on plus the one the
+session ended on. `flows_for` picks the flows whose screens include a screen `mdh-impact` reports as affected or
+the activity hosting it, or every flow when a build script changed; `mdh impact` lists them, and `run_changed`
+(`mdh flow run --changed`, `mdh_verify` with `changed`) replays them. `mdh-verify` owns flows, so it fills
+`verify.flows` into the impact report; `mdh-impact` stays independent of it.
+
 `run_flows` replays several flows one after another; `junit()` renders their verdicts as one test suite with a
 test case per flow, the first failed check as the failure message and the verdict text as its body.
+
+**End to end in CI.** `.github/workflows/e2e.yml` builds `mdh` and the sample app, boots an API 34 emulator,
+runs `mdh run` and replays the sample's flows (`examples/android-sample/.mdh/flows`) with `--junit`, keeping the
+report and the run directories as artifacts.
 

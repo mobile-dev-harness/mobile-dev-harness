@@ -183,14 +183,18 @@ harness 本身不再额外增加开销，并且在后续计划中的性能、兼
 - [Android SDK platform-tools](https://developer.android.com/tools/releases/platform-tools)（`adb`）；`mdh` 会通过
   `ANDROID_HOME`、`ANDROID_SDK_ROOT` 或 Android Studio 的默认位置找到 SDK
 - 一台模拟器，或打开了 USB 调试的真机，Android 8.0（API 26）及以上
-- [Rust](https://rustup.rs) 1.88 及以上，用于从源码安装（预编译版本在计划中）
+- [Rust](https://rustup.rs) 1.88 及以上，用于从源码安装
 
 ## 安装
 
+预编译版本支持 macOS（Apple 芯片、Intel）和 Linux（x64、arm64）：
+
 ```sh
-cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/qkmaosjtu/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
 mdh doctor
 ```
+
+也可以从源码安装：`cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness`。
 
 `mdh doctor` 会检查 SDK、adb、模拟器、JDK 和已连接的设备，并告诉你缺了什么、怎么解决：
 
@@ -239,7 +243,15 @@ mdh logs                             # 最近的警告、错误和崩溃报告
 
 `mdh mcp` 通过 stdio 以 [MCP](https://modelcontextprotocol.io) 协议提供同一套能力。
 
-**Claude Code：**
+**Claude Code（插件，推荐）**：包含 MCP server、`verify` skill（校验流程）、`debug-crash` skill，以及两个 hook：会话开始时
+告诉 agent 有哪些在线设备；agent 结束前，如果有改动还没有通过的验证结论，会提醒它一次：
+
+```text
+/plugin marketplace add qkmaosjtu/mobile-dev-harness
+/plugin install mobile-dev-harness@mobile-dev-harness
+```
+
+**Claude Code（只用 MCP）：**
 
 ```sh
 claude mcp add mdh -- mdh mcp
@@ -258,22 +270,24 @@ claude mcp add mdh -- mdh mcp
 | `mdh_act` | 一个或多个动作（`tap`、`long_press`、`type`、`swipe`、`scroll`、`key`），每个都报告发生了什么变化 |
 | `mdh_wait` | 等待某个元素出现或消失 |
 | `mdh_logs` | 最近的日志和崩溃报告 |
-| `mdh_app` | 启动、停止或安装 App |
-| `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow；返回结论、实际观测值，证据保存在磁盘上 |
+| `mdh_app` | 启动、停止或安装 App；打开 deep link；清除数据；授予或撤销权限 |
+| `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow（指定名字，或由未提交的改动自动挑选）；返回结论、实际观测值，证据保存在磁盘上 |
 | `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |
 | `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
-| `mdh_status` | 设备和会话状态；切换设备或重置会话 |
+| `mdh_status` | 设备和会话状态；切换设备、重置会话、关闭或恢复系统动画 |
 
 然后就可以对 agent 说：*"打开示例 App，用 alice@example.com 登录，检查消息列表能不能正常显示。"* 返回结果和
 CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并附上崩溃报告。
 
-只能使用命令行的 agent 可以直接调用 CLI，所有命令都支持 `--json`。
+只能使用命令行的 agent 可以直接调用 CLI，所有命令都支持 `--json`。`mdh init` 会在 `AGENTS.md` 里加一节
+"如何校验这个项目"，供 Codex、Cursor 等 agent 阅读。
 
 ## 命令
 
 | 命令 | 说明 |
 |---|---|
 | `mdh doctor` | 检查工具链和设备 |
+| `mdh init [--project DIR] [--no-agents-md]` | 初始化项目：创建 `.mdh/`（flow 提交到仓库，状态文件忽略），并在 `AGENTS.md` 中加入"如何校验"一节 |
 | `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | 用 Gradle 构建，有变化才安装（自动选择匹配设备 ABI 的 APK），重启 App 并显示第一个界面；`--reinstall` 用于替换由另一把密钥签名的旧版本 |
 | `mdh devices` | 列出已连接的设备和模拟器 |
 | `mdh observe [--diff]` | 当前屏幕；`--diff` 只显示自上次查看以来的变化 |
@@ -288,9 +302,12 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh logs [--level warn] [--lines 50]` | App 最近的日志和崩溃报告 |
 | `mdh verify CHECK... [--timeout 3]` | 检查 App 当前的状态并输出结论（失败时退出码 1）；检查项：`visible T`、`not visible T`、`enabled\|disabled\|checked\|unchecked\|focused T`、`text T == V`、`text T ~= V`、`screen ACTIVITY`、`no crash`、`log ~= TEXT`、`no log ~= TEXT` |
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | 把会话中录制的步骤保存为 `.mdh/flows/NAME.yaml` |
-| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow，每个 flow 一份结论 |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
+| `mdh flow run --changed [--base REF]` | 重放经过未提交改动所影响界面的 flow |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |
+| `mdh open URI [--package P]` | 打开 deep link |
+| `mdh state animations on\|off` · `mdh state grant\|revoke PERMISSION` · `mdh state clear-data` | 系统动画（重置会话时恢复）、运行时权限、App 数据 |
 | `mdh session show` · `mdh session reset` | 查看或重置会话 |
 | `mdh mcp` | 以 MCP 协议提供工具 |
 
@@ -367,7 +384,7 @@ mdh launch dev.mdh.sample
 | ✅ | **控制** | 可靠地驱动 App（已完成） |
 | ✅ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动（已完成） |
 | ✅ | **影响面分析** | 通过静态分析得出一处代码改动影响到哪些界面、在那里需要校验什么（已完成） |
-| ⏳ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放、JUnit 报告（已完成）；接下来是基线和 Claude Code 插件；检查类型可插拔： |
+| ✅ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放（CI 中也可以）、根据改动的影响面自动挑选 flow、JUnit 报告、Claude Code 插件（已完成）；基线随 UI 检查一起提供；检查类型可插拔： |
 | ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
 | ⏳ | ↳ **UI 一致性检查** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
 | ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |

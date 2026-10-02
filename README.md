@@ -193,14 +193,18 @@ way as the planned performance, compatibility and visual checks do far more work
 - [Android SDK platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`); `mdh` finds
   the SDK through `ANDROID_HOME`, `ANDROID_SDK_ROOT` or the default Android Studio location
 - An emulator or a device with USB debugging, Android 8.0 (API 26) or newer
-- [Rust](https://rustup.rs) 1.88 or newer, to install from source (prebuilt binaries are planned)
+- [Rust](https://rustup.rs) 1.88 or newer, to install from source
 
 ## Install
 
+Prebuilt for macOS (Apple silicon, Intel) and Linux (x64, arm64):
+
 ```sh
-cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/qkmaosjtu/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
 mdh doctor
 ```
+
+Or from source: `cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness`.
 
 `mdh doctor` checks the SDK, adb, emulators, the JDK and connected devices, and says how to fix what's missing:
 
@@ -249,7 +253,16 @@ To try every feature, use the [sample app](#sample-app).
 
 `mdh mcp` serves the same engine over [MCP](https://modelcontextprotocol.io) on stdio.
 
-**Claude Code:**
+**Claude Code (plugin, recommended):** the MCP server plus a `verify` skill (the verification protocol), a
+`debug-crash` skill, and hooks that show the devices online when a session starts and remind the agent, once,
+before it stops with app changes that have no passing verdict:
+
+```text
+/plugin marketplace add qkmaosjtu/mobile-dev-harness
+/plugin install mobile-dev-harness@mobile-dev-harness
+```
+
+**Claude Code (MCP only):**
 
 ```sh
 claude mcp add mdh -- mdh mcp
@@ -268,23 +281,25 @@ claude mcp add mdh -- mdh mcp
 | `mdh_act` | One or more actions (`tap`, `long_press`, `type`, `swipe`, `scroll`, `key`), each reporting what changed |
 | `mdh_wait` | Wait until an element appears or disappears |
 | `mdh_logs` | Recent log lines and crash reports |
-| `mdh_app` | Launch, stop or install an app |
-| `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows; a verdict with what was observed and evidence on disk |
+| `mdh_app` | Launch, stop or install an app; open a deep link; clear its data; grant or revoke a permission |
+| `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows — named, or the ones the uncommitted change needs; a verdict with what was observed and evidence on disk |
 | `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
-| `mdh_status` | Device and session status; switch device or reset |
+| `mdh_status` | Device and session status; switch device, reset, turn animations off or back on |
 
 Then ask your agent something like *"Open the sample app, log in with alice@example.com, and check that the
 messages list shows up."* Results are the same compact text the CLI prints; a crash of the app is returned as an
 error with the crash report.
 
-Agents that only have a shell can use the CLI directly — every command takes `--json`.
+Agents that only have a shell can use the CLI directly — every command takes `--json`. `mdh init` adds a "how
+to verify this project" section to `AGENTS.md` for Codex, Cursor and other agents.
 
 ## Commands
 
 | Command | Description |
 |---|---|
 | `mdh doctor` | Check the toolchain and devices |
+| `mdh init [--project DIR] [--no-agents-md]` | Set the project up: `.mdh/` (flows committed, state ignored) and a "how to verify" section in `AGENTS.md` |
 | `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | Build with Gradle, install if changed (the right ABI split), restart the app, show its first screen; `--reinstall` replaces an app signed with another key |
 | `mdh devices` | List connected devices and emulators |
 | `mdh observe [--diff]` | The current screen; `--diff` shows only what changed since you last looked |
@@ -299,9 +314,12 @@ Agents that only have a shell can use the CLI directly — every command takes `
 | `mdh logs [--level warn] [--lines 50]` | Recent logs and crash reports of the app |
 | `mdh verify CHECK... [--timeout 3]` | Check the app as it is now and print a verdict (exit 1 on failure); checks: `visible T`, `not visible T`, `enabled\|disabled\|checked\|unchecked\|focused T`, `text T == V`, `text T ~= V`, `screen ACTIVITY`, `no crash`, `log ~= TEXT`, `no log ~= TEXT` |
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | Save the session's recorded steps as `.mdh/flows/NAME.yaml` |
-| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start, one verdict each |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
+| `mdh flow run --changed [--base REF]` | Replay the flows that pass the screens the uncommitted change reaches |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
+| `mdh open URI [--package P]` | Open a deep link |
+| `mdh state animations on\|off` · `mdh state grant\|revoke PERMISSION` · `mdh state clear-data` | Animations (restored on session reset), runtime permissions, app data |
 | `mdh session show` · `mdh session reset` | Inspect or reset the session |
 | `mdh mcp` | Serve the tools over MCP |
 
@@ -386,7 +404,7 @@ matrix that repeats it across devices:
 | ✅ | **Control** | Drive the app reliably (done) |
 | ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
 | ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
-| ⏳ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests, JUnit reports (done); baselines and the Claude Code plugin next — with pluggable check kinds: |
+| ✅ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests (in CI too), the flows a change needs picked from its impact, JUnit reports, a Claude Code plugin (done); baselines arrive with UI checks — with pluggable check kinds: |
 | ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
 | ⏳ | ↳ **UI consistency checks** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
 | ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |

@@ -21,9 +21,11 @@ on-device helper; the ADR-0005 output envelope; `examples/android-sample`; M2: `
 far: change impact analysis in `mdh-impact` (`mdh impact` / `mdh_impact`, ADR-0010) and the
 verification engine in `mdh-verify` (`Check` interface, functional checks, verdicts with evidence in
 `.mdh/runs/`, flows saved from recordings and replayed with setup, JUnit; `mdh verify`, `mdh flow`,
-`mdh_verify`, `mdh_flow`). Next in M4: animations off, the Claude Code plugin, and using impact
-analysis to pick the flows a change needs. State and config is a track that grows with each
-milestone; the benchmark is the last milestone (M10).
+`mdh_verify`, `mdh_flow`), the flows a change needs picked from its impact (`flow run --changed`),
+state for flows (animations, permissions, data reset, deep links: `mdh state`, `mdh open`), the
+Claude Code plugin (`integrations/claude-code`, hooks via `mdh hook`), `mdh init` (AGENTS.md
+section), and the emulator e2e job replaying the sample's flows. Next: M5 (UI consistency checks).
+State and config is a track that grows with each milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## What we optimize for
@@ -51,8 +53,11 @@ crates/
   mdh-compat/    matrix: compatibility across devices and configurations   — empty until M7
   mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
   mdh-cli/       entry point: package `mobile-dev-harness`, binary `mdh` (parsing + rendering only)
+integrations/claude-code/  Claude Code plugin (MCP config, skills, hooks calling `mdh hook`); the
+                 marketplace is .claude-plugin/marketplace.json at the root
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
-examples/android-sample/  test app exercising every feature (Kotlin, Views + Compose)
+examples/android-sample/  test app exercising every feature (Kotlin, Views + Compose); its flows in
+                 .mdh/flows/ are replayed on an emulator by .github/workflows/e2e.yml
 scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
                  diagram/ generates docs/assets/architecture-{light,dark}.svg (Rough.js; `npm install && npm run build`)
 fixtures/        real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
@@ -153,6 +158,10 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - `no crash` must look at the whole window (session or flow), not only unreported logs: a crash the
   agent already saw must still fail the verdict.
 - Screen checks poll until they hold; never add fixed sleeps to flows or checks.
+- Flows of the sample app are an end-to-end test: when a change alters a sample screen, update the
+  flow and run it locally (`MDH_PASSWORD=correct-horse mdh flow run …` in examples/android-sample).
+- Run `claude plugin validate ./integrations/claude-code` and `claude plugin validate .` after
+  changing the plugin or the marketplace.
 - Verdict text is what agents read: one line per check, observed values only for failures, evidence
   as file paths (never inline screenshots).
 
