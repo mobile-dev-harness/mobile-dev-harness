@@ -302,7 +302,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh logs [--level warn] [--lines 50]` | App 最近的日志和崩溃报告 |
 | `mdh verify CHECK... [--timeout 3]` | 检查 App 当前的状态并输出结论（失败时退出码 1）；检查项：`visible T`、`not visible T`、`enabled\|disabled\|checked\|unchecked\|focused T`、`text T == V`、`text T ~= V`、`screen ACTIVITY`、`no crash`、`log ~= TEXT`、`no log ~= TEXT` |
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | 把会话中录制的步骤保存为 `.mdh/flows/NAME.yaml` |
-| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
 | `mdh flow run --changed [--base REF]` | 重放经过未提交改动所影响界面的 flow |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |

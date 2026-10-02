@@ -314,7 +314,7 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh logs [--level warn] [--lines 50]` | Recent logs and crash reports of the app |
 | `mdh verify CHECK... [--timeout 3]` | Check the app as it is now and print a verdict (exit 1 on failure); checks: `visible T`, `not visible T`, `enabled\|disabled\|checked\|unchecked\|focused T`, `text T == V`, `text T ~= V`, `screen ACTIVITY`, `no crash`, `log ~= TEXT`, `no log ~= TEXT` |
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | Save the session's recorded steps as `.mdh/flows/NAME.yaml` |
-| `mdh flow run NAME... [--junit FILE] [--step-timeout 10]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
+| `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
 | `mdh flow run --changed [--base REF]` | Replay the flows that pass the screens the uncommitted change reaches |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |

@@ -247,7 +247,7 @@ mdh logs [--level warn] [--lines 50]
 mdh impact [--base REF] [--project DIR]   # what the change reaches; no device needed
 mdh verify CHECK... [--timeout 3]     # e.g. 'visible "Sign in"' 'enabled id=sign_in' 'screen .LoginActivity'
 mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name>
-mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10]
+mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10] [--timeout 3]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
 mdh compat run [--matrix <name>] [flows...] | devices
 mdh visual check [screen|flow] | baseline save|approve | rules

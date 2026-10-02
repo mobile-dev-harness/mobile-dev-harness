@@ -44,11 +44,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          working-directory: examples/android-sample
-          script: |
-            ../../target/release/mdh devices
-            ../../target/release/mdh run
-            ../../target/release/mdh flow run login-success login-wrong-password settings-bluetooth compose-greeting messages-scroll --junit flows.xml
+          script: scripts/e2e.sh
       - name: Keep the evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,3 +54,4 @@ jobs:
             examples/android-sample/flows.xml
             examples/android-sample/.mdh/runs/
           if-no-files-found: ignore
+          include-hidden-files: true

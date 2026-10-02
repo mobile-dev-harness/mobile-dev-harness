@@ -282,6 +282,9 @@ enum FlowCommand {
         /// Seconds each step waits for its target
         #[arg(long, default_value_t = 10)]
         step_timeout: u64,
+        /// Seconds checks may take to start holding
+        #[arg(long, default_value_t = 3)]
+        timeout: u64,
     },
 }
 
@@ -614,10 +617,14 @@ async fn run(
                 base,
                 junit,
                 step_timeout,
+                timeout,
             } => {
                 let options = mdh_verify::FlowOptions {
                     step_timeout: Duration::from_secs(step_timeout),
-                    ..mdh_verify::FlowOptions::default()
+                    verify: mdh_verify::VerifyOptions {
+                        timeout: Duration::from_secs(timeout),
+                        ..mdh_verify::VerifyOptions::default()
+                    },
                 };
                 let store = mdh_verify::FlowStore::new(FLOWS_DIR);
                 let runs = if changed {
