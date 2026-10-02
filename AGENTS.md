@@ -37,6 +37,7 @@ crates/
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
 examples/android-sample/  test app exercising every feature (Kotlin, Views + Compose)
 scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
+                 diagram/ generates docs/assets/architecture-{light,dark}.svg (Rough.js; `npm install && npm run build`)
 fixtures/        real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
 docs/DESIGN.md   design overview + roadmap; details in docs/design/, decisions in docs/adr/
 ```
@@ -142,4 +143,6 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   `README.md` when a milestone item lands.
 - `README.md` (English) and `README.zh-CN.md` (Simplified Chinese) are user-facing and must say the same
   thing: update both in the same change. Everything else in the repo is English only.
+- The README architecture diagram is code (`scripts/diagram/architecture.mjs`); when crates, domains or
+  data paths change, update it and regenerate both SVGs rather than editing them.
 - Significant design decisions get an ADR in `docs/adr/` (never edit an accepted ADR; supersede it).

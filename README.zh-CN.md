@@ -65,6 +65,44 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 [e128] button "Close app"
 ```
 
+## 系统架构
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
+  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。引擎按五个质量领域组织（控制已完成，校验、UI 一致性、性能和兼容性在计划中），建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
+</picture>
+
+- **两个入口，一套引擎**：agent 通过 MCP 接入，人、CI 和脚本使用 CLI，拿到的是同样的紧凑文本。
+- **五个质量领域，共享一套基础层**：控制已经完成，其余领域都建立在它之上（见[状态与路线图](#状态与路线图)）。
+- **设备上的常驻 helper**：`dev.mdh.helper` 保持一个无障碍连接，所以读取屏幕和注入输入都只要几毫秒；logcat 则把
+  崩溃和错误信息反馈到每一次的结果里。
+
+这张图是用代码生成的（[`scripts/diagram`](scripts/diagram)），采用 Excalidraw 的风格。
+
+## 为什么用 Rust：验证才是瓶颈
+
+以现在大模型的能力，拖慢 AI 编程任务的往往不是写代码，而是验证。agent 要反复地修改、构建、运行、查看、修复；
+一个任务可能要经历几十轮验证，而每一轮都要等 harness 执行完，再等模型读完它返回的结果。所以负责验证的这一环必须足够快，
+体现在三个方面：
+
+1. **每次调用花的时间少**：`mdh` 启动只要约 5 毫秒。作为对比，在同一台机器上，一个什么都不加载的空 Python 或 Node
+   进程启动就要 30 到 40 毫秒。设备相关的 I/O 也是并发执行的：一次观测会同时读取 UI 树、前台 Activity 和新日志。
+   当 agent 通过 CLI 操作时，每一步都是一个新进程，启动开销每次都要付出。
+2. **模型读结果花的时间少**：每屏约 150 token，动作之后只返回变化的部分。模型读取的时间和成本都随 token 数增长。
+3. **没有额外负担**：单个静态二进制文件（约 6.5MB），设备端 helper 也内置其中。不需要任何运行时，不需要安装依赖，
+   在 CI 里和在笔记本上表现一致。
+
+| 在 API 36 模拟器上实测 | 耗时 |
+|---|---|
+| 用 `uiautomator dump` 读取 UI | 约 2,000 毫秒 |
+| 用 `mdh` helper 读取 UI | 约 10 毫秒 |
+| 启动 `mdh` 进程 | 约 5 毫秒 |
+| `mdh observe` 端到端（UI 树、Activity、日志） | 约 100 毫秒 |
+| 执行一个动作并等到界面稳定 | 0.8 到 1.4 秒，主要是 App 自身的动画 |
+
+公平地说：最大的提速来自架构设计，比如用常驻的 helper 代替 `uiautomator`，用 diff 代替整屏内容。Rust 的作用是保证
+harness 本身不再额外增加开销，并且在后续计划中的性能、兼容性和视觉检查让每次调用承担更多工作时，依然保持这一点。
+
 ## 环境要求
 
 - macOS 或 Linux（Windows 尚未测试）

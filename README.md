@@ -66,6 +66,50 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 [e128] button "Close app"
 ```
 
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
+  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine, organized as five quality domains (control is done; verify, UI consistency, performance and compatibility are planned) on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
+</picture>
+
+- **Two entry points, one engine.** Agents connect over MCP, people, CI and scripts use the CLI; both get the same
+  compact text.
+- **Five quality domains on a shared foundation.** Control is done; the others build on it (see
+  [Status and roadmap](#status-and-roadmap)).
+- **A warm helper on the device.** `dev.mdh.helper` keeps an accessibility connection open, so reading the screen
+  and injecting input take milliseconds; logcat feeds crash and error reports back into every result.
+
+The diagram is generated from code ([`scripts/diagram`](scripts/diagram)) in the style of Excalidraw.
+
+## Why Rust: verification is the bottleneck
+
+With today's models, writing the code is rarely what slows an AI coding task down — checking it is. An agent edits,
+builds, runs, looks, fixes and repeats; one task can take dozens of verification rounds, and every round is spent
+waiting on the harness and on the model reading what it returned. So the part that verifies has to be fast in
+three ways:
+
+1. **Little time per call.** `mdh` starts in about 5 ms — an empty Python or Node process alone takes 30–40 ms on the
+   same machine, before loading anything — and does its device I/O concurrently: one observation reads the UI
+   tree, the foreground activity and new logs in parallel. When an agent drives the CLI, every step is a new
+   process, so startup is paid on every call.
+2. **Little time for the model to read.** About 150 tokens per screen and only diffs after actions; the model's
+   reading time and cost grow with every token.
+3. **Nothing in the way.** One static binary (~6.5 MB) with the device helper embedded: no runtime, no dependencies
+   to install, the same behavior in CI as on a laptop.
+
+| Measured on an API 36 emulator | Time |
+|---|---|
+| Read the UI with `uiautomator dump` | ~2,000 ms |
+| Read the UI with the `mdh` helper | ~10 ms |
+| Start the `mdh` process | ~5 ms |
+| `mdh observe`, end to end (tree, activity, logs) | ~100 ms |
+| An action until the UI has settled | 0.8–1.4 s, mostly the app's own animations |
+
+To be fair to other languages: the largest wins come from the design — a warm helper instead of `uiautomator`,
+diffs instead of full screens. Rust is what keeps the harness itself from adding anything on top, and keeps it that
+way as the planned performance, compatibility and visual checks do far more work per call than today.
+
 ## Requirements
 
 - macOS or Linux (Windows is untested)

@@ -1,0 +1,12 @@
+{
+  "name": "mdh-diagrams",
+  "private": true,
+  "type": "module",
+  "description": "Hand-drawn (Excalidraw-style) diagrams for the README, generated from code",
+  "scripts": {
+    "build": "node architecture.mjs"
+  },
+  "dependencies": {
+    "roughjs": "4.6.6"
+  }
+}
