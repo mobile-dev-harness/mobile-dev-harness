@@ -34,7 +34,8 @@ public final class HelperInstrumentation extends Instrumentation {
         AccessibilityServiceInfo info = automation.getServiceInfo();
         // Same view of the hierarchy as `uiautomator dump`: unimportant views and resource ids included.
         info.flags |= AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
-                | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
+                | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+                | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
         automation.setServiceInfo(info);
         try {
             new Server(new Commands(automation)).run();

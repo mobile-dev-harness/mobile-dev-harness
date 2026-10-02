@@ -2,8 +2,8 @@
 
 use std::time::{Duration, Instant};
 
-use mdh_core::ui::RawNode;
-use mdh_core::{Error, Result};
+use mdh_core::ui::{RawNode, WindowInfo};
+use mdh_core::{Error, Input, Result};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use super::Adb;
 
 /// Must match `versionCode` in android-helper/build.gradle.kts and `Commands.VERSION_CODE`.
-pub const HELPER_VERSION_CODE: u64 = 1;
+pub const HELPER_VERSION_CODE: u64 = 2;
 
 const PACKAGE: &str = "dev.mdh.helper";
 const INSTRUMENTATION: &str = "dev.mdh.helper/.HelperInstrumentation";
@@ -75,12 +75,32 @@ impl Helper {
         Ok(response["version_code"].as_u64().unwrap_or_default())
     }
 
-    pub async fn tree(&self) -> Result<Vec<RawNode>> {
+    /// Window roots and the on-screen window list.
+    pub async fn tree(&self) -> Result<(Vec<RawNode>, Vec<WindowInfo>)> {
         let mut response = self.call(json!({ "cmd": "tree" })).await?;
-        serde_json::from_value(response["roots"].take()).map_err(|e| Error::Parse {
-            tool: "mdh helper".into(),
-            detail: e.to_string(),
-        })
+        Ok((
+            decode(response["roots"].take())?,
+            decode(response["windows"].take())?,
+        ))
+    }
+
+    /// Injects input through UiAutomation: a few ms instead of ~120 ms for `adb shell input`.
+    pub async fn input(&self, input: &Input) -> Result<()> {
+        let request = match input {
+            Input::Tap { x, y } => json!({ "cmd": "tap", "x": x, "y": y }),
+            Input::Swipe {
+                from,
+                to,
+                duration_ms,
+            } => json!({
+                "cmd": "swipe",
+                "x1": from.0, "y1": from.1, "x2": to.0, "y2": to.1,
+                "duration_ms": duration_ms,
+            }),
+            Input::Key { name } => json!({ "cmd": "key", "key": name }),
+            Input::SetText { text } => json!({ "cmd": "set_text", "text": text }),
+        };
+        self.call(request).await.map(drop)
     }
 
     /// Waits until no accessibility events arrived for `quiet`; `false` if `timeout` hit first.
@@ -94,13 +114,6 @@ impl Helper {
             }))
             .await?;
         Ok(response["idle"].as_bool().unwrap_or(false))
-    }
-
-    /// Replaces the focused field's content; unlike `input text`, any Unicode text works.
-    pub async fn set_text(&self, text: &str) -> Result<()> {
-        self.call(json!({ "cmd": "set_text", "text": text }))
-            .await
-            .map(drop)
     }
 
     async fn call(&self, request: Value) -> Result<Value> {
@@ -138,6 +151,13 @@ impl Helper {
             })
         }
     }
+}
+
+fn decode<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
+    serde_json::from_value(value).map_err(|e| Error::Parse {
+        tool: "mdh helper".into(),
+        detail: e.to_string(),
+    })
 }
 
 fn unavailable(reason: impl ToString) -> Error {

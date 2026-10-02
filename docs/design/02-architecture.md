@@ -322,14 +322,19 @@ UiAutomation is device-wide.
   `adb forward tcp:0 localabstract:mdh-helper`; forwards are owned by the adb server and reused across invocations.
 - Protocol: one JSON request per line, one JSON response per line, `{"ok": true, ...}` or
   `{"ok": false, "error": ...}`. Commands: `ping` (version code, SDK level), `tree` (field names match `RawNode`),
-  `wait_idle`, `set_text`.
+  `wait_idle`, `set_text`, `tap`, `swipe`, `key`; `tree` also returns the window list (keyboard, system dialogs).
+- Input is injected **asynchronously** through `UiAutomation.injectInputEvent`. Synchronous injection waits until
+  the target window has handled the event and was observed to take 0.4–1.7 s while the app animates; settling is
+  the host's job (§6).
 - `Helper::ensure` (host): reuse the forward → ping → on a missing or stale helper, check the installed
   `versionCode`, (re)install the APK embedded in the binary, start it, poll until it answers. An APK signed with
   another key is uninstalled first.
 - Releases: `scripts/build-helper.sh` rebuilds the APK into `crates/mdh-driver/assets/`. The version code lives in
   three places (Gradle, `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`) and must be bumped together.
 
-**Measured:** warm `mdh observe` ~23 ms end to end; cold start ~360 ms; restart after a kill ~300 ms.
+**Measured:** warm `mdh observe` ~23 ms end to end; cold start ~360 ms; restart after a kill ~300 ms; tree ~7 ms
+and tap ~36 ms (median) per helper request vs. ~120 ms for `adb shell input`. The foreground activity comes from
+`dumpsys window displays` (~37 ms), fetched concurrently with the tree.
 
 **Coexistence:** only one UiAutomation client can run per device. While the helper runs, other clients'
 `uiautomator dump` is killed, so mobile-mcp, Appium or Maestro on the same device conflict with it. If the helper

@@ -35,6 +35,12 @@ pub enum Error {
     #[error("helper command `{cmd}` failed: {message}")]
     HelperCommand { cmd: String, message: String },
 
+    #[error("app `{package}` is not installed or has no launcher activity")]
+    AppNotFound { package: String },
+
+    #[error("could not launch `{target}`: {message}")]
+    LaunchFailed { target: String, message: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -50,6 +56,8 @@ impl Error {
             Error::AmbiguousDevice { .. } => ErrorCode::AmbiguousDevice,
             Error::HelperUnavailable { .. } => ErrorCode::HelperUnavailable,
             Error::HelperCommand { .. } => ErrorCode::HelperError,
+            Error::AppNotFound { .. } => ErrorCode::AppNotFound,
+            Error::LaunchFailed { .. } => ErrorCode::LaunchFailed,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -76,6 +84,12 @@ impl Error {
                     .into()
             }
             Error::HelperCommand { .. } => "check the device screen state and retry".into(),
+            Error::AppNotFound { .. } => {
+                "check the package name (`adb shell pm list packages`) or install the app first".into()
+            }
+            Error::LaunchFailed { .. } => {
+                "check the component name; activities started directly must be exported".into()
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -94,6 +108,8 @@ pub enum ErrorCode {
     AmbiguousDevice,
     HelperUnavailable,
     HelperError,
+    AppNotFound,
+    LaunchFailed,
     Io,
 }
 
@@ -107,7 +123,9 @@ impl ErrorCode {
             | ErrorCode::EnvironmentNotReady
             | ErrorCode::DeviceNotFound
             | ErrorCode::AmbiguousDevice
-            | ErrorCode::HelperUnavailable => 3,
+            | ErrorCode::HelperUnavailable
+            | ErrorCode::AppNotFound
+            | ErrorCode::LaunchFailed => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }

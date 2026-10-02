@@ -9,8 +9,10 @@ Guidance for coding agents working in this repository. Human contributors: see
 build/install, device state setup, compact UI/log observation, assertions and replayable flows,
 exposed as a CLI and (from M1) an MCP server. Android first; iOS, React Native and Flutter later.
 
-**Current state: M1 in progress.** Implemented: Android SDK discovery, `mdh doctor`, `mdh devices`,
-`mdh observe` (compact UI tree via the on-device helper), the ADR-0005 output envelope.
+**Current state: M1 in progress.** Implemented: `doctor`, `devices`, `observe` (screen line + compact
+tree via the on-device helper), `screenshot`, coordinate input (`tap`, `swipe`, `key`, `type`),
+`launch`/`stop`/`install`, the ADR-0005 output envelope. Next: session engine (refs across calls,
+diffs, wait_stable, ref-based actions).
 Next: M1 (engine/session, output envelope, compact UI tree, diffs, screenshots, input,
 logcat, crash detection, MCP server). Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -91,7 +93,8 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Java only, no dependencies, minSdk 26; keep the APK tiny (it is embedded in the binary).
 - After changing `android-helper/`, bump the version code in all three places (Gradle `versionCode`,
   `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`), run `scripts/build-helper.sh` and commit the APK.
-- JSON field names in `Commands.node()` must match `mdh_core::ui::RawNode`.
+- JSON field names in `Commands.node()` / `windows()` must match `mdh_core::ui::{RawNode, WindowInfo}`.
+- Inject input asynchronously; synchronous injection blocks for up to seconds while apps animate.
 - Only one UiAutomation client can run per device: while the helper runs, `uiautomator dump` fails.
   Stop it with `adb shell am force-stop dev.mdh.helper` when capturing fixtures with uiautomator.
 

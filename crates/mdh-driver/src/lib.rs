@@ -3,13 +3,14 @@
 pub mod android;
 mod process;
 
+use std::path::Path;
+
 use async_trait::async_trait;
 use mdh_core::ui::RawTree;
-use mdh_core::{Device, DeviceState, Error, Platform, Result};
+use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, Platform, Result};
 
-/// A platform backend that discovers and controls devices.
-///
-/// Install, launch, input and logs land later in M1.
+/// A platform backend: low-level device capabilities only. Element targeting, waiting and
+/// observation live above it and are shared by all backends.
 #[async_trait]
 pub trait Driver: Send + Sync {
     fn platform(&self) -> Platform;
@@ -17,6 +18,21 @@ pub trait Driver: Send + Sync {
     async fn devices(&self) -> Result<Vec<Device>>;
 
     async fn ui_tree(&self, device: &Device) -> Result<RawTree>;
+
+    /// The focused activity, e.g. `com.example/.MainActivity`.
+    async fn foreground_activity(&self, device: &Device) -> Result<Option<String>>;
+
+    async fn input(&self, device: &Device, input: &Input) -> Result<()>;
+
+    /// A PNG of the screen.
+    async fn screenshot(&self, device: &Device) -> Result<Vec<u8>>;
+
+    async fn install(&self, device: &Device, app: &Path, grant_permissions: bool) -> Result<()>;
+
+    /// Starts `app`, a package (its launcher activity) or a `package/activity` component.
+    async fn launch(&self, device: &Device, app: &str) -> Result<LaunchInfo>;
+
+    async fn stop(&self, device: &Device, package: &str) -> Result<()>;
 }
 
 /// Picks the device to work on: the requested one, or the only online device.

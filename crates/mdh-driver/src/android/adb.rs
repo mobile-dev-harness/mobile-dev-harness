@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use mdh_core::{Device, DeviceState, Platform, Result};
 
-use crate::process::{run, run_with_timeout};
+use crate::process::{run, run_capture, run_with_timeout};
 
 pub struct Adb {
     path: PathBuf,
@@ -50,6 +50,27 @@ impl Adb {
     pub async fn shell(&self, serial: &str, command: &str) -> Result<String> {
         self.on(serial, &["shell", command]).await
     }
+
+    /// Like [`shell`](Self::shell) but returns stdout even when the command fails.
+    pub async fn shell_stdout(&self, serial: &str, command: &str) -> Result<String> {
+        let args = ["-s", serial, "shell", command];
+        Ok(run_capture(&self.path, &args, Duration::from_secs(120))
+            .await?
+            .0)
+    }
+
+    /// Raw stdout bytes of `adb exec-out`, for binary output such as screenshots.
+    pub async fn exec_out_bytes(&self, serial: &str, args: &[&str]) -> Result<Vec<u8>> {
+        let mut full = vec!["-s", serial, "exec-out"];
+        full.extend_from_slice(args);
+        crate::process::run_bytes(&self.path, &full, Duration::from_secs(30)).await
+    }
+}
+
+/// Single-quotes `s` for the device shell, so values like `pkg/.Main$Inner` reach the command
+/// unchanged.
+pub fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 /// Parses `adb devices -l`. Lines look like
@@ -105,6 +126,12 @@ R58M123ABC             unauthorized usb:1-1 transport_id:2
         assert_eq!(devices[1].state, DeviceState::Unauthorized);
         assert_eq!(devices[1].model, None);
         assert!(!devices[1].is_emulator);
+    }
+
+    #[test]
+    fn shell_quote_keeps_metacharacters_literal() {
+        assert_eq!(shell_quote("a/.B$C"), "'a/.B$C'");
+        assert_eq!(shell_quote("it's"), r"'it'\''s'");
     }
 
     #[test]

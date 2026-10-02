@@ -108,4 +108,113 @@ pub struct RawTree {
     /// One root per window.
     pub roots: Vec<RawNode>,
     pub source: TreeSource,
+    /// On-screen windows, top-most first. Empty when the backend can't list them.
+    #[serde(default)]
+    pub windows: Vec<WindowInfo>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WindowKind {
+    Application,
+    InputMethod,
+    System,
+    AccessibilityOverlay,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowInfo {
+    pub kind: WindowKind,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub focused: bool,
+    pub title: Option<String>,
+    pub package: Option<String>,
+    pub bounds: Rect,
+}
+
+/// What is in front of the user, beyond the UI tree.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ScreenInfo {
+    /// Focused activity as `package/.Activity`, as reported by the window manager.
+    pub activity: Option<String>,
+    pub size: Rect,
+    pub keyboard: bool,
+    /// Package of a window covering the app that belongs to someone else, typically a system
+    /// dialog (permission prompt, ANR or crash dialog). Agents must deal with it first.
+    pub overlay: Option<String>,
+}
+
+impl ScreenInfo {
+    pub fn new(activity: Option<String>, size: Rect, windows: &[WindowInfo]) -> Self {
+        let app_package = activity
+            .as_deref()
+            .and_then(|a| a.split_once('/'))
+            .map(|(package, _)| package);
+        let overlay = windows
+            .iter()
+            .filter(|w| w.active || w.focused)
+            .filter(|w| w.kind != WindowKind::InputMethod)
+            .find_map(|w| w.package.as_deref().filter(|p| Some(*p) != app_package))
+            .map(str::to_owned);
+        Self {
+            activity,
+            size,
+            keyboard: windows.iter().any(|w| w.kind == WindowKind::InputMethod),
+            overlay,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn window(kind: WindowKind, package: &str, active: bool) -> WindowInfo {
+        WindowInfo {
+            kind,
+            active,
+            focused: active,
+            title: None,
+            package: Some(package.into()),
+            bounds: Rect::default(),
+        }
+    }
+
+    #[test]
+    fn detects_keyboard_and_foreign_overlay() {
+        let activity = Some("com.example/.MainActivity".to_owned());
+        let plain = ScreenInfo::new(
+            activity.clone(),
+            Rect::default(),
+            &[window(WindowKind::Application, "com.example", true)],
+        );
+        assert!(!plain.keyboard);
+        assert_eq!(plain.overlay, None);
+
+        let prompt = ScreenInfo::new(
+            activity,
+            Rect::default(),
+            &[
+                window(
+                    WindowKind::Application,
+                    "com.android.permissioncontroller",
+                    true,
+                ),
+                window(
+                    WindowKind::InputMethod,
+                    "com.google.android.inputmethod.latin",
+                    false,
+                ),
+                window(WindowKind::Application, "com.example", false),
+            ],
+        );
+        assert!(prompt.keyboard);
+        assert_eq!(
+            prompt.overlay.as_deref(),
+            Some("com.android.permissioncontroller")
+        );
+    }
 }

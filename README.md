@@ -29,7 +29,10 @@ cargo install --path crates/mdh-cli   # crates.io release coming later
 
 mdh doctor    # check Android SDK, adb, emulator/AVDs, JDK
 mdh devices   # list connected devices and emulators
-mdh observe   # compact UI tree of the current screen
+mdh observe   # current screen as a compact UI tree
+mdh screenshot -o shot.jpg
+mdh launch com.android.settings
+mdh tap 672 846 && mdh type "深色模式" && mdh key back
 mdh --json observe
 ```
 

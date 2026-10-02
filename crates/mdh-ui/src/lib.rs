@@ -5,12 +5,14 @@
 
 mod compress;
 mod diff;
+mod image;
 mod refs;
 mod render;
 mod tree;
 
 pub use compress::compress;
 pub use diff::{Change, Field, Removed, TreeDiff, diff};
+pub use image::{Jpeg, screenshot_jpeg};
 pub use refs::RefTable;
 pub use render::{render, render_diff};
 pub use tree::{OpaqueReason, OpaqueRegion, Role, State, UiNode, UiTree};

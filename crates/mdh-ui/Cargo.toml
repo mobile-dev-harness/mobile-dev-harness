@@ -9,6 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+image = { version = "0.25.9", default-features = false, features = ["png", "jpeg"] }
 mdh-core.workspace = true
 serde.workspace = true
 

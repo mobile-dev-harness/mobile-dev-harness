@@ -28,3 +28,7 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# Image decoding and encoding are ~10x slower unoptimized; keep dependencies fast in dev builds.
+[profile.dev.package."*"]
+opt-level = 2
