@@ -125,10 +125,11 @@ function diagram(t) {
   parts.push(arrow(t, 580, 484, 580, 520));
   parts.push(box(t, 30, 524, 1100, 130, "none", { weight: 1.2 }));
   parts.push(text(t, 50, 546, "shared foundation", { size: 17, anchor: "start", color: t.muted }));
-  parts.push(card(t, 50, 562, 330, 78, t.base, "mdh-observe", ["compact tree · refs · diffs · logs"], { titleSize: 20 }));
-  parts.push(card(t, 400, 562, 240, 78, t.base, "mdh-project", ["Gradle · diagnostics"], { titleSize: 20 }));
-  parts.push(card(t, 660, 562, 240, 78, t.base, "mdh-driver", ["adb · helper client"], { titleSize: 20 }));
-  parts.push(card(t, 920, 562, 190, 78, t.base, "mdh-core", ["types · errors"], { titleSize: 20 }));
+  parts.push(card(t, 50, 562, 250, 78, t.base, "mdh-observe", ["tree · refs · diffs · logs"], { titleSize: 20 }));
+  parts.push(card(t, 315, 562, 200, 78, t.base, "mdh-project", ["Gradle · diagnostics"], { titleSize: 20 }));
+  parts.push(card(t, 530, 562, 225, 78, t.base, "mdh-impact", ["change → screens"], { titleSize: 20 }));
+  parts.push(card(t, 770, 562, 190, 78, t.base, "mdh-driver", ["adb · helper"], { titleSize: 20 }));
+  parts.push(card(t, 975, 562, 135, 78, t.base, "mdh-core", ["types · errors"], { titleSize: 20 }));
 
   // 5. The device
   parts.push(box(t, 30, 700, 1100, 170, t.device, { weight: 1.6 }));
@@ -138,8 +139,8 @@ function diagram(t) {
   parts.push(card(t, 790, 742, 310, 80, t.helper, "dev.mdh.helper", ["UiAutomation, always warm"], { titleSize: 20 }));
 
   // Data paths
-  parts.push(arrow(t, 780, 644, 900, 738, { both: true }));
-  parts.push(text(t, 860, 684, "JSON via adb forward · ~10 ms", { size: 16, anchor: "start", color: t.note }));
+  parts.push(arrow(t, 865, 644, 925, 738, { both: true }));
+  parts.push(text(t, 905, 684, "JSON via adb forward · ~10 ms", { size: 16, anchor: "start", color: t.note }));
   parts.push(arrow(t, 694, 782, 786, 782, { both: true }));
   parts.push(text(t, 740, 760, "UI · input", { size: 14, color: t.muted }));
   parts.push(arrow(t, 466, 782, 294, 782, { color: t.muted, dashed: true }));

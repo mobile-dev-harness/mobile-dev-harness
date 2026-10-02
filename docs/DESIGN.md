@@ -8,8 +8,8 @@
 
 | Document | Contents |
 |---|---|
-| [design/01-functional.md](design/01-functional.md) | Functional design: users and scenarios, core concepts, feature modules (F1–F13), CLI/MCP/config/flow/output interfaces, non-functional requirements |
-| [design/02-architecture.md](design/02-architecture.md) | Technical architecture: crates, core abstractions, key flows, UI tree compression, stability, logs, Gradle probing, helper, the perf/compat/visual domains, MCP, plugin, error model, testing, release, security |
+| [design/01-functional.md](design/01-functional.md) | Functional design: users and scenarios, core concepts, feature modules (F1–F14), CLI/MCP/config/flow/output interfaces, non-functional requirements |
+| [design/02-architecture.md](design/02-architecture.md) | Technical architecture: crates, core abstractions, key flows, UI tree compression, stability, logs, Gradle probing, helper, the perf/compat/visual domains, impact analysis, MCP, plugin, error model, testing, release, security |
 | [adr/](adr/) | Architecture decision records |
 
 ## Why it exists: precise verification
@@ -32,6 +32,7 @@ writes and mostly in what it believes about the running app. mdh turns *the agen
 | look mid-transition or at a spinner instead of the result | both errors | settling, spinner awareness, unresponsive-app detection |
 | never read logcat, miss crashes and ANRs | false pass | crashes and errors come with every result, unasked |
 | check the element they care about, miss side effects | false pass | diffs list every change |
+| verify the screen they edited, not the other screens the change reaches | false pass | `mdh impact` lists every affected screen, how to reach it and what to check |
 | don't notice obscured elements or system dialogs | both errors | `obscured`, `overlay` |
 | can't reproduce a check, so can't confirm a fix | wasted rounds | deterministic waiting and replayable flows |
 
@@ -58,6 +59,7 @@ configurations.
 |---|---|---|---|
 | **Control** | `mdh-control` | Can the agent drive the app reliably? | F1, F3, F5 |
 | **Verification engine** | `mdh-verify` | How are checks run, judged and evidenced? Flows, verdicts, evidence, baselines, reports | F6, F7 |
+| ↳ Change impact | `mdh-impact` | What does a change reach, and so what needs verifying? Static, no device (ADR-0010) | F14 |
 | ↳ Functional checks | `mdh-verify` | Does it do what it should? | F6.1 |
 | ↳ UI consistency checks | `mdh-visual` | Does it match its baseline, its design and accessibility rules? | F13 |
 | ↳ Performance checks | `mdh-perf` | Is it fast and lean, and did that regress? | F11 |
@@ -83,7 +85,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | **M0 Scaffold** ✅ | Workspace, CI, licenses, F1.1 `doctor`, F1.2 `devices` | CI green |
 | **M1 Control** ✅ | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording), F4.6–F4.8 logs and crashes ✅, F9.1 MCP server ✅, `examples/android-sample` ✅ | An agent drives every sample-app scenario through MCP alone ✅ |
 | **M2 Project** ✅ | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
-| **M4 Verification engine + functional checks** | F6.1–F6.4, F7.1–F7.4, F9.2 Claude Code plugin, F9.3; from the state track: data reset, permissions, deep links, animations (what flow `setup` needs) | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
+| **M4 Verification engine + functional checks** | F14 change impact ✅ (ADR-0010), F6.1–F6.4, F7.1–F7.4, F9.2 Claude Code plugin, F9.3; from the state track: data reset, permissions, deep links, animations (what flow `setup` needs) | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
 | **M5 UI consistency checks v1** | F13.1 baselines (structural + pixel), F13.3 cross-config layout checks on one device, F13.4 rule checks | A layout regression and a missing label in the sample app show up in a flow's verdict with evidence |
 | **M6 Performance checks v1** | F11.1–F11.5 | A startup and a jank regression in the sample app show up in a verdict against a baseline → **release 0.2.0** |
 | **M7 Compatibility matrix v1** | F12.1–F12.4 (local emulators and physical devices) | One command runs the sample's flows and their checks across a 3×3 matrix and reports per-cell verdicts |

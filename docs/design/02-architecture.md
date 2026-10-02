@@ -1,6 +1,6 @@
 # 02 · Technical Architecture
 
-> Status: draft v0.4 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
+> Status: draft v0.5 · Companion docs: [01-functional.md](01-functional.md), [ADRs](../adr/)
 
 ## 1. Overview
 
@@ -14,6 +14,7 @@
           │  │ mdh-verify   verification engine                      │   │
           │  │   flows · check interface · verdicts · evidence ·     │   │
           │  │   baselines · reports                                 │   │
+          │  │   what to verify ◀── mdh-impact (static, no device)   │   │
           │  │   ┌────────────┐ ┌──────────────┐ ┌───────────────┐   │   │   what is checked
           │  │   │ functional │ │ UI consist.  │ │ performance   │   │   │
           │  │   │ (built in) │ │ mdh-visual   │ │ mdh-perf      │   │   │
@@ -59,6 +60,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-observe` | foundation | Compact UI trees (compression, roles, stable keys, refs, rendering, diffs, opaque regions), screenshot processing; logs and crash reports next | ✅ partly |
 | `mdh-project` | foundation | Gradle probing, building, diagnostics, APK selection; later RN, Expo, Flutter, Xcode | ✅ |
 | `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
+| `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, baselines, flow record/replay, reports (JUnit), functional checks | M4 |
 | `mdh-visual` | check kind | UI consistency: structural and pixel comparison with baselines, cross-config layout checks, rule checks, design mocks | M5, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
@@ -641,3 +643,95 @@ text.
 - Destructive operations on physical devices require `--allow-device-changes`.
 - Secrets are only referenced through env variables and are redacted in output, recordings and run directories.
 - The helper only listens on the device's loopback interface, reachable through adb forward, never the network.
+
+## 23. Change impact analysis (`mdh-impact`)
+
+ADR-0010; features F14. `mdh impact [--base REF]` / `mdh_impact` answer "what does this change reach, and what
+should be verified?" from the source alone: no device, no build, code that doesn't compile is fine.
+
+```
+git diff --relative -M <base>, untracked files      ──▶ change set (paths relative to the Gradle root)
+git ls-files (tracked + untracked, not ignored)     ──▶ every Kotlin/Java/XML/resource file, parsed on all cores
+git cat-file --batch <base>:<path>                  ──▶ base versions of the changed files, parsed the same way
+                ▼
+declaration diff (by key)  ──▶  seeds  ──▶  users, breadth-first, per seed  ──▶  screens · reach · callers · verify
+```
+
+### 23.1 Extraction
+
+One `FileIndex` per file: package, imports, **declarations** (types, functions, properties, constructors; Android
+resources; manifest entries) and **references** (calls with argument counts, types, class literals, resource
+references, other names, file names in string literals), each reference attributed to its innermost enclosing
+declaration.
+
+- **Kotlin** (`tree-sitter-kotlin-ng`) and **Java** (`tree-sitter-java`): receivers get a type where syntax tells:
+  `Checkout().pay()`, `Log.e()`, properties and parameters with declared types or constructor initializers
+  (`private val repo = Repo()`, `by viewModels<LoginViewModel>()`). Local functions, classes and properties are
+  not declarations; what they use counts for the enclosing one. Overloads get keys with their parameter lists.
+  `R.layout.main` and `binding` classes (`ActivityLoginBinding` → `activity_login`) become resource references.
+  A class literal records the view id that triggers it: an `R.id` beside it (`R.id.open_login to
+  LoginActivity::class.java`) or the view whose click listener contains it.
+- **XML** (`tree-sitter-xml`): a layout or menu is a declaration, and so is each view with an `@+id` (its
+  attributes are its body), with its label (`android:text`, …) kept for reach paths; values entries are
+  declarations with their value; navigation graphs give destination edges; the manifest gives components,
+  permissions, the launcher activity and deep links (`scheme://host/path`).
+- **Signature vs. body.** A declaration's signature is the normalized token sequence of what users depend on
+  (modifiers, parameters, return type, supertypes); its body is a hash of the rest. Tokens skip comments and
+  whitespace, so a change that only touches comments or formatting changes neither, and the file is reported as
+  cosmetic. A type's body leaves out its members, which are diffed on their own.
+- **Parse errors.** tree-sitter recovers; a Kotlin file with errors is parsed again with soft-keyword calls
+  (`open(…)`) masked, keeping the attempt with fewer errors. Remaining errors in a changed file are reported.
+
+### 23.2 Resolution
+
+By name, narrowed by what syntax knows, with a confidence on every edge:
+
+| Reference | Candidates | Exact when |
+|---|---|---|
+| Resource (`R.string.x`, `@string/x`) | resources of that type and name, every qualifier | always |
+| Type, class literal | types of that name | one candidate in the file, imported, or in the package |
+| Call/name with a known receiver type `T` | members of `T`, `T.Companion`, extensions of `T`; members of `T`'s supertypes (likely) | one member of `T` |
+| Call/name without a receiver | members of the enclosing types and their companions; members inherited from project supertypes; top-level declarations in the file, the package or imported | one candidate in the enclosing scope, or one visible top-level declaration |
+| Call/name with an unknown receiver | members and extensions anywhere | never (`likely` for one, `ambiguous` for up to four, dropped above) |
+
+Overloads of one function are one target: the argument count picks one when it can, otherwise the edge is
+`likely`.
+
+### 23.3 Propagation and screens
+
+Each changed declaration (added, signature or body changed) is a seed, followed on its own so it keeps its own
+path to each screen. From a declaration, the next ones are: the declarations containing its uses; subclasses of
+a changed type or of the type declaring a changed member; for an override, the member it overrides (calls go
+through the interface an injected dependency is typed as); for a manifest entry, its component class.
+`ambiguous` edges are followed only from the seed itself; depth is capped at 12.
+
+Screens are concrete classes whose project-visible supertypes end in `Activity` or `Fragment`, and composables
+named `…Screen` or `…Route` (not previews). Reaching an activity or fragment, or one of its members, stops
+there; a composable screen is recorded and followed further to find its host activity. Per screen the report
+keeps the best path (confidence, then signature over body changes, then shortest) and how many changes reach it.
+
+**Reach.** Screen-to-screen edges come from class literals of screens (intents) and fragment constructors, each
+attributed to the screens above its use, and from navigation-graph actions; the trigger's view id is shown as
+its label. Reach is the deep links of the screen (or of a composable's host), then the shortest tap path from the
+launcher activity.
+
+### 23.4 Findings
+
+- **Before → after** for each modified declaration: calls, class literals, resource and literal references it
+  gained or lost (`+ SettingsActivity::class · - finish()`).
+- **Callers of changed signatures**, calls whose argument count no longer fits first; **dangling uses** of
+  removed declarations (resources exactly; code by scope, import or receiver type).
+- **What to verify**: functional — the affected screens; UI — changed resources (except ids), composables and
+  custom views, with the screens each reaches; performance — list binding, drawing, lazy lists, `Application`
+  and launcher startup; compatibility — manifest entries, qualified resources, API-level branches, default
+  strings whose translations may now be stale or are missing; tests — test classes using reached code.
+- **Limits**, always stated: reflection, dependency injection, generated code and run-time routes aren't
+  followed; build-script changes are reported as affecting everything.
+
+### 23.5 Cost
+
+Measured on Now in Android (386 files analyzed, 1,900 declarations, 20,000 references) on an M-series laptop:
+~60 ms to index on all cores, ~15 ms to analyze, ~140 ms end to end including git. The sample app takes ~100 ms,
+mostly git. Text output is budgeted per section (12 changes, 10 screens, 4 call-site groups, …) with folded
+counts; `--json` carries everything.
+

@@ -14,6 +14,9 @@ works. When it changes a mobile app, it usually can't: it edits code and hopes. 
 - **Crashes surface immediately.** New errors, crashes, native crashes and ANRs come with every result, with the
   app's own stack frames and the steps that led there.
 - **Fast.** A warm on-device helper reads the UI in ~10 ms (uiautomator takes ~2 s) and types any Unicode text.
+- **Knows what a change reaches.** `mdh impact` reads the uncommitted change and the project's Kotlin, Java and
+  resource files — no device, no build, ~150 ms on a 300-file app — and lists the screens it affects, how to reach
+  each one, the call sites of changed signatures and what to verify.
 - **Build errors an agent can act on.** `mdh run` builds with Gradle, installs only what changed and restarts the
   app; compiler, resource, manifest and dependency failures come back as `file:line` with the offending line.
 - **One engine, two interfaces.** A CLI for humans, scripts and shell-based agents, and an MCP server for agents
@@ -30,7 +33,8 @@ mid-transition, misses the crash in logcat, or checks the button it changed but 
 replaces *eyeballing a screen* with structured facts and deterministic checks:
 
 - **More accurate**: fewer false passes ("it works" when it doesn't) and fewer false fails ("it's broken" when it
-  isn't), because the agent sees settled states, every side effect and every crash.
+  isn't), because the agent knows every screen its change reaches and sees settled states, every side effect and
+  every crash.
 - **Fewer tokens**: a screen in ~150 tokens instead of a ~1,500-token screenshot or thousands of tokens of XML, and
   only the diff after each action — so verifying after every change is affordable.
 
@@ -61,6 +65,27 @@ screen com.android.settings/.SubSettings  1344x2992
 ~ [e18] item "Internet": detail "AndroidWifi" → "Airplane mode is on"
 ~ [e19] item "SIMs": enabled → disabled
 ~ [e20] switch "Airplane mode": off → on
+```
+
+Before verifying, the agent learns what its change reaches — here, a signature change breaks a caller on another
+screen, and the login screen no longer goes to the messages list:
+
+```
+$ mdh impact
+impact vs HEAD (b7197c3): 2 files changed · 2 declarations
+changed
+  ~ LoginActivity.onCreate  body  LoginActivity.kt:15
+  ~ Checkout.pay            signature (cartId: String) → (cartId: String, retry: Boolean)  TroublesActivity.kt:57
+before → after
+  LoginActivity.onCreate: + SettingsActivity::class · - MessagesActivity::class · - finish()
+affected screens
+  LoginActivity     via LoginActivity.onCreate · reach: mdhsample://login | MainActivity ▸ "Log in" ▸ LoginActivity
+  TroublesActivity  via Checkout.pay → TroublesActivity.onCreate · reach: MainActivity ▸ "Troubles" ▸ TroublesActivity
+callers of changed signatures
+  Checkout.pay: TroublesActivity.kt:21 in TroublesActivity.onCreate — 1 argument, needs 2
+verify
+  functional     LoginActivity, TroublesActivity
+note: syntax only: reflection, dependency injection, generated code and routes built at run time are not followed
 ```
 
 And when the app crashes, the agent knows right away (exit code 5):
@@ -207,6 +232,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_wait` | Wait until an element appears or disappears |
 | `mdh_logs` | Recent log lines and crash reports |
 | `mdh_app` | Launch, stop or install an app |
+| `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
 | `mdh_status` | Device and session status; switch device or reset |
 
 Then ask your agent something like *"Open the sample app, log in with alice@example.com, and check that the
@@ -232,6 +258,7 @@ Agents that only have a shell can use the CLI directly — every command takes `
 | `mdh key NAME` | Press a key: `back`, `home`, `enter`, … |
 | `mdh wait TARGET [--gone] [--timeout 10]` | Wait for an element to appear (or disappear) |
 | `mdh logs [--level warn] [--lines 50]` | Recent logs and crash reports of the app |
+| `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
 | `mdh session show` · `mdh session reset` | Inspect or reset the session |
 | `mdh mcp` | Serve the tools over MCP |
@@ -308,13 +335,14 @@ Test account: `alice@example.com` / `correct-horse`.
 ## Status and roadmap
 
 Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
-crash reports, the CLI and the MCP server. Planned: verification as an engine with pluggable check kinds, and a
+crash reports, change impact analysis, the CLI and the MCP server. Planned: verification as an engine with pluggable check kinds, and a
 matrix that repeats it across devices:
 
 | | Layer | What's planned |
 |---|---|---|
 | ✅ | **Control** | Drive the app reliably (done) |
 | ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
+| ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
 | ⏳ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests, baselines, reports, Claude Code plugin — with pluggable check kinds: |
 | ⏳ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? |
 | ⏳ | ↳ **UI consistency checks** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |

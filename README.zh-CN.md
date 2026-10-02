@@ -14,6 +14,9 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
 - **崩溃第一时间暴露**：新的错误日志、崩溃、native 崩溃和 ANR 会随每次结果一起返回，并附上 App 自己的堆栈和
   导致崩溃的操作步骤。
 - **快**：常驻在设备上的 helper 读取界面只要约 10ms（uiautomator 要约 2 秒），还能输入任意语言的文字。
+- **知道改动影响到哪里**：`mdh impact` 读取未提交的改动和项目里的 Kotlin、Java 与资源文件——不需要设备，
+  不需要构建，300 个文件的 App 约 150ms——列出受影响的界面、每个界面怎么进入、签名变了的函数有哪些调用点，
+  以及需要校验什么。
 - **agent 能直接动手修的构建错误**：`mdh run` 用 Gradle 构建，只安装有变化的部分，并重启 App；编译、资源、Manifest
   和依赖方面的错误都会以 `文件:行号` 加出错源码行的形式返回。
 - **一套引擎，两种接口**：给人、脚本和只有命令行的 agent 用的 CLI，以及给 Claude Code 等 agent 用的
@@ -27,8 +30,8 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
 编译通过就宣布完成，读到的是转场动画中途的截图，漏掉了 logcat 里的崩溃，或者只检查了自己改的那个按钮，却没发现另一个页面被改坏了。
 `mdh` 把"agent 自己看屏幕"换成结构化的事实和确定性的检查：
 
-- **更准确**：更少"误判通过"（以为好了其实没好），也更少"误判失败"（以为坏了其实没坏），因为 agent 看到的是稳定后的界面、
-  所有的连带变化和每一次崩溃。
+- **更准确**：更少"误判通过"（以为好了其实没好），也更少"误判失败"（以为坏了其实没坏），因为 agent 知道改动影响到的每一个界面，
+  看到的是稳定后的界面、所有的连带变化和每一次崩溃。
 - **更省 token**：一屏约 150 token，而一张截图约 1,500 token、原始 XML 动辄几千 token；每次操作后只返回变化的部分。
   这样每次改动后都校验一遍，agent 也负担得起。
 
@@ -59,6 +62,26 @@ screen com.android.settings/.SubSettings  1344x2992
 ~ [e18] item "Internet": detail "AndroidWifi" → "Airplane mode is on"
 ~ [e19] item "SIMs": enabled → disabled
 ~ [e20] switch "Airplane mode": off → on
+```
+
+校验之前，agent 先知道改动影响到哪里——下面这个例子里，一处签名改动让另一个界面的调用点编译不过，登录界面也不再跳转到消息列表：
+
+```
+$ mdh impact
+impact vs HEAD (b7197c3): 2 files changed · 2 declarations
+changed
+  ~ LoginActivity.onCreate  body  LoginActivity.kt:15
+  ~ Checkout.pay            signature (cartId: String) → (cartId: String, retry: Boolean)  TroublesActivity.kt:57
+before → after
+  LoginActivity.onCreate: + SettingsActivity::class · - MessagesActivity::class · - finish()
+affected screens
+  LoginActivity     via LoginActivity.onCreate · reach: mdhsample://login | MainActivity ▸ "Log in" ▸ LoginActivity
+  TroublesActivity  via Checkout.pay → TroublesActivity.onCreate · reach: MainActivity ▸ "Troubles" ▸ TroublesActivity
+callers of changed signatures
+  Checkout.pay: TroublesActivity.kt:21 in TroublesActivity.onCreate — 1 argument, needs 2
+verify
+  functional     LoginActivity, TroublesActivity
+note: syntax only: reflection, dependency injection, generated code and routes built at run time are not followed
 ```
 
 App 崩溃时，agent 立刻就能知道（退出码 5）：
@@ -199,6 +222,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_wait` | 等待某个元素出现或消失 |
 | `mdh_logs` | 最近的日志和崩溃报告 |
 | `mdh_app` | 启动、停止或安装 App |
+| `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
 | `mdh_status` | 设备和会话状态；切换设备或重置会话 |
 
 然后就可以对 agent 说：*"打开示例 App，用 alice@example.com 登录，检查消息列表能不能正常显示。"* 返回结果和
@@ -223,6 +247,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh key NAME` | 按键：`back`、`home`、`enter` 等 |
 | `mdh wait TARGET [--gone] [--timeout 10]` | 等待元素出现（或消失） |
 | `mdh logs [--level warn] [--lines 50]` | App 最近的日志和崩溃报告 |
+| `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |
 | `mdh session show` · `mdh session reset` | 查看或重置会话 |
 | `mdh mcp` | 以 MCP 协议提供工具 |
@@ -293,12 +318,13 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、CLI 以及 MCP server。后续计划：把校验做成一个可插拔检查类型的引擎，再用矩阵在不同设备上重复执行：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、CLI 以及 MCP server。后续计划：把校验做成一个可插拔检查类型的引擎，再用矩阵在不同设备上重复执行：
 
 | | 层次 | 计划内容 |
 |---|---|---|
 | ✅ | **控制** | 可靠地驱动 App（已完成） |
 | ✅ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动（已完成） |
+| ✅ | **影响面分析** | 通过静态分析得出一处代码改动影响到哪些界面、在那里需要校验什么（已完成） |
 | ⏳ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放、基线、报告、Claude Code 插件；检查类型可插拔： |
 | ⏳ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？ |
 | ⏳ | ↳ **UI 一致性检查** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |

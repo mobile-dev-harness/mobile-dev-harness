@@ -15,3 +15,4 @@ Superseded.
 | [0007](0007-helper-in-m1.md) | Ship the on-device helper in M1 | Accepted |
 | [0008](0008-quality-domains.md) | Organize around five quality domains on a shared foundation | Superseded in part by 0009 |
 | [0009](0009-verification-engine.md) | Verification is an engine; checks plug into it; compatibility is a matrix | Accepted |
+| [0010](0010-impact-analysis.md) | Change impact analysis is static, syntax-level and fast | Accepted |

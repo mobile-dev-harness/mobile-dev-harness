@@ -43,6 +43,7 @@
 | **Verdict** | A verification result — `pass` / `fail` / `error` — with the expected vs. observed value of every assertion and evidence |
 | **Run** | The artifact directory of one `run` / `verify` / `flow run` (screenshots, logs, verdict) |
 | **Route** | A named deep link from config, e.g. `settings → example://settings` |
+| **Impact** | What a source change reaches: changed declarations, their callers and users up to the screens that show them, and what to verify there |
 
 ## 3. Feature modules
 
@@ -51,7 +52,7 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 | Layer | Modules |
 |---|---|
 | Control | F1 Environment and devices · F3 State setup · F5 Interaction |
-| Verification engine | F6 Verification (verdicts, evidence, functional checks) · F7 Flows |
+| Verification engine | F6 Verification (verdicts, evidence, functional checks) · F7 Flows · F14 Change impact (what a change needs verified) |
 | ↳ Check kinds | F6.1 Functional · F13 UI consistency · F11 Performance |
 | Compatibility matrix | F12 Compatibility |
 | Foundation | F2 Build (`mdh-project`) · F4 Observation and F8 Cost and speed (`mdh-observe`) · F10 Platforms and frameworks |
@@ -206,6 +207,22 @@ A check kind of the verification engine (F6.4): deviations and rule violations a
 | F13.4 | Rule checks | On the tree and pixels: touch targets ≥ 48 dp, interactive elements without a label, text contrast (sampled from the screenshot), duplicate labels; findings reference refs and selectors |
 | F13.5 | Design tokens (later) | Colors and text styles on screen checked against the design system's tokens |
 
+### F14 Change impact analysis (`mdh-impact`, ADR-0010)
+
+Tells the agent what its change reaches before it verifies anything, so it checks every affected screen and not
+just the one it was editing. Static and syntax-level: no device, no build, works on code that doesn't compile.
+
+| ID | Feature | Behavior |
+|---|---|---|
+| F14.1 | Change detection | Working tree (staged, unstaged and untracked files) against `HEAD`, or against `--base <ref>`; limited to the project directory |
+| F14.2 | Declaration diff | Kotlin and Java classes, objects, functions and properties; Android resources (layouts, values entries, drawables and other resource files); manifest entries. Each is added, removed, signature changed or body changed; comment- and formatting-only changes are dropped |
+| F14.3 | Before → after | Calls, navigation edges (`Intent(…, X::class.java)`, class literals of screens) and resource references gained or lost by the changed code |
+| F14.4 | Callers and users | Reverse references across the project, resolved by name with receiver types, imports, package and scope; each with a confidence (`exact`, `likely`, `ambiguous`) and a location. Users of removed declarations are flagged |
+| F14.5 | Affected screens | Callers followed up to activities, fragments and composables hosted by an activity, with the path (`padForSystemBars ← LoginActivity.onCreate`); how to reach each screen: deep links from the manifest, or the taps from the launcher screen (button labels from layouts) |
+| F14.6 | What to verify | Functional: the affected screens. UI: changed layouts, resources, composables or themes. Performance: changes in list adapters, lazy lists, drawing, `Application`/launcher startup. Compatibility: manifest changes, qualified resources (`values-zh`, `layout-land`), `SDK_INT` branches. Tests: unit and instrumented tests that reference changed code. With M4's flows: the flows that pass the affected screens |
+| F14.7 | Honest limits | Lists what syntax can't see (reflection, dependency injection, generated code, routes built at run time) and changed files it doesn't analyze (build scripts are reported as "build configuration changed: verify the whole app") |
+| F14.8 | Budgets | Each section has a line budget and reports what it folded; `--json` returns everything |
+
 ## 4. Interfaces
 
 ### 4.1 CLI command tree
@@ -226,6 +243,7 @@ mdh launch <package|component> | stop <package> | install <apk> [-g]
 mdh open <route|uri>
 mdh state animations off|restore | grant <perm> | reset data | snapshot save|load <name> | locale <tag> | dark on|off
 mdh logs [--level warn] [--lines 50]
+mdh impact [--base REF] [--project DIR]   # what the change reaches; no device needed
 mdh verify <assertions.yaml | -e '<inline assertion>'>
 mdh flow save <name> | list | run <name...> [--junit out.xml]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
@@ -258,6 +276,7 @@ than split into many small tools.
 | `mdh_run` | Build → install → launch → first observation, with progress | run | M2 ✅ |
 | `mdh_navigate` | Open a route or deep link | open | M3 |
 | `mdh_state` | Permissions, reset, snapshots, appearance, animations | state | M3 |
+| `mdh_impact` | What the uncommitted change (or the change since a ref) reaches and what to verify | impact | M4 |
 | `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run | M4 |
 | `mdh_flow` | Save and list flows | flow save / list | M4 |
 | `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual | M5 |

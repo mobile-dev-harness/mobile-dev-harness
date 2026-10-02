@@ -17,7 +17,8 @@ steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-pr
 `scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
 observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
 ADR-0005 output envelope; `examples/android-sample`; M2: `mdh run` / `mdh_run` (Gradle probe, build,
-structured diagnostics, install-if-changed, restart, first observation). Next: M4, the verification engine,
+structured diagnostics, install-if-changed, restart, first observation); M4 so far: change impact
+analysis in `mdh-impact` (`mdh impact` / `mdh_impact`, ADR-0010). Next in M4: the verification engine,
 together with the state capabilities flows need (state and config is a track that grows with each
 milestone). The benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
@@ -37,6 +38,8 @@ crates/
   mdh-driver/    foundation: Driver trait + android/ (SDK, adb, helper client, uiautomator, parsers)
   mdh-observe/   foundation: compact UI trees, stable refs, rendering, diffs, screenshots; logs next
   mdh-project/   foundation: Gradle probe (init script), builds, diagnostics, APK lookup
+  mdh-impact/    verification input: change impact — tree-sitter index of Kotlin/Java/Android XML, git
+                 change set, declaration diff, users up to screens, what to verify (no device, no build)
   mdh-control/   control: session engine, targeting, actions, waiting, app lifecycle, `run`
   mdh-verify/    verification engine: Check interface, verdicts, flows, functional checks — empty until M4
   mdh-visual/    check kind: UI consistency                                 — empty until M5
@@ -53,7 +56,8 @@ docs/DESIGN.md   design overview + roadmap; details in docs/design/, decisions i
 ```
 
 Dependencies point strictly downward: entry points → compat → visual / perf → verify → control →
-observe / project → driver → core. New kinds of checks (accessibility, security, …) implement the
+observe / project → driver → core; `mdh-impact` depends only on core and is used by verify and the
+entry points. New kinds of checks (accessibility, security, …) implement the
 engine's `Check` interface in their own crate instead of growing `mdh-verify`; compatibility is not a
 check kind but runs flows and checks per matrix cell. Never make a lower crate depend on a higher one.
 Crates for later milestones exist with their scope documented in `lib.rs`; keep them empty until
@@ -137,6 +141,19 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Every tool's parameters must be a struct (object schema at the root); `crates/mdh-mcp/tests/tools.rs`
   checks this. Document parameters with doc comments — they become the schema descriptions agents read.
 - Keep the tool count and descriptions small; every definition costs agent context on every turn.
+
+## Impact analysis
+
+- Syntax only (ADR-0010): never add a type checker, a Gradle call or a language server to
+  `mdh-impact`; it must stay fast enough to run after every edit (Now in Android: ~150 ms).
+- Extractors (`kotlin/`, `java.rs`, `xml.rs`) produce `FileIndex` values and are tested on source
+  snippets; end-to-end behavior is tested on a temporary git repository in
+  `crates/mdh-impact/tests/analyze.rs`, with the rendered text pinned by an `insta` snapshot.
+- Link exactly one tree-sitter grammar per language: grammars export fixed C symbols
+  (`tree_sitter_kotlin`), and two Kotlin grammars in one binary silently share one of them.
+- Before changing resolution or propagation, run `mdh impact` on a real project with real edits (the
+  sample app, and a large app such as Now in Android) and read the output; a wrong edge shows up as a
+  screen that shouldn't be there.
 
 ## Sample app
 
