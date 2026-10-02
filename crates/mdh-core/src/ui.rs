@@ -51,6 +51,31 @@ impl Rect {
         (!r.is_empty()).then_some(r)
     }
 
+    /// The parts of `self` not covered by `other` (up to four rectangles).
+    pub fn subtract(&self, other: &Rect) -> Vec<Rect> {
+        let Some(cut) = self.intersect(other) else {
+            return vec![*self];
+        };
+        [
+            Rect::new(self.left, self.top, self.right, cut.top), // above
+            Rect::new(self.left, cut.bottom, self.right, self.bottom), // below
+            Rect::new(self.left, cut.top, cut.left, cut.bottom), // left
+            Rect::new(cut.right, cut.top, self.right, cut.bottom), // right
+        ]
+        .into_iter()
+        .filter(|r| !r.is_empty())
+        .collect()
+    }
+
+    /// The largest part of `self` not covered by any of `covers`, if any is left.
+    pub fn largest_visible_part(&self, covers: &[Rect]) -> Option<Rect> {
+        let mut parts = vec![*self];
+        for cover in covers {
+            parts = parts.iter().flat_map(|p| p.subtract(cover)).collect();
+        }
+        parts.into_iter().max_by_key(Rect::area)
+    }
+
     pub fn union(&self, other: &Rect) -> Rect {
         Rect::new(
             self.left.min(other.left),
@@ -88,6 +113,9 @@ pub struct RawNode {
     pub desc: Option<String>,
     /// Placeholder shown in empty inputs.
     pub hint: Option<String>,
+    /// Role announced by the toolkit when the class is generic, e.g. `Switch` for a Compose row
+    /// with `Role.Switch` (Android's `AccessibilityNodeInfo.roleDescription`).
+    pub role_description: Option<String>,
     pub bounds: Rect,
     pub flags: NodeFlags,
     pub children: Vec<RawNode>,
@@ -145,6 +173,10 @@ pub struct ScreenInfo {
     /// Package of a window covering the app that belongs to someone else, typically a system
     /// dialog (permission prompt, ANR or crash dialog). Agents must deal with it first.
     pub overlay: Option<String>,
+    /// Screen areas covered by system windows drawn over the app (status and navigation bars,
+    /// the keyboard). Taps avoid them; apps drawing edge-to-edge can have content underneath.
+    #[serde(default)]
+    pub obstructions: Vec<Rect>,
 }
 
 impl ScreenInfo {
@@ -159,11 +191,25 @@ impl ScreenInfo {
             .filter(|w| w.kind != WindowKind::InputMethod)
             .find_map(|w| w.package.as_deref().filter(|p| Some(*p) != app_package))
             .map(str::to_owned);
+        let obstructions = windows
+            .iter()
+            .filter(|w| matches!(w.kind, WindowKind::System | WindowKind::InputMethod))
+            .filter(|w| !w.active && !w.focused)
+            .map(|w| w.bounds)
+            .filter(|b| !b.is_empty())
+            .collect();
+        // A dialog's tree only spans the dialog; the windows span the display.
+        let size = windows
+            .iter()
+            .map(|w| w.bounds)
+            .reduce(|a, b| a.union(&b))
+            .unwrap_or(size);
         Self {
             activity,
             size,
             keyboard: windows.iter().any(|w| w.kind == WindowKind::InputMethod),
             overlay,
+            obstructions,
         }
     }
 }
@@ -181,6 +227,21 @@ mod tests {
             package: Some(package.into()),
             bounds: Rect::default(),
         }
+    }
+
+    #[test]
+    fn visible_part_avoids_bars() {
+        let button = Rect::new(48, 48, 1296, 192);
+        let status_bar = Rect::new(0, 0, 1344, 159);
+        assert_eq!(
+            button.largest_visible_part(&[status_bar]),
+            Some(Rect::new(48, 159, 1296, 192))
+        );
+        assert_eq!(
+            button.largest_visible_part(&[Rect::new(0, 0, 2000, 2000)]),
+            None
+        );
+        assert_eq!(button.largest_visible_part(&[]), Some(button));
     }
 
     #[test]

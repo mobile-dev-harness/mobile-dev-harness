@@ -1,0 +1,140 @@
+--------- beginning of main
+         1790943443.829 shell 20267 20267 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: window
+         1790943443.830  1000   667   687 W FastPrintWriter: Write failure
+         1790943443.830  1000   667   687 W FastPrintWriter: java.io.IOException: write failed: EPIPE (Broken pipe)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.IoBridge.write(IoBridge.java:651)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at java.io.FileOutputStream.write(FileOutputStream.java:436)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at com.android.internal.util.FastPrintWriter.flushBytesLocked(FastPrintWriter.java:355)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at com.android.internal.util.FastPrintWriter.flushLocked(FastPrintWriter.java:378)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at com.android.internal.util.FastPrintWriter.flush(FastPrintWriter.java:413)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at android.os.Binder.dump(Binder.java:1064)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at android.os.Binder.onTransact(Binder.java:932)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at android.view.IWindowManager$Stub.onTransact(IWindowManager.java:3510)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at com.android.server.wm.WindowManagerService.onTransact(WindowManagerService.java:1523)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at android.os.Binder.execTransactInternal(Binder.java:1426)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at android.os.Binder.execTransact(Binder.java:1365)
+         1790943443.830  1000   667   687 W FastPrintWriter: Caused by: android.system.ErrnoException: write failed: EPIPE (Broken pipe)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.Linux.writeBytes(Native Method)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.Linux.write(Linux.java:336)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.ForwardingOs.write(ForwardingOs.java:948)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.BlockGuardOs.write(BlockGuardOs.java:448)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	at libcore.io.IoBridge.write(IoBridge.java:646)
+         1790943443.830  1000   667   687 W FastPrintWriter: 	... 10 more
+         1790943443.870 10219 19601 19601 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+         1790943443.872 10219 19601 19601 E AndroidRuntime: FATAL EXCEPTION: main
+         1790943443.872 10219 19601 19601 E AndroidRuntime: Process: dev.mdh.sample, PID: 19601
+         1790943443.872 10219 19601 19601 E AndroidRuntime: java.lang.IllegalStateException: Sample crash: could not pay for the cart
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.Checkout.pay(TroublesActivity.kt:61)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.TroublesActivity.onCreate$lambda$0(TroublesActivity.kt:21)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.TroublesActivity$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.TroublesActivity.click$lambda$0(TroublesActivity.kt:47)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.TroublesActivity$$ExternalSyntheticLambda0.onClick(D8$$SyntheticClass:0)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.view.View.performClick(View.java:8083)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.view.View.performClickInternal(View.java:8060)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.view.View.-$$Nest$mperformClickInternal(Unknown Source:0)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.view.View$PerformClick.run(View.java:31549)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:995)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:103)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:248)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:338)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: Caused by: java.lang.IllegalArgumentException: cart id must not be blank
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.Checkout.requireCart(TroublesActivity.kt:66)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	at dev.mdh.sample.Checkout.pay(TroublesActivity.kt:59)
+         1790943443.872 10219 19601 19601 E AndroidRuntime: 	... 16 more
+         1790943443.877  1000   667  1479 W AS.PlaybackActivityMon: No piid assigned for invalid/internal port id 15
+--------- beginning of system
+         1790943443.878  1000   667 20271 I DropBoxManagerService: add tag=data_app_crash isTagEnabled=true flags=0x2
+         1790943443.879  1000   667   687 W ActivityTaskManager:   Force finishing activity dev.mdh.sample/.TroublesActivity
+         1790943443.881  1000   516   552 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790943443.882 10187   927  1002 V WindowManagerShell: Transition requested (#143): android.os.BinderProxy@aed8f15 TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=35 effectiveUid=10219 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.mdh.sample/.MainActivity } baseActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} topActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.TroublesActivity} origActivity=null realActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} numActivities=2 lastActiveTime=15196921 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@7fc822a} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{ca8681b dev.mdh.sample.TroublesActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 143 }
+         1790943443.883 10219 19601 19601 I Process : Sending signal. PID: 19601 SIG: 9
+         1790943443.893  1000   516   516 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790943443.900  1000   667   790 W InputDispatcher: channel 'ea65626 dev.mdh.sample/dev.mdh.sample.TroublesActivity' ~ Consumer closed input channel or an error occurred.  events=0x9
+         1790943443.900  1000   667   790 E InputDispatcher: channel 'ea65626 dev.mdh.sample/dev.mdh.sample.TroublesActivity' ~ Channel is unrecoverably broken and will be disposed!
+         1790943443.900  1000   667   790 I WindowManager: WINDOW DIED Window{ea65626 u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity}
+         1790943443.901  1000   667  1279 I ActivityManager: Process dev.mdh.sample (pid 19601) has died: fg  TOP 
+         1790943443.901  1000   667   688 I ImeTracker: dev.mdh.sample:bb471a55: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+         1790943443.902  1000   667   688 I ImeTracker: dev.mdh.sample:bb471a55: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790943443.902  1000   667  1279 I ActivityManager: Killing 20046:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a219i2 (adj 0): isolated not needed
+         1790943443.902 10159 10989 10989 I SubtypeOperator: SubtypeOperator$1.onUnbindInput():43 
+         1790943443.904  1000   667   688 I WindowManager: WIN DEATH: Window{ea65626 u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity EXITING}
+         1790943443.904 shell   518   518 I adbd    : Remote process closed the socket (on MSG_PEEK)
+         1790943443.904  1000   667   688 I WindowManager: WIN DEATH: Window{46b02aa u0 dev.mdh.sample/dev.mdh.sample.MainActivity}
+         1790943443.905 10148  6695  6695 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.safetynet.service.START xflg=0x4 pkg=com.google.android.gms }
+         1790943443.905  1000   667  1283 W WindowManager: Cannot find window which accessibility connection is added to
+         1790943443.905 10148  6695  6695 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.safebrowsing.SafeBrowsingService.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+         1790943443.908  1000   667   712 W ActivityManager: setHasOverlayUi called on unknown pid: 19601
+         1790943443.909  1000   667   712 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@a70e6d45 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790943443.909  root   451   451 I Zygote  : Process 19601 exited due to signal 9 (Killed)
+         1790943443.910  1000   667   772 W UsageStatsService: Unexpected activity event reported! (dev.mdh.sample/dev.mdh.sample.MainActivity event : 23 instanceId : 181665673)
+         1790943443.911  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943443.912  1000   667   905 D CompatChangeReporter: Compat change id reported: 377864165; UID 10219; state: ENABLED
+         1790943443.916  1053  8571  8571 I Zygote  : Process 20046 exited cleanly (0)
+         1790943443.921  1000   667   712 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+         1790943443.928  1000   667   720 I libprocessgroup: Removed cgroup /sys/fs/cgroup/apps/uid_10219/pid_19601
+         1790943443.928  1000   667   720 I libprocessgroup: Removed cgroup /sys/fs/cgroup/apps/uid_99002/pid_20046
+         1790943443.929  root   451   451 D Zygote  : Forked child process 20272
+         1790943443.930  1000   667   719 I ActivityManager: Start proc 20272:dev.mdh.sample/u0a219 for top-activity {dev.mdh.sample/dev.mdh.sample.MainActivity}
+         1790943443.930  1000   667   719 I ActivityManager: ProcessObserver broadcast disabled
+         1790943443.937 10219 20272 20272 I dev.mdh.sample: Late-enabling -Xcheck:jni
+         1790943443.975 10219 20272 20272 I dev.mdh.sample: Using CollectorTypeCMC GC.
+         1790943443.978 shell   518   549 I adbd    : jdwp connection from 20272
+         1790943443.986 10219 20272 20272 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790943443.996  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943444.316 10219 20272 20272 D nativeloader: Configuring clns-9 for other apk /data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/lib/arm64:/data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.mdh.sample
+         1790943444.321 10219 20272 20272 I dev.mdh.sample: AssetManager2(0xb40000759dc1c6f8) locale list changing from [] to [en-US]
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment: Currently set values for:
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment: dev.mdh.sample is not listed in per-application setting
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment: dev.mdh.sample is not listed in ANGLE allowlist or settings, returning default
+         1790943444.326 10219 20272 20272 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790943444.348  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943444.349  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943444.350  1000   667   709 V WindowManager: Sent Transition (#143) createdAt=10-02 20:17:23.879 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=35 effectiveUid=10219 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.mdh.sample/.MainActivity } baseActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} topActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.TroublesActivity} origActivity=null realActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} numActivities=2 lastActiveTime=15196921 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{b9ab6b6 Task{5af3a90 #35 type=standard A=10219:dev.mdh.sample}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{7f5475f dev.mdh.sample.TroublesActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 143 }
+         1790943444.350  1000   667   709 V WindowManager:     startWCT=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790943444.350  1000   667   709 V WindowManager:     info={id=143 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790943444.350  1000   667   709 V WindowManager:         {m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{199994970 u0 dev.mdh.sample/.TroublesActivity)/@0x3d7d180 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},
+         1790943444.350  1000   667   709 V WindowManager:         {m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{124514643 u0 dev.mdh.sample/.MainActivity)/@0x850ddc sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}
+         1790943444.350  1000   667   709 V WindowManager:     ]}
+         1790943444.350 10219 20272 20289 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+         1790943444.351 10187   927  2181 V WindowManagerShell: onTransitionReady(transaction=2864743192863)
+         1790943444.352 10187   927  1002 V WindowManagerShell: onTransitionReady (#143) android.os.BinderProxy@aed8f15: {id=143 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790943444.352 10187   927  1002 V WindowManagerShell:         {m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{199994970 u0 dev.mdh.sample/.TroublesActivity)/@0xaf994fc sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},
+         1790943444.352 10187   927  1002 V WindowManagerShell:         {m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{124514643 u0 dev.mdh.sample/.MainActivity)/@0xe916785 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}
+         1790943444.352 10187   927  1002 V WindowManagerShell:     ]}
+         1790943444.352 10187   927  1002 V WindowManagerShell: Playing animation for (#143) android.os.BinderProxy@aed8f15@0
+         1790943444.352 10187   927  1002 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790943444.352 10187   927  1002 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=143 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{199994970 u0 dev.mdh.sample/.TroublesActivity)/@0xaf994fc sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},{m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{124514643 u0 dev.mdh.sample/.MainActivity)/@0xe916785 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}]}
+         1790943444.353 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@2e7720c windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2936755, appThread = android.app.IApplicationThread$Stub$Proxy@2fd156a, debugName = overlayBackTransition }}
+         1790943444.353 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@c449a5b, appThread = android.app.IApplicationThread$Stub$Proxy@d9fa2f8, debugName = LauncherToDream }}
+         1790943444.353 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null windowingMode=undefined},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{NOT atype=undefined independent=true modes=[] flags=NONE mustBeTask=true order=ANY topActivity=null launchCookie=null customAnim=true windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@47023d1, appThread = android.app.IApplicationThread$Stub$Proxy@34f1e36, debugName = QuickstepLaunchHome }}
+         1790943444.353 10187   927  1002 V WindowManagerShell:  Delegate animation for (#143) to null
+         1790943444.353 10187   927  1002 V WindowManagerShell: start default transition animation, info = {id=143 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{199994970 u0 dev.mdh.sample/.TroublesActivity)/@0xaf994fc sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},{m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{124514643 u0 dev.mdh.sample/.MainActivity)/@0xe916785 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}]}
+         1790943444.353 10187   927  1002 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@7c904e8 animAttr=0x6 type=CLOSE isEntrance=true
+         1790943444.353 10219 20272 20272 I dev.mdh.sample: AssetManager2(0xb40000759dc15cb8) locale list changing from [] to [en-US]
+         1790943444.354 10187   927  1002 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@d06ffe7 animAttr=0x7 type=CLOSE isEntrance=false
+         1790943444.354 10187   927  1002 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@5a00f9f
+         1790943444.382 10219 20272 20272 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+         1790943444.386  1000   667   712 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{199994970 u0 dev.mdh.sample/.TroublesActivity t35 f} isExiting}
+         1790943444.409 10219 20272 20272 D CompatChangeReporter: Compat change id reported: 377864165; UID 10219; state: ENABLED
+         1790943444.420 10219 20272 20272 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+         1790943444.450  1000   667   667 W AccessibilityManagerService:  wait for adding window timeout: 443
+         1790943444.454 10219 20272 20272 D CompatChangeReporter: Compat change id reported: 376561342; UID 10219; state: ENABLED
+         1790943444.454 10148  6695 20293 I DropBoxUtil: (REDACTED) Reading dropbox entry with tag %s and timestamp %d
+         1790943444.544 10219 20272 20289 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790943444.544 10219 20272 20289 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790943444.668 10219 20272 20289 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790943444.669 10219 20272 20289 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790943444.683  1000   667   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+         1790943444.684  1000   667   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+         1790943444.684  1000   667   834 D InetDiagMessage: Destroyed live tcp sockets for uids={10167} in 3ms
+         1790943444.684  1000   667   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+         1790943444.684  1000   667   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+         1790943444.684  1000   667   834 D InetDiagMessage: Destroyed live tcp sockets for uids={20167} in 1ms

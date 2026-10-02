@@ -15,7 +15,8 @@ first; iOS, React Native and Flutter later.
 steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
 `scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
 observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
-ADR-0005 output envelope. Next: the sample app and the benchmark against mobile-mcp.
+ADR-0005 output envelope; `examples/android-sample`. M1 is complete except the benchmark against
+mobile-mcp, which is in the backlog (docs/DESIGN.md). Next milestone: M2 (project/build).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout
@@ -34,6 +35,7 @@ crates/
   mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
   mdh-cli/       entry point: package `mobile-dev-harness`, binary `mdh` (parsing + rendering only)
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
+examples/android-sample/  test app exercising every feature (Kotlin, Views + Compose)
 scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
 fixtures/        real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
 docs/DESIGN.md   design overview + roadmap; details in docs/design/, decisions in docs/adr/
@@ -122,6 +124,15 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Every tool's parameters must be a struct (object schema at the root); `crates/mdh-mcp/tests/tools.rs`
   checks this. Document parameters with doc comments — they become the schema descriptions agents read.
 - Keep the tool count and descriptions small; every definition costs agent context on every turn.
+
+## Sample app
+
+- `examples/android-sample` is the end-to-end target: build with `./gradlew assembleDebug`, install with
+  `mdh install`, then drive it with the CLI or MCP. When a behavior changes, run the affected scenario there
+  and look at the actual output, not just the tests — most M1 bugs were found this way.
+- Real captures from it (e.g. `fixtures/android/logcat/sample_*_api36.txt`) back the parser tests; prefer them over
+  synthetic input.
+- Keep its deliberate bugs (Troubles screen, `OverlapActivity`) deliberate; fix accidental ones.
 
 ## Commits and PRs
 

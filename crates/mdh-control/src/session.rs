@@ -23,7 +23,10 @@ const STATE_VERSION: u32 = 1;
 const MAX_SCROLLS: usize = 10;
 const FOCUS_TIMEOUT: Duration = Duration::from_secs(1);
 const WAIT_POLL: Duration = Duration::from_millis(200);
-const SCROLL_MS: u32 = 300;
+const SCROLL_MS: u32 = 400;
+/// Holding still before lifting stops lists where the finger stopped instead of flinging past the
+/// content `scroll --until` is looking for (observed skipping 30+ rows).
+const SCROLL_HOLD_MS: u32 = 150;
 /// Steps listed under a crash, so the agent sees what led to it.
 const STEPS_BEFORE_CRASH: usize = 3;
 /// How far back `logs` looks, independent of the session's cursor.
@@ -224,9 +227,10 @@ impl Session {
         timings.record("act", acted);
 
         let settling = Instant::now();
-        let (snapshot, settled) = settle(&self.control, timings).await?;
+        let outcome = settle(&self.control, timings, Some(&before.tree)).await?;
         timings.record("settle", settling);
-        let after = self.adopt(snapshot);
+        let (settled, unresponsive_ms) = (outcome.settled, outcome.unresponsive_ms);
+        let after = self.adopt(outcome.snapshot);
         self.state.steps.push(RecordedStep {
             at_ms: now_ms(),
             action: recorded,
@@ -240,7 +244,12 @@ impl Session {
 
         let (diff, new_screen, body) = report(Some(previous.as_ref().unwrap_or(&before)), &after);
         let mut header = format!("{description} → ok ({} ms)", millis(started));
-        if !settled {
+        if let Some(ms) = unresponsive_ms {
+            header.push_str(&format!(
+                " — the app did not respond: reading its UI took {:.1} s (main thread blocked? an ANR may follow)",
+                ms as f64 / 1000.0
+            ));
+        } else if !settled {
             header.push_str(&format!(
                 " — UI still changing after {} s",
                 SETTLE_TIMEOUT.as_secs()
@@ -251,6 +260,7 @@ impl Session {
         Ok(ActOutcome {
             action: description,
             settled,
+            unresponsive_ms,
             new_screen,
             screen: after.screen,
             diff,
@@ -469,7 +479,7 @@ impl Session {
     ) -> Result<(String, Action)> {
         match action {
             Action::Tap { target } => {
-                let r = resolve(target, &before.tree, previous)?;
+                let r = resolve(target, &before.tree, previous, &before.screen.obstructions)?;
                 let (x, y) = r.point;
                 self.control.input(&Input::Tap { x, y }).await?;
                 Ok((
@@ -483,12 +493,13 @@ impl Session {
                 target,
                 duration_ms,
             } => {
-                let r = resolve(target, &before.tree, previous)?;
+                let r = resolve(target, &before.tree, previous, &before.screen.obstructions)?;
                 self.control
                     .input(&Input::Swipe {
                         from: r.point,
                         to: r.point,
                         duration_ms: *duration_ms,
+                        hold_ms: 0,
                     })
                     .await?;
                 Ok((
@@ -508,7 +519,7 @@ impl Session {
                 let mut view = before.clone();
                 let mut recorded_into = None;
                 if let Some(target) = into {
-                    let r = resolve(target, &view.tree, previous)?;
+                    let r = resolve(target, &view.tree, previous, &view.screen.obstructions)?;
                     let (x, y) = r.point;
                     recorded_into = Some(persistable(target, &r, &view.tree));
                     self.control.input(&Input::Tap { x, y }).await?;
@@ -576,6 +587,7 @@ impl Session {
                         from: *from,
                         to: *to,
                         duration_ms: *duration_ms,
+                        hold_ms: 0,
                     })
                     .await?;
                 Ok((
@@ -596,7 +608,8 @@ impl Session {
             } => {
                 let (area, recorded_within) = match within {
                     Some(target) => {
-                        let r = resolve(target, &before.tree, previous)?;
+                        let r =
+                            resolve(target, &before.tree, previous, &before.screen.obstructions)?;
                         let bounds = r.node.map_or(before.tree.screen, |n| n.bounds);
                         (
                             inset(bounds, 10),
@@ -629,8 +642,9 @@ impl Session {
                         break;
                     }
                     self.control.input(&gesture).await?;
-                    let (snapshot, _) = settle(&self.control, &mut Timings::default()).await?;
-                    let next = self.adopt(snapshot);
+                    let settled =
+                        settle(&self.control, &mut Timings::default(), Some(&view.tree)).await?;
+                    let next = self.adopt(settled.snapshot);
                     if next.tree.fingerprint() == view.tree.fingerprint() {
                         break; // reached the end
                     }
@@ -703,7 +717,7 @@ fn packages_of(app: Option<&str>, screens: &[&ScreenInfo]) -> Vec<String> {
 
 fn present(target: &Target, tree: &UiTree, previous: Option<&UiTree>) -> bool {
     !matches!(
-        resolve(target, tree, previous),
+        resolve(target, tree, previous, &[]),
         Err(Error::ElementNotFound { .. })
     )
 }
@@ -751,6 +765,7 @@ fn scroll_gesture(direction: Direction, area: Rect) -> Input {
         from,
         to,
         duration_ms: SCROLL_MS,
+        hold_ms: SCROLL_HOLD_MS,
     }
 }
 

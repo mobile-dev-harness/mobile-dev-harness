@@ -40,6 +40,23 @@ pub struct Snapshot {
     pub source: TreeSource,
 }
 
+impl Snapshot {
+    fn new(
+        mut tree: UiTree,
+        windows: &[WindowInfo],
+        activity: Option<String>,
+        source: TreeSource,
+    ) -> Self {
+        let screen = ScreenInfo::new(activity, tree.screen, windows);
+        tree.mark_obscured(&screen.obstructions);
+        Self {
+            tree,
+            screen,
+            source,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct Screenshot {
     pub path: PathBuf,
@@ -67,11 +84,7 @@ impl Control {
         let (tree, activity) =
             tokio::join!(self.tree(), self.driver.foreground_activity(&self.device));
         let (tree, windows, source) = tree?;
-        Ok(Snapshot {
-            screen: ScreenInfo::new(activity?, tree.screen, &windows),
-            tree,
-            source,
-        })
+        Ok(Snapshot::new(tree, &windows, activity?, source))
     }
 
     /// Just the tree, for polling.

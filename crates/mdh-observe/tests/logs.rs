@@ -110,3 +110,77 @@ fn repeated_lines_are_counted_not_listed() {
         ["W/Conn: other", "W/Conn: callback not found (×3)"]
     );
 }
+
+#[test]
+fn native_crash_from_a_real_capture() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/android/logcat/sample_native_crash_api36.txt"
+    );
+    let entries = parse_logcat(&std::fs::read_to_string(path).unwrap());
+    let d = digest(&entries, &app("dev.mdh.sample", &[]));
+    let crash = d
+        .crashes
+        .iter()
+        .find(|c| c.kind == CrashKind::Native)
+        .expect("a native crash");
+    assert_eq!(crash.package.as_deref(), Some("dev.mdh.sample"));
+    assert!(
+        crash.summary.starts_with("signal 11 (SIGSEGV)"),
+        "{}",
+        crash.summary
+    );
+    assert_eq!(crash.frames[0], "#00 libc.so (kill+8)");
+    assert!(crash.frames.iter().all(|f| !f.contains("BuildId")));
+    assert!(crash.of_app);
+}
+
+#[test]
+fn java_crash_shows_the_apps_own_frames_and_cause() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/android/logcat/sample_java_crash_api36.txt"
+    );
+    let entries = parse_logcat(&std::fs::read_to_string(path).unwrap());
+    let d = digest(&entries, &app("dev.mdh.sample", &[]));
+    let crash = &d.crashes[0];
+    assert_eq!(
+        crash.summary,
+        "java.lang.IllegalStateException: Sample crash: could not pay for the cart"
+    );
+    assert_eq!(
+        crash.frames[0],
+        "dev.mdh.sample.Checkout.pay(TroublesActivity.kt:61)"
+    );
+    assert!(
+        crash.frames.iter().all(|f| f.starts_with("dev.mdh.sample")),
+        "framework frames are folded"
+    );
+    assert_eq!(
+        crash.caused_by,
+        ["java.lang.IllegalArgumentException: cart id must not be blank"]
+    );
+}
+
+#[test]
+fn anr_from_a_real_capture() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/android/logcat/sample_anr_api36.txt"
+    );
+    let entries = parse_logcat(&std::fs::read_to_string(path).unwrap());
+    let d = digest(&entries, &app("dev.mdh.sample", &[]));
+    let anr = d
+        .crashes
+        .iter()
+        .find(|c| c.kind == CrashKind::Anr)
+        .expect("an ANR");
+    assert_eq!(anr.package.as_deref(), Some("dev.mdh.sample"));
+    assert_eq!(anr.pid, Some(20765));
+    assert!(
+        anr.summary.starts_with("Input dispatching timed out"),
+        "{}",
+        anr.summary
+    );
+    assert!(anr.of_app);
+}

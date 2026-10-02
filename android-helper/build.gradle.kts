@@ -11,8 +11,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Must match HELPER_VERSION_CODE in crates/mdh-driver/src/android/helper.rs.
-        versionCode = 2
-        versionName = "2"
+        versionCode = 4
+        versionName = "4"
     }
 
     signingConfigs {

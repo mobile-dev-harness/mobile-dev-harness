@@ -59,6 +59,9 @@ pub struct ActOutcome {
     /// What was done, e.g. `tap e5 "Network & internet"`.
     pub action: String,
     pub settled: bool,
+    /// The app stopped answering while settling (see `settle::UNRESPONSIVE`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unresponsive_ms: Option<u64>,
     /// The screen changed so much that the full tree is reported instead of a diff.
     pub new_screen: bool,
     pub screen: ScreenInfo,

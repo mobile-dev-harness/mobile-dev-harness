@@ -41,7 +41,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | Milestone | Features | Done when |
 |---|---|---|
 | **M0 Scaffold** ✅ | Workspace, CI, licenses, F1.1 `doctor`, F1.2 `devices` | CI green |
-| **M1 Control** (in progress) | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording), F4.6–F4.8 logs and crashes ✅, F9.1 MCP server ✅; first `examples/android-sample` | Head-to-head benchmark against mobile-mcp on the sample app (same task set): fewer round trips and tokens at equal or better success rate; results published |
+| **M1 Control** (in progress) | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording), F4.6–F4.8 logs and crashes ✅, F9.1 MCP server ✅, `examples/android-sample` ✅ | An agent drives every sample-app scenario through MCP alone ✅. (The benchmark against mobile-mcp moved to the backlog.) |
 | **M2 Project** | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M3 State & config** | `mdh init`, `mdh.yaml`, F3.1–F3.8, F1.5 | Reach "logged in + specific screen" without manual tapping |
 | **M4 Verify** | F6.1–F6.3, F7.1–F7.4, F9.2 Claude Code plugin, F9.3 | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
@@ -50,6 +50,15 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | **M7 Compatibility v1** | F12.1–F12.4 (local emulators and physical devices) | One command runs the sample's flows across a 3×3 matrix and reports per-cell results |
 | **M8 Ecosystem** | F10.1 RN/Expo, F10.2 Flutter, F13.2 design-mock comparison, F12.5 cloud and vendor devices, F7.5 Maestro import | — |
 | **M9 iOS** | F10.3 | Control and verify pass S1–S4 on the iOS simulator |
+
+## Backlog
+
+| Item | Notes |
+|---|---|
+| **Benchmark against mobile-mcp** | Same task set on `examples/android-sample` with both tools; compare round trips, tokens, latency and success rate; publish in README. Deferred from M1 (2026-10-02). |
+| Display size from the helper | `ScreenInfo.size` is derived from window bounds; while a dialog is the only window (crash dialog, permission prompt) it is too small. The helper should report the display's real size. |
+| Compose content without semantics | Drawn Compose content (a canvas without semantics) is absent from the accessibility tree, so opaque-region detection can't see it. Candidate: screenshot-based detection of unexplained drawn areas (M5, `mdh-visual`). |
+| Calls while the app is frozen | Settling abandons tree reads after 2 s, but the helper keeps serving the blocked request; the next call can wait up to ~10 s. A per-request deadline inside the helper would bound it. |
 
 ## Open questions
 

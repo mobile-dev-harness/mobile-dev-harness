@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use super::Adb;
 
 /// Must match `versionCode` in android-helper/build.gradle.kts and `Commands.VERSION_CODE`.
-pub const HELPER_VERSION_CODE: u64 = 2;
+pub const HELPER_VERSION_CODE: u64 = 4;
 
 const PACKAGE: &str = "dev.mdh.helper";
 const INSTRUMENTATION: &str = "dev.mdh.helper/.HelperInstrumentation";
@@ -92,10 +92,12 @@ impl Helper {
                 from,
                 to,
                 duration_ms,
+                hold_ms,
             } => json!({
                 "cmd": "swipe",
                 "x1": from.0, "y1": from.1, "x2": to.0, "y2": to.1,
                 "duration_ms": duration_ms,
+                "hold_ms": hold_ms,
             }),
             Input::Key { name } => json!({ "cmd": "key", "key": name }),
             Input::SetText { text } => json!({ "cmd": "set_text", "text": text }),

@@ -45,6 +45,19 @@ mdh screenshot -o shot.jpg
 mdh --json observe --diff
 ```
 
+## Try it on the sample app
+
+`examples/android-sample` is a small app built to exercise every feature: View and Compose screens, a login form,
+a 100-row list, linked switches, a WebView, deep links (`mdhsample://login|messages|settings`), a runtime
+permission, an edge-to-edge layout bug, and buttons that crash (Java and native), freeze (ANR), load slowly and log
+errors. Test account: `alice@example.com` / `correct-horse`.
+
+```sh
+cd examples/android-sample && ./gradlew assembleDebug
+mdh install build/outputs/apk/debug/mdh-sample-debug.apk
+mdh launch dev.mdh.sample
+```
+
 ## Use it from an agent (MCP)
 
 `mdh mcp` serves the same session engine over MCP on stdio. In Claude Code:

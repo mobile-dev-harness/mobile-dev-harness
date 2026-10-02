@@ -95,10 +95,12 @@ impl AndroidDriver {
     async fn input_with_adb(&self, device: &Device, input: &Input) -> Result<()> {
         let command = match input {
             Input::Tap { x, y } => format!("input tap {x} {y}"),
+            // `input swipe` can't hold at the end; scrolls may fling a little further.
             Input::Swipe {
                 from,
                 to,
                 duration_ms,
+                ..
             } => format!(
                 "input swipe {} {} {} {} {duration_ms}",
                 from.0, from.1, to.0, to.1
@@ -136,6 +138,17 @@ impl Driver for AndroidDriver {
                 source: TreeSource::Helper,
                 windows,
             }),
+            // Nothing is on screen for a moment while an app dies or between windows; an empty
+            // tree lets settling and crash reporting carry on.
+            Err(Error::HelperCommand { message, .. })
+                if message.contains("no window with content") =>
+            {
+                Ok(RawTree {
+                    roots: Vec::new(),
+                    source: TreeSource::Helper,
+                    windows: Vec::new(),
+                })
+            }
             Err(Error::HelperUnavailable { .. }) => self.dump_with_uiautomator(device).await,
             Err(e) => Err(e),
         }

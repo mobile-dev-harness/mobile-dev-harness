@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:label="mdh sample"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:label="Log in">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mdhsample" android:host="login" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".MessagesActivity"
+            android:exported="true"
+            android:label="Messages">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mdhsample" android:host="messages" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="Settings">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mdhsample" android:host="settings" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ComposeActivity"
+            android:label="Compose" />
+        <activity
+            android:name=".WebActivity"
+            android:label="Web page" />
+        <activity
+            android:name=".TroublesActivity"
+            android:label="Troubles" />
+        <activity
+            android:name=".PermissionsActivity"
+            android:label="Permissions" />
+        <activity
+            android:name=".OverlapActivity"
+            android:label="Overlap bug"
+            android:theme="@android:style/Theme.Material.Light.DarkActionBar" />
+    </application>
+</manifest>

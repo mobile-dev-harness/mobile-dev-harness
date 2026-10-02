@@ -13,6 +13,9 @@ pub enum Input {
         from: (i32, i32),
         to: (i32, i32),
         duration_ms: u32,
+        /// Stay at `to` this long before lifting, so the release has no velocity (no fling).
+        #[serde(default)]
+        hold_ms: u32,
     },
     /// Android key code name without the `KEYCODE_` prefix, e.g. `BACK`, `HOME`, `ENTER`.
     Key {

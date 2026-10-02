@@ -156,10 +156,13 @@ pub(crate) struct Resolved<'a> {
 
 /// Finds `target` in `tree`. A ref that no longer exists is looked up in `previous` (the tree the
 /// agent last saw) and re-found through a selector derived from it.
+/// The point to act on is the center of the largest part of the element that `covers` (system
+/// windows) leave visible.
 pub(crate) fn resolve<'a>(
     target: &Target,
     tree: &'a UiTree,
     previous: Option<&UiTree>,
+    covers: &[mdh_core::ui::Rect],
 ) -> Result<Resolved<'a>> {
     let node = match target {
         Target::Point { x, y } => {
@@ -184,9 +187,14 @@ pub(crate) fn resolve<'a>(
         },
         Target::Selector(sel) => resolve_selector(sel, tree, &sel.to_string())?,
     };
+    let visible = node
+        .visible_part(covers)
+        .ok_or_else(|| Error::TargetObscured {
+            target: target.to_string(),
+        })?;
     Ok(Resolved {
         node: Some(node),
-        point: node.bounds.center(),
+        point: visible.center(),
     })
 }
 
@@ -399,7 +407,7 @@ mod tests {
     }
 
     fn resolved_label(target: &Target, tree: &UiTree) -> Option<String> {
-        resolve(target, tree, None).ok()?.node?.label.clone()
+        resolve(target, tree, None, &[]).ok()?.node?.label.clone()
     }
 
     #[test]
@@ -468,7 +476,7 @@ mod tests {
             raw("TextView", Some("Wi-Fi"), None, 0, false),
             switch("Wi-Fi", 100),
         ]);
-        let r = resolve(&label("Wi-Fi"), &t, None).unwrap();
+        let r = resolve(&label("Wi-Fi"), &t, None, &[]).unwrap();
         assert_eq!(r.node.unwrap().role, Role::Switch);
     }
 
@@ -479,11 +487,11 @@ mod tests {
             raw("Button", Some("Delete"), None, 100, true),
             raw("Button", Some("Network & internet"), None, 200, true),
         ]);
-        match resolve(&label("Delete"), &t, None) {
+        match resolve(&label("Delete"), &t, None, &[]) {
             Err(Error::AmbiguousTarget { candidates, .. }) => assert_eq!(candidates.len(), 2),
             other => panic!("expected ambiguity, got {:?}", other.map(|r| r.point)),
         }
-        match resolve(&label("Netwrk & internet"), &t, None) {
+        match resolve(&label("Netwrk & internet"), &t, None, &[]) {
             Err(Error::ElementNotFound { candidates, .. }) => {
                 assert_eq!(candidates, [r#"[e3] button "Network & internet""#]);
             }
@@ -541,11 +549,11 @@ mod tests {
             .clone();
         assert!(after.find(&old_ref).is_none(), "the old ref should be gone");
 
-        let r = resolve(&Target::Ref(old_ref.clone()), &after, Some(&before)).unwrap();
+        let r = resolve(&Target::Ref(old_ref.clone()), &after, Some(&before), &[]).unwrap();
         assert_eq!(r.node.unwrap().label.as_deref(), Some("Save"));
         assert_ne!(r.node.unwrap().r#ref, old_ref);
         assert!(matches!(
-            resolve(&Target::Ref(old_ref), &after, None),
+            resolve(&Target::Ref(old_ref), &after, None, &[]),
             Err(Error::ElementNotFound { .. })
         ));
     }

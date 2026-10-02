@@ -85,6 +85,9 @@ pub struct State {
     pub focused: bool,
     pub scrollable: bool,
     pub password: bool,
+    /// Mostly covered by system windows (see `mark_obscured`).
+    #[serde(default)]
+    pub obscured: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,7 +106,19 @@ pub struct UiNode {
     pub id: Option<String>,
     pub state: State,
     pub bounds: Rect,
+    /// Parts of the app drawn on top of this node (an action bar over edge-to-edge content, a
+    /// bottom bar, …); see `compress::app_covers`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub covered_by: Vec<Rect>,
     pub children: Vec<UiNode>,
+}
+
+impl UiNode {
+    /// The largest part of the node left visible by the app's own overlays and `system` windows.
+    pub fn visible_part(&self, system: &[Rect]) -> Option<Rect> {
+        let covers: Vec<Rect> = system.iter().chain(&self.covered_by).copied().collect();
+        self.bounds.largest_visible_part(&covers)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +155,19 @@ impl UiTree {
             stack.extend(node.children.iter().rev());
             Some(node)
         })
+    }
+
+    /// Marks nodes of which less than half is visible, given the app's own overlays and the
+    /// `system` windows (status and navigation bars, keyboard).
+    pub fn mark_obscured(&mut self, system: &[Rect]) {
+        fn mark(nodes: &mut [UiNode], system: &[Rect]) {
+            for n in nodes {
+                let visible = n.visible_part(system).map_or(0, |r| r.area());
+                n.state.obscured = visible * 2 < n.bounds.area();
+                mark(&mut n.children, system);
+            }
+        }
+        mark(&mut self.nodes, system);
     }
 
     pub fn find(&self, r#ref: &str) -> Option<&UiNode> {

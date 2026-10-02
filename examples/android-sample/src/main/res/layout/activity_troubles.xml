@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Button android:id="@+id/crash_java" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Crash (Java)" />
+    <Button android:id="@+id/crash_native" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Crash (native)" />
+    <Button android:id="@+id/freeze" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Freeze (ANR)" />
+    <Button android:id="@+id/slow" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Slow load" />
+    <Button android:id="@+id/log_errors" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Log errors" />
+    <Button android:id="@+id/overlap" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Layout bug (overlap)" />
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="Ready" />
+</LinearLayout>

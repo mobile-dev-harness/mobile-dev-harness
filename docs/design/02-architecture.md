@@ -224,6 +224,22 @@ Input: a `RawNode` tree. Output: a `UiTree` of compact nodes with refs.
 9. **Opaque-region detection:** if a large area of the screen (e.g. > 30%) contains no kept nodes, or a WebView is
    present, the observation marks `opaque_regions` and suggests a screenshot.
 
+Further rules learned on `examples/android-sample` (all covered by tests):
+
+- **Role descriptions first.** Toolkits announce roles in `AccessibilityNodeInfo.roleDescription` when the class is
+  generic; a Compose `toggleable(role = Role.Switch)` row is a checkable `View` whose description sits on a child
+  with the same bounds.
+- **Text field labels from children.** Compose renders an `OutlinedTextField` label as a child text, so a field
+  without hint or description takes its first text child as label.
+- **The app's own overlays.** Containers drawn after (on top of) a node that have content and cover less than half
+  the screen — action bars, toolbars, bottom bars — are recorded per node (`covered_by`). Together with system
+  windows they decide the tap point (center of the largest visible part) and the `obscured` state (less than half
+  visible). Observed with an edge-to-edge app whose first buttons sat under the action bar.
+- **WebViews** are opaque only when empty: the system WebView exposes the page through accessibility. Directly
+  nested WebView nodes collapse.
+- **Spacers aren't opaque.** Empty generic views and layouts (`View`, `Space`, `FrameLayout`, …) are spacers or
+  backgrounds; only custom views, `SurfaceView`, `TextureView` and images count as drawn content.
+
 The compressor's output is pinned with snapshot tests (`insta`). Fixtures are uiautomator XML from real apps, and
 the tests also record estimated token counts before and after compression to catch regressions.
 
@@ -242,6 +258,17 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
   5 s overall timeout).
 - **Measured** on API 36: a whole action takes 0.8–1.4 s, of which input is ~40 ms and settling the rest — mostly
   `waitForIdle` waiting out real transition animations, which is time the UI genuinely needs.
+- **Spinners:** indeterminate progress indicators animate without accessibility events or tree changes, so a tap
+  that starts loading would settle on the spinner (observed on the sample's sign-in). Settling also waits while a
+  progress node is showing that wasn't there before the action, within the 5 s timeout; spinners present before
+  the action (e.g. "searching for networks") are ignored.
+- **Unresponsive apps:** while the app's main thread is blocked, each tree read blocks inside the helper (~10 s
+  observed). Settling abandons a read after 2 s and reports that the app did not respond — before the system
+  declares an ANR, which needs an input event during the block.
+- **Scrolling without fling:** scroll gestures (400 ms) hold still at the end for 150 ms before lifting, so lists
+  stop where the finger stopped; a quick swipe flung `scroll --until` 30+ rows past its target.
+- **No active window:** briefly none exists while an app dies or windows change; the helper then falls back to the
+  top-most application window, and an empty screen yields an empty tree instead of an error.
 - **uiautomator "could not get idle state" failures:** retry, falling back to `--compressed` if needed.
 - **System dialogs:** every observation checks whether the foreground window belongs to the system (permission,
   ANR or crash dialogs) and flags it separately so the agent deals with it first.
@@ -336,7 +363,8 @@ UiAutomation is device-wide.
   `adb forward tcp:0 localabstract:mdh-helper`; forwards are owned by the adb server and reused across invocations.
 - Protocol: one JSON request per line, one JSON response per line, `{"ok": true, ...}` or
   `{"ok": false, "error": ...}`. Commands: `ping` (version code, SDK level), `tree` (field names match `RawNode`),
-  `wait_idle`, `set_text`, `tap`, `swipe`, `key`; `tree` also returns the window list (keyboard, system dialogs).
+  `wait_idle`, `set_text`, `tap`, `swipe` (with an optional `hold_ms` at the end), `key`; `tree` also returns the
+  window list (keyboard, system bars, dialogs) and each node's role description.
 - Input is injected **asynchronously** through `UiAutomation.injectInputEvent`. Synchronous injection waits until
   the target window has handled the event and was observed to take 0.4–1.7 s while the app animates; settling is
   the host's job (§6).

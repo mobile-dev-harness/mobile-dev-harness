@@ -1,0 +1,205 @@
+--------- beginning of main
+         1790943700.064  1000   667   985 W AS.PlaybackActivityMon: No piid assigned for invalid/internal port id 15
+         1790943700.065  1041   499   613 D AudioFlinger: mixer(0xb4000072c5fc5770) throttle end: throttle time(36)
+         1790943700.112  1041   499   613 D AudioFlinger: mixer(0xb4000072c5fc5770) throttle end: throttle time(32)
+         1790943703.104  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: threadLoop: entering standby, frames: 8454848
+         1790943703.104  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: joining consumeThread
+         1790943703.106  1041   454 21009 D android.hardware.audio@7.1-impl.ranchu: consumeThread: exiting
+         1790943703.106  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: stopping PCM stream
+         1790943706.112  1000   667   790 W InputDispatcher: Window ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity is unresponsive: ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity is not responding. Waited 5001ms for MotionEvent
+         1790943706.112  1000   667   790 W InputDispatcher: Canceling events for ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity because it is unresponsive
+--------- beginning of system
+         1790943706.114  1000   667   790 I WindowManager: ANR in Window{ca975d6 u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity}. Reason:Input dispatching timed out (ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity is not responding. Waited 5001ms for MotionEvent).
+         1790943706.116  1000   667 21015 D ActivityManager: created ANR temporary file:/data/anr/temp_anr_6056742842906847504.txt
+         1790943706.116  1000   667 21015 I ActivityManager: Collecting stacks for pid 20765 into temporary file temp_anr_6056742842906847504.txt
+         1790943706.116  1000   667 21015 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.116  1000   667 21015 E android.os.Debug: Failed to get binder state info for pid: 20765 status: -2: No such file or directory
+         1790943706.113  1000   667   667 W AnrMainProcessD: type=1400 audit(0.0:232): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.117  1000   667 21015 I system_server: libdebuggerd_client: started dumping process 20765
+         1790943706.118  1058   272   272 I tombstoned: registered intercept for pid 20765 and type kDebuggerdJavaBacktrace
+         1790943706.119 10219 20765 20768 I dev.mdh.sample: Thread[2,tid=20768,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc24380,peer=0x20033f8,"Signal Catcher"]: reacting to signal 3
+         1790943706.119 10219 20765 20768 I dev.mdh.sample: 
+         1790943706.136  1000   667 21016 I ActivityManager: dumpStackTraces pids={1075=true, 1086=true, 1659=true, 1672=true, 1761=true, 1891=true, 1980=true, 2054=true, 2230=true, 2354=true, 2606=true, 2675=true, 2784=true, 2891=true, 2893=true, 3010=true, 3035=true, 3044=true, 3114=true, 3238=true, 3298=true, 3334=true, 3358=true, 3394=true, 3414=true, 3510=true, 3536=true, 3635=true, 3651=true, 5662=true, 6695=true, 7249=true, 7902=true, 7913=true, 8085=true, 8116=true, 8403=true, 8744=true, 8809=true, 8908=true, 9297=true, 9398=true, 9891=true, 10091=true, 10381=true, 10451=true, 11204=true, 14145=true, 14910=true, 16027=true, 16685=true, 16688=true, 16700=true, 16718=true, 16719=true, 16734=true, 16748=true, 16767=true, 16770=true, 16786=true, 16798=true, 17372=true, 18388=true, 19809=true}
+         1790943706.136  1000   667 21016 I ActivityManager: Dumping to /data/anr/anr_2026-10-02-20-21-46-136
+         1790943706.224  1058   272   272 I tombstoned: received crash request for pid 20765
+         1790943706.224  1058   272   272 I tombstoned: found intercept fd 512 for pid 20765 and type kDebuggerdJavaBacktrace
+         1790943706.224 10219 20765 20768 I dev.mdh.sample: Wrote stack traces to tombstoned
+         1790943706.225  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.225  1000   667 21015 I system_server: libdebuggerd_client: done dumping process 20765
+         1790943706.228  1000   667 21016 I ActivityManager: Collecting stacks for pid 667
+         1790943706.228  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.228  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 667 status: -2: No such file or directory
+         1790943706.225  1000   667   667 W AnrConsumer: type=1400 audit(0.0:233): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.231  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 667
+         1790943706.231  1058   272   272 I tombstoned: registered intercept for pid 667 and type kDebuggerdJavaBacktrace
+         1790943706.231  1000   667   673 I system_server: Thread[2,tid=673,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc24380,peer=0x2007040,"Signal Catcher"]: reacting to signal 3
+         1790943706.231  1000   667   673 I system_server: 
+         1790943706.320  1000   667   721 E OomConnection: failed waiting for OOM events: java.lang.RuntimeException: listener failed waiting for OOM event
+         1790943706.404  1000   667 21017 I ActivityManager: Skipping next CPU consuming process, not a java proc: 667
+         1790943706.404  1000   667 21017 I ActivityManager: Skipping next CPU consuming process, not a java proc: 20765
+         1790943706.404  1000   667 21017 I ActivityManager: Skipping next CPU consuming process, not a java proc: 470
+         1790943706.404  1000   667 21017 I ActivityManager: Skipping next CPU consuming process, not a java proc: 19712
+         1790943706.404  1000   667 21017 I ActivityManager: Skipping next CPU consuming process, not a java proc: 20179
+         1790943706.554  1058   272   272 I tombstoned: received crash request for pid 667
+         1790943706.554  1058   272   272 I tombstoned: found intercept fd 512 for pid 667 and type kDebuggerdJavaBacktrace
+         1790943706.554  1000   667   673 I system_server: Wrote stack traces to tombstoned
+         1790943706.554  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.555  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 667
+         1790943706.557  1000   667 21016 I ActivityManager: Collecting stacks for pid 10989
+         1790943706.557  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.557  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 10989 status: -2: No such file or directory
+         1790943706.553  1000   667   667 W AnrConsumer: type=1400 audit(0.0:234): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.558  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 10989
+         1790943706.558  1058   272   272 I tombstoned: registered intercept for pid 10989 and type kDebuggerdJavaBacktrace
+         1790943706.559 10159 10989 10992 I putmethod.latin: Thread[2,tid=10992,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc24380,peer=0x2003a20,"Signal Catcher"]: reacting to signal 3
+         1790943706.559 10159 10989 10992 I putmethod.latin: 
+         1790943706.750  1058   272   272 I tombstoned: received crash request for pid 10989
+         1790943706.750  1058   272   272 I tombstoned: found intercept fd 512 for pid 10989 and type kDebuggerdJavaBacktrace
+         1790943706.750 10159 10989 10992 I putmethod.latin: Wrote stack traces to tombstoned
+         1790943706.750  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.750  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 10989
+         1790943706.752  1000   667 21016 I ActivityManager: Collecting stacks for pid 1747
+         1790943706.752  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.752  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 1747 status: -2: No such file or directory
+         1790943706.749  1000   667   667 W AnrConsumer: type=1400 audit(0.0:235): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.753  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 1747
+         1790943706.753  1058   272   272 I tombstoned: registered intercept for pid 1747 and type kDebuggerdJavaBacktrace
+         1790943706.754  1000  1747  1754 I or.multidisplay: Thread[2,tid=1754,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc25f50,peer=0x2001de0,"Signal Catcher"]: reacting to signal 3
+         1790943706.754  1000  1747  1754 I or.multidisplay: 
+         1790943706.795  1058   272   272 I tombstoned: received crash request for pid 1747
+         1790943706.795  1058   272   272 I tombstoned: found intercept fd 512 for pid 1747 and type kDebuggerdJavaBacktrace
+         1790943706.795  1000  1747  1754 I or.multidisplay: Wrote stack traces to tombstoned
+         1790943706.795  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.795  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 1747
+         1790943706.797  1000   667 21016 I ActivityManager: Collecting stacks for pid 1054
+         1790943706.797  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.797  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 1054 status: -2: No such file or directory
+         1790943706.793  1000   667   667 W AnrConsumer: type=1400 audit(0.0:236): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.797  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 1054
+         1790943706.798  1058   272   272 I tombstoned: registered intercept for pid 1054 and type kDebuggerdJavaBacktrace
+         1790943706.798  1068  1054  1055 I com.android.se: Thread[2,tid=1055,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc25f50,peer=0x2000d58,"Signal Catcher"]: reacting to signal 3
+         1790943706.798  1068  1054  1055 I com.android.se: 
+         1790943706.832  1058   272   272 I tombstoned: received crash request for pid 1054
+         1790943706.832  1058   272   272 I tombstoned: found intercept fd 512 for pid 1054 and type kDebuggerdJavaBacktrace
+         1790943706.833  1068  1054  1055 I com.android.se: Wrote stack traces to tombstoned
+         1790943706.833  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.833  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 1054
+         1790943706.834  1000   667 21016 I ActivityManager: Collecting stacks for pid 1056
+         1790943706.834  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.835  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 1056 status: -2: No such file or directory
+         1790943706.829  1000   667   667 W AnrConsumer: type=1400 audit(0.0:237): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.836  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 1056
+         1790943706.836  1058   272   272 I tombstoned: registered intercept for pid 1056 and type kDebuggerdJavaBacktrace
+         1790943706.836 radio  1056  1064 I m.android.phone: Thread[2,tid=1064,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc25f50,peer=0x2000c50,"Signal Catcher"]: reacting to signal 3
+         1790943706.836 radio  1056  1064 I m.android.phone: 
+         1790943706.898  1058   272   272 I tombstoned: received crash request for pid 1056
+         1790943706.898  1058   272   272 I tombstoned: found intercept fd 512 for pid 1056 and type kDebuggerdJavaBacktrace
+         1790943706.898 radio  1056  1064 I m.android.phone: Wrote stack traces to tombstoned
+         1790943706.898  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.898  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 1056
+         1790943706.900  1000   667 21016 I ActivityManager: Collecting stacks for pid 1030
+         1790943706.900  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.900  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 1030 status: -2: No such file or directory
+         1790943706.897  1000   667   667 W AnrConsumer: type=1400 audit(0.0:238): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+         1790943706.900  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 1030
+         1790943706.900  1058   272   272 I tombstoned: registered intercept for pid 1030 and type kDebuggerdJavaBacktrace
+         1790943706.901  1073  1030  1031 I rkstack.process: Thread[2,tid=1031,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc25f50,peer=0x2000c40,"Signal Catcher"]: reacting to signal 3
+         1790943706.901  1073  1030  1031 I rkstack.process: 
+         1790943706.941  1058   272   272 I tombstoned: received crash request for pid 1030
+         1790943706.941  1058   272   272 I tombstoned: found intercept fd 512 for pid 1030 and type kDebuggerdJavaBacktrace
+         1790943706.941  1073  1030  1031 I rkstack.process: Wrote stack traces to tombstoned
+         1790943706.941  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943706.941  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 1030
+         1790943706.944  1000   667 21016 I ActivityManager: Collecting stacks for pid 927
+         1790943706.944  1000   667 21016 E system_server: Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+         1790943706.944  1000   667 21016 E android.os.Debug: Failed to get binder state info for pid: 927 status: -2: No such file or directory
+         1790943706.945  1000   667 21016 I system_server: libdebuggerd_client: started dumping process 927
+         1790943706.945  1058   272   272 I tombstoned: registered intercept for pid 927 and type kDebuggerdJavaBacktrace
+         1790943706.945 10187   927   928 I ndroid.systemui: Thread[2,tid=928,WaitingInMainSignalCatcherLoop,Thread*=0xb40000756dc25f50,peer=0x20014b0,"Signal Catcher"]: reacting to signal 3
+         1790943706.945 10187   927   928 I ndroid.systemui: 
+         1790943707.041  1058   272   272 I tombstoned: received crash request for pid 927
+         1790943707.041  1058   272   272 I tombstoned: found intercept fd 512 for pid 927 and type kDebuggerdJavaBacktrace
+         1790943707.041 10187   927   928 I ndroid.systemui: Wrote stack traces to tombstoned
+         1790943707.042  1058   272   272 W tombstoned: skipping tombstone file creation due to intercept
+         1790943707.042  1000   667 21016 I system_server: libdebuggerd_client: done dumping process 927
+         1790943707.044  1000   667 21016 I ActivityManager: dumpStackTraces nativepids=null
+         1790943707.044  1000   667 21016 I ActivityManager: dumpStackTraces extraPids=[]
+         1790943707.044  1000   667 21016 I ActivityManager: Done dumping
+         1790943707.045  1000   667 21016 E ActivityManager: ANR in dev.mdh.sample (dev.mdh.sample/.TroublesActivity)
+         1790943707.045  1000   667 21016 E ActivityManager: PID: 20765
+         1790943707.045  1000   667 21016 E ActivityManager: Reason: Input dispatching timed out (ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity is not responding. Waited 5001ms for MotionEvent).
+         1790943707.045  1000   667 21016 E ActivityManager: Parent: dev.mdh.sample/.TroublesActivity
+         1790943707.045  1000   667 21016 E ActivityManager: ErrorId: 58a19ecc-88c3-4d53-ac7f-a69fd9a4f5c9
+         1790943707.045  1000   667 21016 E ActivityManager: Frozen: false
+         1790943707.045  1000   667 21016 E ActivityManager: Load: 0.53 / 0.6 / 0.43
+         1790943707.045  1000   667 21016 E ActivityManager: ----- Output from /proc/pressure/memory -----
+         1790943707.045  1000   667 21016 E ActivityManager: some avg10=0.00 avg60=0.00 avg300=0.01 total=10708203
+         1790943707.045  1000   667 21016 E ActivityManager: full avg10=0.00 avg60=0.00 avg300=0.00 total=4763875
+         1790943707.045  1000   667 21016 E ActivityManager: ----- End output from /proc/pressure/memory -----
+         1790943707.045  1000   667 21016 E ActivityManager: ----- Output from /proc/pressure/cpu -----
+         1790943707.045  1000   667 21016 E ActivityManager: some avg10=0.48 avg60=0.97 avg300=1.77 total=277156005
+         1790943707.045  1000   667 21016 E ActivityManager: full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+         1790943707.045  1000   667 21016 E ActivityManager: ----- End output from /proc/pressure/cpu -----
+         1790943707.045  1000   667 21016 E ActivityManager: ----- Output from /proc/pressure/io -----
+         1790943707.045  1000   667 21016 E ActivityManager: some avg10=0.00 avg60=0.00 avg300=0.05 total=42619206
+         1790943707.045  1000   667 21016 E ActivityManager: full avg10=0.00 avg60=0.00 avg300=0.00 total=17532159
+         1790943707.045  1000   667 21016 E ActivityManager: ----- End output from /proc/pressure/io -----
+         1790943707.045  1000   667 21016 E ActivityManager: 
+         1790943707.045  1000   667 21016 E ActivityManager: CPU usage from 140247ms to 0ms ago (2026-10-02 20:19:25.874 to 2026-10-02 20:21:46.121):
+         1790943707.045  1000   667 21016 E ActivityManager:   1.1% 667/system_server: 0.6% user + 0.4% kernel / faults: 7453 minor 5 major
+         1790943707.045  1000   667 21016 E ActivityManager:   1% 516/surfaceflinger: 0.3% user + 0.7% kernel / faults: 12 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.7% 470/android.hardware.graphics.composer3-service.ranchu: 0.1% user + 0.5% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   0.6% 20765/dev.mdh.sample: 0.3% user + 0.3% kernel / faults: 3343 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.3% 464/android.hardware.sensors-service.multihal: 0.1% user + 0.2% kernel / faults: 14 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.2% 20179/kworker/0:2-virtio_vsock: 0% user + 0.2% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   0.1% 927/com.android.systemui: 0.1% user + 0% kernel / faults: 578 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.1% 218/logd: 0% user + 0% kernel / faults: 34177 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.1% 19809/dev.mdh.helper: 0% user + 0% kernel / faults: 2229 minor
+         1790943707.045  1000   667 21016 E ActivityManager:   0.1% 14899/kworker/u8:3-events_unbound: 0% user + 0.1% kernel
+         1790943707.045  1000   667 21016 E ActivityManager: 2.6% TOTAL: 0.6% user + 1% kernel + 0% iowait + 0.8% irq + 0% softirq
+         1790943707.045  1000   667 21016 E ActivityManager: CPU usage from 17ms to 276ms later (2026-10-02 20:21:46.138 to 2026-10-02 20:21:46.397):
+         1790943707.045  1000   667 21016 E ActivityManager:   57% 667/system_server: 28% user + 28% kernel / faults: 2984 minor 231 major
+         1790943707.045  1000   667 21016 E ActivityManager:     32% 673/Signal Catcher: 20% user + 12% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:     12% 21017/AnrAuxiliaryTas: 4% user + 8.1% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:     4% 782/CachedAppOptimi: 0% user + 4% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   14% 20765/dev.mdh.sample: 14% user + 0% kernel / faults: 439 minor
+         1790943707.045  1000   667 21016 E ActivityManager:     14% 20768/Signal Catcher: 14% user + 0% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   4% 470/android.hardware.graphics.composer3-service.ranchu: 0% user + 4% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   4.8% 19712/kworker/u8:2-ext4-rsv-conversion: 0% user + 4.8% kernel
+         1790943707.045  1000   667 21016 E ActivityManager:   4.8% 20179/kworker/0:2-virtio_vsock: 0% user + 4.8% kernel
+         1790943707.045  1000   667 21016 E ActivityManager: 32% TOTAL: 10% user + 13% kernel + 3% iowait + 6% irq
+         1790943707.046  1000   667 21016 D ActivityManager: Completed ANR of dev.mdh.sample in 931ms, latency 1ms
+         1790943707.049  1000   667 21018 I DropBoxManagerService: add tag=data_app_anr isTagEnabled=true flags=0x6
+         1790943707.064  1000   667   710 D CoreBackPreview: Window{e366911 u0 Application Not Responding: dev.mdh.sample}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.WindowOnBackInvokedDispatcher$OnBackInvokedCallbackWrapper@a542949, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+         1790943707.075  1000   667  6340 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790943707.077  1000   667  6340 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790943707.083  1000   667  6340 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790943707.083  1000   667  6340 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790943709.798 radio  1056  1270 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+         1790943709.798  1000   667  1810 W IPCThreadState: Sending oneway calls to frozen process.
+         1790943712.064  1000   667   790 I InputDispatcher: ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity spent 10955ms processing MotionEvent
+         1790943712.065  1000   667   790 I InputDispatcher: ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity spent 5953ms processing MotionEvent
+         1790943712.065  1000   667   790 I InputDispatcher: ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity spent 4970ms processing FocusEvent(hasFocus=false)
+         1790943712.065 10219 20765 20765 I Choreographer: Skipped 719 frames!  The application may be doing too much work on its main thread.
+         1790943712.066  1000   667   710 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Dialog$$ExternalSyntheticLambda2@552f350
+         1790943712.067  1000   667   710 D CoreBackPreview: Window{e366911 u0 Application Not Responding: dev.mdh.sample}: Setting back callback null
+         1790943712.070  1000   667   790 W InputDispatcher: channel ca975d6 dev.mdh.sample/dev.mdh.sample.TroublesActivity~ dropping inconsistent event: DispatchEntry{resolvedFlags=0, targetFlags=FOREGROUND | SPLIT, transform=transform (ROT_0) (IDENTITY)
+         1790943712.070  1000   667   790 W InputDispatcher: } original: MotionEvent
+         1790943712.102  1000   667   712 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+         1790943712.128 10219 20765 20779 I HWUI    : Davey! duration=12039ms; Flags=0, FrameTimelineVsyncId=131913, IntendedVsync=15456881242322, Vsync=15468864575176, InputEventId=1829475142, HandleInputStart=15468871432208, AnimationStart=15468871434208, PerformTraversalsStart=15468871497833, DrawStart=15468873380375, FrameDeadline=15456914575654, FrameStartTime=15468870646917, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=15468878949000, SyncStart=15468879075417, IssueDrawCommandsStart=15468879225833, SwapBuffers=15468881107000, FrameCompleted=15468920436292, DequeueBufferDuration=171375, QueueBufferDuration=248333, GpuCompleted=15468920436292, SwapBuffersCompleted=15468882988500, DisplayPresentTime=0, CommandSubmissionCompleted=15468881107000, 
+         1790943712.135  1000   667   798 I ImeTracker: dev.mdh.sample:8f5ba47f: onRequestHide at ORIGIN_SERVER reason HIDE_SAME_WINDOW_FOCUSED_WITHOUT_EDITOR fromUser false
+         1790943712.137 10219 20765 20765 D InsetsController: hide(ime(), fromIme=false)
+         1790943712.137 10219 20765 20765 I ImeTracker: dev.mdh.sample:8f5ba47f: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790943712.141 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2361 
+         1790943712.142 10159 10989 19082 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 0, locked = false
+         1790943712.153 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1532 onStartInput(EditorInfo{EditorInfo{packageName=dev.mdh.sample, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790943712.154 10159 10989 10989 I LatinIMEBase: LatinIMEBase.updateInputViewCoverNavigation():317 Update input view padding, isNavbarOverInputWindow=true, bottom inset=144
+         1790943712.156 10159 10989 19085 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 1, locked = false
+         1790943712.157  1000   667  2279 W PackageConfigPersister: App-specific configuration not found for packageName: dev.mdh.sample and userId: 0
+         1790943716.824  1000   667  1479 D WifiNl80211Manager: Scan result ready event
+         1790943716.824  1000   667  1479 D WifiNative: Scan result ready event
+         1790943716.827 10148  6695  6905 I WifiScanner: onFullResults
+         1790943716.827 10148  6695  6819 I WifiScanner: onFullResults
+         1790943716.831  1000   667   828 I HalDevMgr: bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+         1790943719.802 radio  1056  1270 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+         1790943719.803  1000   667  1479 W IPCThreadState: Sending oneway calls to frozen process.

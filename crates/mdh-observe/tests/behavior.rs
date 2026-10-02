@@ -92,11 +92,17 @@ fn screen_sized_clickable_container_is_layout() {
 
 #[test]
 fn undescribed_canvas_is_reported_but_covered_background_is_not() {
-    let canvas = node("View", Rect::new(0, 0, 1000, 1000));
+    let canvas = RawNode {
+        class: "com.example.SignatureView".into(),
+        ..node("View", Rect::new(0, 0, 1000, 1000))
+    };
     let tree = compress(&screen(vec![canvas]));
     assert!(render(&tree).contains("undescribed region at [0,0][1000,1000]"));
 
-    let background = node("View", SCREEN);
+    let background = RawNode {
+        class: "com.example.Backdrop".into(),
+        ..node("View", SCREEN)
+    };
     let tree = compress(&screen(vec![
         background,
         clickable(text("A", Rect::new(0, 0, 1000, 500))),
@@ -145,4 +151,14 @@ fn identical_siblings_get_distinct_refs() {
         render(&tree),
         "[e1] button \"Delete\"\n[e2] button \"Delete\""
     );
+}
+
+#[test]
+fn empty_generic_views_are_spacers_not_unreadable() {
+    let spacer = node("View", Rect::new(0, 0, 1000, 1000)); // android.widget.View, see `node`
+    let spacer = RawNode {
+        class: "android.view.View".into(),
+        ..spacer
+    };
+    assert!(compress(&screen(vec![spacer])).opaque.is_empty());
 }

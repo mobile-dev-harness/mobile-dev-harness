@@ -13,6 +13,20 @@ const RECENT: usize = 3;
 /// Stack frames shown before folding the rest.
 const FRAMES: usize = 6;
 const MAX_MESSAGE_CHARS: usize = 160;
+/// Graphics-stack and emulator chatter emitted inside every app process; never the app's own
+/// problem. Left out of digests (still shown by `mdh logs`).
+const NOISY_TAGS: &[&str] = &[
+    "HWUI",
+    "OpenGLRenderer",
+    "EGL_emulation",
+    "libEGL",
+    "gralloc4",
+    "Gralloc4",
+    "AdrenoGLES",
+    "vulkan",
+    "RenderThread",
+    "ion",
+];
 /// Digest lines are shorter: they ride along with every action, and `mdh logs` has the full text.
 const RECENT_CHARS: usize = 100;
 
@@ -84,6 +98,9 @@ pub fn digest(entries: &[LogEntry], app: &AppFilter) -> LogDigest {
         .iter()
         .filter(|e| pids.contains(&e.pid) && e.level >= LogLevel::Warn)
         .filter(|e| e.tag != "AndroidRuntime") // reported as a crash instead
+        .filter(|e| !NOISY_TAGS.contains(&e.tag.as_str()))
+        // `Access denied finding property …` and the like; errors from libc still count.
+        .filter(|e| !(e.tag == "libc" && e.level == LogLevel::Warn))
         .collect();
     d.errors = app_lines
         .iter()
@@ -263,6 +280,8 @@ fn native_crash(entries: &[LogEntry], app_packages: &[String]) -> (Option<CrashR
             .into_iter()
             .chain(app_packages.iter().map(String::as_str)),
     );
+    // App frames are recognized by their full path, so shorten only what is shown.
+    let frames = frames.iter().map(|f| short_native_frame(f)).collect();
     let report = CrashReport {
         kind: CrashKind::Native,
         of_app: false,
@@ -275,6 +294,24 @@ fn native_crash(entries: &[LogEntry], app_packages: &[String]) -> (Option<CrashR
         caused_by: Vec::new(),
     };
     (Some(report), block.len())
+}
+
+/// `#00 pc 00000000000d2608  /apex/…/bionic/libc.so (kill+8) (BuildId: 2445…)` → `#00 libc.so (kill+8)`.
+/// Program counters and build ids mean nothing to an agent and cost ~60 characters per frame.
+fn short_native_frame(frame: &str) -> String {
+    let mut parts = frame.split_whitespace();
+    let (Some(number), Some("pc"), Some(_pc), Some(path)) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return frame.to_owned();
+    };
+    let library = path.rsplit('/').next().unwrap_or(path);
+    let symbol: Vec<&str> = parts.take_while(|p| !p.starts_with("(BuildId:")).collect();
+    if symbol.is_empty() {
+        format!("{number} {library}")
+    } else {
+        format!("{number} {library} {}", symbol.join(" "))
+    }
 }
 
 /// `ANR in com.example (com.example/.MainActivity)` followed by `PID: n` and `Reason: …`.
@@ -376,7 +413,12 @@ pub fn render_logs(d: &LogDigest) -> String {
             (None, None) => "unknown process".into(),
         };
         lines.push(format!("!! {kind} {who}: {}", c.summary));
-        lines.extend(c.frames.iter().map(|f| format!("     at {f}")));
+        let prefix = if c.kind == CrashKind::Native {
+            ""
+        } else {
+            "at "
+        };
+        lines.extend(c.frames.iter().map(|f| format!("     {prefix}{f}")));
         if c.folded_frames > 0 {
             lines.push(format!("     … {} more frames", c.folded_frames));
         }

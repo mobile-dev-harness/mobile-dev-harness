@@ -99,6 +99,7 @@ pub fn render_line(node: &UiNode) -> String {
         (node.state.selected, "selected"),
         (node.state.focused, "focused"),
         (node.state.scrollable, "scrollable"),
+        (node.state.obscured, "obscured"),
     ] {
         if on {
             s.push(' ');
@@ -139,18 +140,28 @@ pub fn render_diff(d: &TreeDiff) -> String {
         .iter()
         .map(|n| format!("+ {}", render_line(n)))
         .collect();
-    for c in &d.changed {
-        let mut s = format!("~ [{}] {}", c.r#ref, c.role.as_str());
-        if let Some(label) = &c.label {
+    // One line per element, its changes joined: `~ [e67] switch "Bluetooth": detail "Off" → "On", off → on`.
+    let mut i = 0;
+    while i < d.changed.len() {
+        let first = &d.changed[i];
+        let mut s = format!("~ [{}] {}", first.r#ref, first.role.as_str());
+        if let Some(label) = &first.label {
             s.push(' ');
             s.push_str(&quote(label));
         }
-        let field = match c.field {
-            Field::Value => "value ",
-            Field::Detail => "detail ",
-            Field::Checked | Field::Enabled | Field::Selected | Field::Focused => "",
-        };
-        let _ = write!(s, ": {field}{} → {}", c.from, c.to);
+        s.push_str(": ");
+        let mut parts = Vec::new();
+        while i < d.changed.len() && d.changed[i].r#ref == first.r#ref {
+            let c = &d.changed[i];
+            let field = match c.field {
+                Field::Value => "value ",
+                Field::Detail => "detail ",
+                Field::Checked | Field::Enabled | Field::Selected | Field::Focused => "",
+            };
+            parts.push(format!("{field}{} → {}", c.from, c.to));
+            i += 1;
+        }
+        s.push_str(&parts.join(", "));
         lines.push(s);
     }
     if !d.removed.is_empty() {

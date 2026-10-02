@@ -63,6 +63,11 @@ pub enum Error {
     #[error("{package} crashed: {summary}")]
     AppCrashed { package: String, summary: String },
 
+    #[error(
+        "`{target}` is covered by the app's own bars or by system windows (status bar, navigation bar, keyboard)"
+    )]
+    TargetObscured { target: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -85,6 +90,7 @@ impl Error {
             Error::InvalidTarget { .. } => ErrorCode::InvalidTarget,
             Error::Timeout { .. } => ErrorCode::Timeout,
             Error::AppCrashed { .. } => ErrorCode::AppCrashed,
+            Error::TargetObscured { .. } => ErrorCode::TargetObscured,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -138,6 +144,11 @@ impl Error {
             Error::AppCrashed { .. } => {
                 "the crash report is in the output; fix the cause, then relaunch the app".into()
             }
+            Error::TargetObscured { .. } => {
+                "scroll it into view or hide the keyboard (key BACK); if the app draws under the \
+                 system bars, that is a layout bug worth fixing"
+                    .into()
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -163,6 +174,7 @@ pub enum ErrorCode {
     InvalidTarget,
     Timeout,
     AppCrashed,
+    TargetObscured,
     Io,
 }
 
@@ -185,6 +197,7 @@ impl ErrorCode {
             ErrorCode::InvalidTarget => "INVALID_TARGET",
             ErrorCode::Timeout => "TIMEOUT",
             ErrorCode::AppCrashed => "APP_CRASHED",
+            ErrorCode::TargetObscured => "TARGET_OBSCURED",
             ErrorCode::Io => "IO",
         }
     }
@@ -193,7 +206,10 @@ impl ErrorCode {
     /// timeout), 2 usage, 3 environment, 4 build, 5 app crashed, 10 internal.
     pub fn exit_code(self) -> u8 {
         match self {
-            ErrorCode::ElementNotFound | ErrorCode::AmbiguousTarget | ErrorCode::Timeout => 1,
+            ErrorCode::ElementNotFound
+            | ErrorCode::AmbiguousTarget
+            | ErrorCode::Timeout
+            | ErrorCode::TargetObscured => 1,
             ErrorCode::InvalidTarget => 2,
             ErrorCode::AppCrashed => 5,
             ErrorCode::ToolNotFound

@@ -21,9 +21,9 @@ import org.json.JSONObject;
 /** Request handlers. Field names of the tree match {@code mdh_core::ui::RawNode}. */
 final class Commands {
     /** Bump together with versionCode and HELPER_VERSION_CODE on the host. */
-    static final int VERSION_CODE = 2;
+    static final int VERSION_CODE = 4;
 
-    private static final long ROOT_RETRY_MS = 2000;
+    private static final long ROOT_RETRY_MS = 500;
 
     private final UiAutomation automation;
 
@@ -41,11 +41,11 @@ final class Commands {
                         .put("roots", new JSONArray().put(node(root())))
                         .put("windows", windows());
             case "tap":
-                swipe(request.getInt("x"), request.getInt("y"), request.getInt("x"), request.getInt("y"), 0);
+                swipe(request.getInt("x"), request.getInt("y"), request.getInt("x"), request.getInt("y"), 0, 0);
                 return new JSONObject();
             case "swipe":
                 swipe(request.getInt("x1"), request.getInt("y1"), request.getInt("x2"), request.getInt("y2"),
-                        request.getLong("duration_ms"));
+                        request.getLong("duration_ms"), request.optLong("hold_ms", 0));
                 return new JSONObject();
             case "key":
                 key(request.getString("key"));
@@ -59,7 +59,10 @@ final class Commands {
         }
     }
 
-    /** The active window's root; briefly null during window transitions, so retry. */
+    /**
+     * The active window's root. There is briefly no active window during transitions and while an
+     * app dies (observed), so retry, then fall back to the top-most window that has content.
+     */
     private AccessibilityNodeInfo root() {
         long deadline = SystemClock.uptimeMillis() + ROOT_RETRY_MS;
         while (true) {
@@ -68,10 +71,17 @@ final class Commands {
                 return root;
             }
             if (SystemClock.uptimeMillis() > deadline) {
-                throw new IllegalStateException("no active window");
+                break;
             }
             SystemClock.sleep(50);
         }
+        for (AccessibilityWindowInfo w : automation.getWindows()) {
+            AccessibilityNodeInfo root = w.getRoot();
+            if (root != null && w.getType() == AccessibilityWindowInfo.TYPE_APPLICATION) {
+                return root;
+            }
+        }
+        throw new IllegalStateException("no window with content");
     }
 
     private JSONObject waitIdle(long quietMs, long timeoutMs) throws JSONException {
@@ -101,9 +111,11 @@ final class Commands {
 
     /**
      * Injects a touch gesture from (x1, y1) to (x2, y2). A tap is a zero-length, zero-duration
-     * gesture; a long press is zero-length with a duration.
+     * gesture; a long press is zero-length with a duration. Holding still at the end for
+     * {@code holdMs} releases with no velocity, so lists stop where the finger stopped instead of
+     * flinging past the content (used for scrolling).
      */
-    private void swipe(int x1, int y1, int x2, int y2, long durationMs) {
+    private void swipe(int x1, int y1, int x2, int y2, long durationMs, long holdMs) {
         long down = SystemClock.uptimeMillis();
         inject(touch(down, down, MotionEvent.ACTION_DOWN, x1, y1));
         long steps = Math.max(1, durationMs / 10);
@@ -115,6 +127,10 @@ final class Commands {
             inject(touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, x, y));
         }
         SystemClock.sleep(Math.max(0, down + durationMs - SystemClock.uptimeMillis()));
+        for (long held = 0; held < holdMs; held += 10) {
+            inject(touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, x2, y2));
+            SystemClock.sleep(10);
+        }
         inject(touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x2, y2));
     }
 
@@ -195,6 +211,12 @@ final class Commands {
         putText(o, "text", n.getText());
         putText(o, "desc", n.getContentDescription());
         putText(o, "hint", n.getHintText());
+        // Compose and other toolkits announce roles here when the class name is a generic View
+        // (e.g. a toggleable row with Role.Switch).
+        Bundle extras = n.getExtras();
+        if (extras != null) {
+            putText(o, "role_description", extras.getCharSequence("AccessibilityNodeInfo.roleDescription"));
+        }
 
         Rect r = new Rect();
         n.getBoundsInScreen(r);

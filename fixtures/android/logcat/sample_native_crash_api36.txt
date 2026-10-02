@@ -1,0 +1,235 @@
+--------- beginning of main
+         1790943557.421 shell 20752 20752 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: window
+         1790943557.463 10219 20679 20679 I Process : Sending signal. PID: 20679 SIG: 11
+         1790943557.464  1000   667  1171 W AS.PlaybackActivityMon: No piid assigned for invalid/internal port id 15
+--------- beginning of crash
+         1790943557.465 10219 20679 20679 F libc    : Fatal signal 11 (SIGSEGV), code 0 (SI_USER) in tid 20679 (dev.mdh.sample), pid 20679 (dev.mdh.sample)
+         1790943557.521 10219 20758 20758 I crash_dump64: obtaining output fd from tombstoned, type: kDebuggerdTombstoneProto
+         1790943557.521  1058   272   272 I tombstoned: received crash request for pid 20679
+         1790943557.522 10219 20758 20758 I crash_dump64: performing dump of process 20679 (target tid = 20679)
+         1790943557.853 10219 20758 20758 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+         1790943557.853 10219 20758 20758 F DEBUG   : Build fingerprint: 'google/sdk_gphone64_arm64/emu64a:16/BE2A.250530.026.D1/13818094:user/release-keys'
+         1790943557.853 10219 20758 20758 F DEBUG   : Revision: '0'
+         1790943557.853 10219 20758 20758 F DEBUG   : ABI: 'arm64'
+         1790943557.853 10219 20758 20758 F DEBUG   : Timestamp: 2026-10-02 20:19:17.526442666+0800
+         1790943557.853 10219 20758 20758 F DEBUG   : Process uptime: 4s
+         1790943557.853 10219 20758 20758 F DEBUG   : Cmdline: dev.mdh.sample
+         1790943557.853 10219 20758 20758 F DEBUG   : pid: 20679, tid: 20679, name: dev.mdh.sample  >>> dev.mdh.sample <<<
+         1790943557.853 10219 20758 20758 F DEBUG   : uid: 10219
+         1790943557.853 10219 20758 20758 F DEBUG   : tagged_addr_ctrl: 0000000000000001 (PR_TAGGED_ADDR_ENABLE)
+         1790943557.853 10219 20758 20758 F DEBUG   : pac_enabled_keys: 000000000000000f (PR_PAC_APIAKEY, PR_PAC_APIBKEY, PR_PAC_APDAKEY, PR_PAC_APDBKEY)
+         1790943557.853 10219 20758 20758 F DEBUG   : signal 11 (SIGSEGV), code 0 (SI_USER), fault addr --------
+         1790943557.853 10219 20758 20758 F DEBUG   :     x0  0000000000000000  x1  000000000000000b  x2  0000000000000004  x3  0000083464806a01
+         1790943557.853 10219 20758 20758 F DEBUG   :     x4  00ffffffffffffff  x5  00000000002e3e98  x6  1f394648521f3836  x7  7f7f7f7f7f7f7f7f
+         1790943557.853 10219 20758 20758 F DEBUG   :     x8  0000000000000081  x9  a62dcdf90c76b34c  x10 00000077444741c8  x11 0000000000000000
+         1790943557.853 10219 20758 20758 F DEBUG   :     x12 000000006abfa145  x13 000000007fffffff  x14 00000000002e3e98  x15 000008346482b3fc
+         1790943557.853 10219 20758 20758 F DEBUG   :     x16 00000077251ed390  x17 0000007732afb600  x18 000000774fdb0000  x19 b40000756dc20be0
+         1790943557.853 10219 20758 20758 F DEBUG   :     x20 0000000000000000  x21 b40000756dc20ca0  x22 0000007ff75860d0  x23 0000000000000000
+         1790943557.853 10219 20758 20758 F DEBUG   :     x24 0000000000000000  x25 0000000000000002  x26 0000000000000002  x27 0000000070ae8088
+         1790943557.853 10219 20758 20758 F DEBUG   :     x28 0000007ff7585fa0  x29 0000007ff7586090
+         1790943557.853 10219 20758 20758 F DEBUG   :     lr  000000747b73f504  sp  0000007ff7585f90  pc  0000007732afb608  pst 0000000060000000
+         1790943557.853 10219 20758 20758 F DEBUG   : 65 total frames
+         1790943557.853 10219 20758 20758 F DEBUG   : backtrace:
+         1790943557.853 10219 20758 20758 F DEBUG   :       #00 pc 00000000000d2608  /apex/com.android.runtime/lib64/bionic/libc.so (kill+8) (BuildId: 2445fc73ede03b9536eef49355aff375)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #01 pc 000000000033f500  /apex/com.android.art/lib64/libart.so (art_quick_generic_jni_trampoline+144) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #02 pc 0000000000328460  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #03 pc 00000000006795d0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2088) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #04 pc 00000000005c8690  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+1280) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #05 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #06 pc 0000000000006dd4  <anonymous:77444f5000> (dev.mdh.sample.TroublesActivity.onCreate$lambda$1+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #07 pc 0000000000317488  /apex/com.android.art/lib64/libart.so (art::interpreter::ArtInterpreterToInterpreterBridge(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame*, art::JValue*)+412) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #08 pc 00000000006795bc  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2068) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #09 pc 00000000005c8690  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+1280) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #10 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #11 pc 0000000000006c0c  <anonymous:77444f5000> (dev.mdh.sample.TroublesActivity$$ExternalSyntheticLambda2.invoke+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #12 pc 0000000000317488  /apex/com.android.art/lib64/libart.so (art::interpreter::ArtInterpreterToInterpreterBridge(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame*, art::JValue*)+412) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #13 pc 00000000006795bc  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2068) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #14 pc 00000000005c8c40  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+2736) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #15 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #16 pc 0000000000006f50  <anonymous:77444f5000> (dev.mdh.sample.TroublesActivity.click$lambda$0+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #17 pc 0000000000317488  /apex/com.android.art/lib64/libart.so (art::interpreter::ArtInterpreterToInterpreterBridge(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame*, art::JValue*)+412) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #18 pc 00000000006795bc  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2068) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #19 pc 00000000005c8690  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+1280) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #20 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #21 pc 0000000000006bbc  <anonymous:77444f5000> (dev.mdh.sample.TroublesActivity$$ExternalSyntheticLambda0.onClick+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #22 pc 00000000002d763c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.11186287395527938019)+332) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #23 pc 00000000002d6e70  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+888) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #24 pc 000000000033f638  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #25 pc 00000000003dff3c  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.view.View.performClick+188)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #26 pc 00000000003dfc10  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.view.View.performClickInternal+128)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #27 pc 00000000003dfad0  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.view.View.-$$Nest$mperformClickInternal+112)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #28 pc 00000000003defe0  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.view.View$PerformClick.run+144)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #29 pc 0000000000148664  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.os.Handler.handleCallback+132)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #30 pc 0000000000075050  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.os.Handler.dispatchMessage+128)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #31 pc 0000000000073848  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.os.Looper.loopOnce+1400)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #32 pc 0000000000328460  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #33 pc 00000000006795d0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2088) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #34 pc 00000000005c8690  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+1280) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #35 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #36 pc 000000000027d360  /system/framework/framework.jar (offset 0x1286000) (android.os.Looper.loop+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #37 pc 0000000000317488  /apex/com.android.art/lib64/libart.so (art::interpreter::ArtInterpreterToInterpreterBridge(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame*, art::JValue*)+412) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #38 pc 00000000006795bc  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2068) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #39 pc 00000000005c8690  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+1280) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #40 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #41 pc 00000000001f2a4c  /system/framework/framework.jar (offset 0x7000) (android.app.ActivityThread.main+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #42 pc 00000000002d763c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.11186287395527938019)+332) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #43 pc 00000000002d6e70  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+888) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #44 pc 000000000033f638  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #45 pc 0000000000328460  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #46 pc 00000000003224a0  /apex/com.android.art/lib64/libart.so (_jobject* art::InvokeMethod<(art::PointerSize)8>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned long)+544) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #47 pc 00000000005c5af8  /apex/com.android.art/lib64/libart.so (art::Method_invoke(_JNIEnv*, _jobject*, _jobject*, _jobjectArray*) (.__uniq.165753521025965369065708152063621506277)+32) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #48 pc 000000000033f500  /apex/com.android.art/lib64/libart.so (art_quick_generic_jni_trampoline+144) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #49 pc 0000000000328194  /apex/com.android.art/lib64/libart.so (art_quick_invoke_stub+612) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #50 pc 00000000006793d4  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+1580) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #51 pc 00000000005c84f4  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+868) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #52 pc 0000000000317a88  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #53 pc 0000000000288864  /system/framework/framework.jar (offset 0x2454000) (com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run+0)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #54 pc 00000000002d763c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.11186287395527938019)+332) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #55 pc 00000000002d6e70  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+888) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #56 pc 000000000033f638  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #57 pc 00000000007f8e20  /system/framework/arm64/boot-framework.oat (com.android.internal.os.ZygoteInit.main+3040) (BuildId: 9c1b1c982121166d73574b76a3bd22852a41523a)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #58 pc 0000000000328460  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #59 pc 0000000000327098  /apex/com.android.art/lib64/libart.so (art::JValue art::InvokeWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)+800) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #60 pc 000000000064a850  /apex/com.android.art/lib64/libart.so (art::JNI<true>::CallStaticVoidMethodV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)+156) (BuildId: b229f9d1b6196afaae086f29f029f907)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #61 pc 00000000000ff09c  /system/lib64/libandroid_runtime.so (_JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)+104) (BuildId: d2709c129e71fb74eab7847fbed936ba)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #62 pc 000000000012918c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+904) (BuildId: d2709c129e71fb74eab7847fbed936ba)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #63 pc 0000000000004564  /system/bin/app_process64 (main+1200) (BuildId: bc83fa691872471af3dc0c1a72a63d9b)
+         1790943557.853 10219 20758 20758 F DEBUG   :       #64 pc 0000000000069ec8  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+120) (BuildId: 2445fc73ede03b9536eef49355aff375)
+         1790943557.862  1058   272   272 E tombstoned: Tombstone written to: tombstone_03
+--------- beginning of system
+         1790943557.862  1000   667 20764 I DropBoxManagerService: add tag=data_app_native_crash isTagEnabled=true flags=0x2
+         1790943557.862  1000   667 20763 W ActivityTaskManager:   Force finishing activity dev.mdh.sample/.TroublesActivity
+         1790943557.863 10187   927  1002 V WindowManagerShell: Transition requested (#154): android.os.BinderProxy@b2de71b TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=36 effectiveUid=10219 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.mdh.sample/.MainActivity } baseActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} topActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.TroublesActivity} origActivity=null realActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} numActivities=2 lastActiveTime=15313371 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@8d7d0b8} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{bcc1e91 dev.mdh.sample.TroublesActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 154 }
+         1790943557.865  1000   516   553 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790943557.865  1000   667   778 I DropBoxManagerService: add tag=SYSTEM_TOMBSTONE_PROTO_WITH_HEADERS isTagEnabled=true flags=0x4
+         1790943557.874  1000   667   790 W InputDispatcher: channel 'e400a2a dev.mdh.sample/dev.mdh.sample.TroublesActivity' ~ Consumer closed input channel or an error occurred.  events=0x9
+         1790943557.874  1000   667   790 E InputDispatcher: channel 'e400a2a dev.mdh.sample/dev.mdh.sample.TroublesActivity' ~ Channel is unrecoverably broken and will be disposed!
+         1790943557.874  1000   667   790 I WindowManager: WINDOW DIED Window{e400a2a u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity}
+         1790943557.875  1000   667   688 I WindowManager: WIN DEATH: Window{e400a2a u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity EXITING}
+         1790943557.875  root   451   451 I Zygote  : Process 20679 exited due to signal 11 (Segmentation fault)
+         1790943557.875  1000   667  1793 I ActivityManager: Process dev.mdh.sample (pid 20679) has died: fg  TOP 
+         1790943557.875 shell   518   518 I adbd    : Remote process closed the socket (on MSG_PEEK)
+         1790943557.876  1000   667  1282 I ImeTracker: dev.mdh.sample:ebba75a3: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+         1790943557.876  1000   667  1282 I ImeTracker: dev.mdh.sample:ebba75a3: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790943557.876  1000   667   688 I WindowManager: WIN DEATH: Window{2d76440 u0 dev.mdh.sample/dev.mdh.sample.MainActivity}
+         1790943557.876  1000   667   720 I libprocessgroup: Removed cgroup /sys/fs/cgroup/apps/uid_10219/pid_20679
+         1790943557.876  1000   667   985 W WindowManager: Cannot find window which accessibility connection is added to
+         1790943557.877  1000   516   516 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790943557.879  1000   667   712 W ActivityManager: setHasOverlayUi called on unknown pid: 20679
+         1790943557.879 10159 10989 10989 I SubtypeOperator: SubtypeOperator$1.onUnbindInput():43 
+         1790943557.879  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943557.891  1000   667   772 W UsageStatsService: Unexpected activity event reported! (dev.mdh.sample/dev.mdh.sample.MainActivity event : 23 instanceId : 37865443)
+         1790943557.892  1000   667   712 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@a70e6d45 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790943557.900  root   451   451 D Zygote  : Forked child process 20765
+         1790943557.900  1000   667   719 I ActivityManager: Start proc 20765:dev.mdh.sample/u0a219 for top-activity {dev.mdh.sample/dev.mdh.sample.MainActivity}
+         1790943557.900  1000   667   719 I ActivityManager: ProcessObserver broadcast disabled
+         1790943557.902  1000   667   778 I BootReceiver: Copying /data/tombstones/tombstone_03 to DropBox (SYSTEM_TOMBSTONE)
+         1790943557.902  1000   667   778 I DropBoxManagerService: add tag=SYSTEM_TOMBSTONE isTagEnabled=true flags=0x6
+         1790943557.926  1000   667   712 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+         1790943557.934 10219 20765 20765 I dev.mdh.sample: Late-enabling -Xcheck:jni
+         1790943557.954 10219 20765 20765 I dev.mdh.sample: Using CollectorTypeCMC GC.
+         1790943557.963 shell   518   549 I adbd    : jdwp connection from 20765
+         1790943557.966 10219 20765 20765 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790943557.973  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943558.277 10219 20765 20765 D nativeloader: Configuring clns-9 for other apk /data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/lib/arm64:/data/app/~~ckuUeGIJyPp2h5_fZlt5bg==/dev.mdh.sample-FrKiKndic2EcSwzItEkGOA==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.mdh.sample
+         1790943558.280 10219 20765 20765 I dev.mdh.sample: AssetManager2(0xb40000759dc1c6f8) locale list changing from [] to [en-US]
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment: Currently set values for:
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment: dev.mdh.sample is not listed in per-application setting
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+         1790943558.283 10219 20765 20765 V GraphicsEnvironment: dev.mdh.sample is not listed in ANGLE allowlist or settings, returning default
+         1790943558.284 10219 20765 20765 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790943558.304  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943558.304  1000   667   882 D BackgroundInstallControlService: Package event received: 0
+         1790943558.304 10219 20765 20781 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+         1790943558.304  1000   667   709 V WindowManager: Sent Transition (#154) createdAt=10-02 20:19:17.862 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=36 effectiveUid=10219 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.mdh.sample/.MainActivity } baseActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} topActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.TroublesActivity} origActivity=null realActivity=ComponentInfo{dev.mdh.sample/dev.mdh.sample.MainActivity} numActivities=2 lastActiveTime=15313371 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{82e320d Task{ff3e412 #36 type=standard A=10219:dev.mdh.sample}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{77353d0 dev.mdh.sample.TroublesActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(345, 867 - 999, 2211) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 154 }
+         1790943558.305  1000   667   709 V WindowManager:     startWCT=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790943558.305  1000   667   709 V WindowManager:     info={id=154 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790943558.305  1000   667   709 V WindowManager:         {m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{13330974 u0 dev.mdh.sample/.TroublesActivity)/@0x1eb33cd sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},
+         1790943558.305  1000   667   709 V WindowManager:         {m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{118433693 u0 dev.mdh.sample/.MainActivity)/@0xbf54564 sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}
+         1790943558.305  1000   667   709 V WindowManager:     ]}
+         1790943558.305 10187   927  2671 V WindowManagerShell: onTransitionReady(transaction=2864743193221)
+         1790943558.305 10187   927  1002 V WindowManagerShell: onTransitionReady (#154) android.os.BinderProxy@b2de71b: {id=154 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790943558.305 10187   927  1002 V WindowManagerShell:         {m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{13330974 u0 dev.mdh.sample/.TroublesActivity)/@0xe4ea4da sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},
+         1790943558.305 10187   927  1002 V WindowManagerShell:         {m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{118433693 u0 dev.mdh.sample/.MainActivity)/@0x852cd0b sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}
+         1790943558.305 10187   927  1002 V WindowManagerShell:     ]}
+         1790943558.305 10187   927  1002 V WindowManagerShell: Playing animation for (#154) android.os.BinderProxy@b2de71b@0
+         1790943558.305 10187   927  1002 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790943558.305 10187   927  1002 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=154 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{13330974 u0 dev.mdh.sample/.TroublesActivity)/@0xe4ea4da sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},{m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{118433693 u0 dev.mdh.sample/.MainActivity)/@0x852cd0b sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}]}
+         1790943558.305 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@2e7720c windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2936755, appThread = android.app.IApplicationThread$Stub$Proxy@2fd156a, debugName = overlayBackTransition }}
+         1790943558.305 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@c449a5b, appThread = android.app.IApplicationThread$Stub$Proxy@d9fa2f8, debugName = LauncherToDream }}
+         1790943558.305 10187   927  1002 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null windowingMode=undefined},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{NOT atype=undefined independent=true modes=[] flags=NONE mustBeTask=true order=ANY topActivity=null launchCookie=null customAnim=true windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@47023d1, appThread = android.app.IApplicationThread$Stub$Proxy@34f1e36, debugName = QuickstepLaunchHome }}
+         1790943558.305 10187   927  1002 V WindowManagerShell:  Delegate animation for (#154) to null
+         1790943558.305 10187   927  1002 V WindowManagerShell: start default transition animation, info = {id=154 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{m=CLOSE f=FILLS_TASK leash=Surface(name=ActivityRecord{13330974 u0 dev.mdh.sample/.TroublesActivity)/@0xe4ea4da sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.TroublesActivity opt={t=FROM_STYLE mUserId=0}},{m=OPEN f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{118433693 u0 dev.mdh.sample/.MainActivity)/@0x852cd0b sb=Rect(0, 0 - 1344, 2992) eb=Rect(0, 0 - 1344, 2992) epz=Point(1344, 2992) d=0 bc=fffafafa component=dev.mdh.sample/.MainActivity opt={t=FROM_STYLE mUserId=0}}]}
+         1790943558.305 10187   927  1002 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@68234a6 animAttr=0x6 type=CLOSE isEntrance=true
+         1790943558.306 10187   927  1002 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@4cb493d animAttr=0x7 type=CLOSE isEntrance=false
+         1790943558.306 10219 20765 20765 I dev.mdh.sample: AssetManager2(0xb40000759dc15cb8) locale list changing from [] to [en-US]
+         1790943558.307 10187   927  1002 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@5a00f9f
+         1790943558.326 10219 20765 20765 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+         1790943558.328 10219 20765 20781 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790943558.328 10219 20765 20781 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790943558.336 10219 20765 20781 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790943558.336 10219 20765 20781 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790943558.344 10219 20765 20765 D CompatChangeReporter: Compat change id reported: 377864165; UID 10219; state: ENABLED
+         1790943558.345 10219 20765 20765 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+         1790943558.361 10219 20765 20765 D CompatChangeReporter: Compat change id reported: 376561342; UID 10219; state: ENABLED
+         1790943558.364  1000   667   712 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{13330974 u0 dev.mdh.sample/.TroublesActivity t36 f} isExiting}
+         1790943558.428 10148  6695 20785 I DropBoxUtil: (REDACTED) Reading dropbox entry with tag %s and timestamp %d
+         1790943558.451  1000   667   667 W AccessibilityManagerService:  wait for adding window timeout: 452
+         1790943558.465 10219 20765 20765 W HWUI    : Unknown dataspace 0
+         1790943558.479  1000   667  1788 D CoreBackPreview: Window{47a0db5 u0 dev.mdh.sample/dev.mdh.sample.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@4c1c4d8, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+         1790943558.761 10187   927  1002 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#154) android.os.BinderProxy@b2de71b@0
+         1790943558.762  1000   667  1793 E IPCThreadState: Binder transaction failure. id: 2710546, BR_*: 29189, error: -22 (Invalid argument)
+         1790943558.762  1000   667  1793 W ActivityManager: pid 667 system sent binder code 7 with flags 1 to frozen apps and got error -32
+         1790943558.762  1000   667  1793 W WindowManager: Exception thrown during dispatchAppVisibility Window{e400a2a u0 dev.mdh.sample/dev.mdh.sample.TroublesActivity EXITING}
+         1790943558.762  1000   667  1793 W WindowManager: android.os.DeadObjectException
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:592)
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:557)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3151)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1311)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:389)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6650)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5561)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1391)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:1029)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:496)
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:261)
+         1790943558.762  1000   667  1793 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:223)
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1426)
+         1790943558.762  1000   667  1793 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1365)
+         1790943558.762  1000   667  1793 W Process : Unable to open /proc/20679/status
+         1790943558.779  1000   667   709 V WindowManager: Finish Transition (#154): created at 10-02 20:19:17.862 collect-started=0.02ms request-sent=0.092ms started=1.546ms ready=438.261ms sent=441.72ms commit=5.889ms finished=899.436ms
+         1790943558.780  1000   667  1793 I ImeTracker: system_server:238ef845: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+         1790943558.783 10187   927  1002 V WindowManagerShell: Track 0 became idle
+         1790943558.783 10187   927  1002 V WindowManagerShell: All active transition animations finished
+         1790943558.784  1000   667   712 I ImeTracker: system_server:238ef845: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790943558.828  1000   516   516 E BpTransactionCompletedListener: Failed to transact (-32)
+         1790943558.843  1000   667   798 I ImeTracker: dev.mdh.sample:f5b1cafd: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+         1790943558.844 10159 10989 10989 I SubtypeOperator: SubtypeOperator$1.onBindInput():33 
+         1790943558.845 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2361 
+         1790943558.845 10159 10989 10989 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1532 onStartInput(EditorInfo{EditorInfo{packageName=dev.mdh.sample, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790943558.845 10159 10989 10989 I LatinIMEBase: LatinIMEBase.updateInputViewCoverNavigation():317 Update input view padding, isNavbarOverInputWindow=true, bottom inset=144
+         1790943558.848  1000   667  1795 W PackageConfigPersister: App-specific configuration not found for packageName: dev.mdh.sample and userId: 0
+         1790943558.848 10159 10989 19085 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 0, locked = false
+         1790943558.849  1000   667  1793 I ImeTracker: system_server:eae91078: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+         1790943558.849  1000   667   712 I ImeTracker: system_server:eae91078: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790943558.852 10159 10989 19085 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 1, locked = false
+         1790943558.854 10219 20765 20765 D InsetsController: hide(ime(), fromIme=false)
+         1790943558.854 10219 20765 20765 I ImeTracker: dev.mdh.sample:f5b1cafd: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790943558.937 10148  6695  6726 I FontLog : (REDACTED) Received query %s, URI %s
+         1790943558.937 10148  6695  6726 I FontLog : (REDACTED) Query [%s] resolved to %s
+         1790943558.941 10148  6695  6726 I FontLog : (REDACTED) Fetch %s end status %s
+         1790943558.945 10148  6695  6905 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+         1790943558.958 10148  6695  6905 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+         1790943559.113 10219 20765 20771 I dev.mdh.sample: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+         1790943559.498  1000   667  1711 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+         1790943559.745 radio  1056  1270 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+         1790943559.745  1000   667   687 W IPCThreadState: Sending oneway calls to frozen process.
+         1790943560.555  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: threadLoop: entering standby, frames: 7963072
+         1790943560.555  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: joining consumeThread
+         1790943560.573  1041   454 20650 D android.hardware.audio@7.1-impl.ranchu: consumeThread: exiting
+         1790943560.573  1041   454  6968 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: stopping PCM stream
+         1790943562.679 shell 20797 20797 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: window
+         1790943564.076 10219 20765 20808 D ProfileInstaller: Installing profile for dev.mdh.sample
