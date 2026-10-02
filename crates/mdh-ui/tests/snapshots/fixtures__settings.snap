@@ -1,0 +1,19 @@
+---
+source: crates/mdh-ui/tests/fixtures.rs
+expression: "snapshot(concat! (stringify! (settings), \"_api36\"))"
+---
+raw: 81 nodes, ~7808 tokens | compact: 13 nodes, ~189 tokens
+
+[e1] list scrollable #settings_homepage_container
+  [e2] item "Search Settings" #search_action_bar
+  [e3] list scrollable #recycler_view
+    [e4] item "Google" · "Services & preferences"
+    [e5] item "Network & internet" · "Mobile, Wi‑Fi, hotspot"
+    [e6] item "Connected devices" · "Bluetooth, pairing"
+    [e7] item "Apps" · "Assistant, recent apps, default apps"
+    [e8] item "Notifications" · "Notification history, conversations"
+    [e9] item "Sound & vibration" · "Volume and haptics"
+    [e10] item "Modes" · "Do Not Disturb, Bedtime, Driving"
+    [e11] item "Display & touch" · "Dark theme, font size, touch"
+    [e12] item "Wallpaper & style" · "Colors, themed icons, app grid"
+    [e13] item "Storage" · "88% used - 0.96 GB free"

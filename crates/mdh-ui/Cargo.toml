@@ -1,6 +1,6 @@
 [package]
-name = "mdh-driver"
-description = "Device drivers (adb, simctl) for mobile-dev-harness"
+name = "mdh-ui"
+description = "UI tree compression, stable refs and diffs for mobile-dev-harness"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,12 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-async-trait.workspace = true
 mdh-core.workspace = true
-quick-xml = "0.41.0"
-tokio.workspace = true
-which.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+insta = "1.48.0"
+mdh-driver.workspace = true
 
 [lints]
 workspace = true

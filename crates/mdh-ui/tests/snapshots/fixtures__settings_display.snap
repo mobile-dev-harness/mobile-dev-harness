@@ -1,0 +1,22 @@
+---
+source: crates/mdh-ui/tests/fixtures.rs
+expression: "snapshot(concat! (stringify! (settings_display), \"_api36\"))"
+---
+raw: 61 nodes, ~5738 tokens | compact: 16 nodes, ~161 tokens
+
+[e1] list scrollable #content_parent
+  [e2] group "Display & touch" #collapsing_toolbar
+    [e3] button "Navigate up"
+  [e4] list focused scrollable #recycler_view
+    [e5] "Brightness"
+    [e6] item "Brightness level" · "83%"
+    [e7] "Lock display"
+    [e8] item "Lock screen" · "Show all notification content"
+    [e9] item "Screen timeout" · "Not set"
+    [e10] "Appearance"
+    [e11] switch "Dark theme" · "Will turn on when Bedtime starts" off #switchWidget
+    [e12] item "Screen saver" · "On / Clock"
+    [e13] item "Display size and text"
+    [e14] item "Navigation mode" · "Gesture navigation"
+    [e15] "Color"
+    [e16] item

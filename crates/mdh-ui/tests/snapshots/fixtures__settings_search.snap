@@ -1,0 +1,16 @@
+---
+source: crates/mdh-ui/tests/fixtures.rs
+expression: "snapshot(concat! (stringify! (settings_search), \"_api36\"))"
+---
+raw: 57 nodes, ~5849 tokens | compact: 10 nodes, ~131 tokens
+
+[e1] button "Back"
+[e2] textbox "Search settings" value="dark" focused #open_search_view_edit_text
+[e3] button "Clear text" #open_search_view_clear_button
+[e4] list scrollable #list_results
+  [e5] item "Dark theme" · "Display & touch"
+  [e6] item "Enable dark mode" · "Messages Settings"
+  [e7] item "Schedule" · "Display & touch > Dark theme"
+  [e8] item "Color inversion" · "Accessibility > Color and motion"
+  [e9] item "Bedtime mode" · "Digital Wellbeing > Bedtime mode"
+  [e10] item "Search Support for \"dark\""

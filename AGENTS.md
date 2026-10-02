@@ -18,8 +18,10 @@ logcat, crash detection, MCP server). Feature IDs like `F4.1` refer to docs/desi
 ```
 crates/
   mdh-core/     shared types (Device, Platform, Error/Result) — no I/O
-  mdh-driver/   Driver trait + android/ (SDK discovery, adb wrapper)
+  mdh-driver/   Driver trait + android/ (SDK discovery, adb wrapper, uiautomator parser)
+  mdh-ui/       compact UI tree: compression, stable refs, rendering, diffs
   mdh-cli/      package `mobile-dev-harness`, binary `mdh` (clap)
+fixtures/       real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
 docs/DESIGN.md  design overview + roadmap; details in docs/design/, decisions in docs/adr/
 ```
 
@@ -72,6 +74,11 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Unit tests must not require a device, emulator, network or Android SDK.
 - Device-dependent tests are gated behind `MDH_E2E=1` and must not run by default.
 - When fixing a parser bug, first add the offending real output as a test case.
+- Compressor output is pinned with `insta` snapshots (`crates/mdh-ui/tests/snapshots/`). After an
+  intended output change, regenerate with `INSTA_UPDATE=always cargo test -p mdh-ui` and review the
+  snapshot diff — including the token counts in the header — before committing.
+- Fixture names carry the API level. Before saving a new dump, confirm the screen actually changed
+  (`am start` may only bring an existing task to the front; use `-S`).
 - For manual checks, a headless emulator can be started with
   `$ANDROID_HOME/emulator/emulator -avd <name> -no-window -no-audio -no-snapshot-save` and stopped
   with `adb emu kill`. (macOS has no `timeout` command; poll in a loop instead.)

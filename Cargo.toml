@@ -13,6 +13,7 @@ authors = ["The mobile-dev-harness contributors"]
 [workspace.dependencies]
 mdh-core = { path = "crates/mdh-core", version = "0.1.0" }
 mdh-driver = { path = "crates/mdh-driver", version = "0.1.0" }
+mdh-ui = { path = "crates/mdh-ui", version = "0.1.0" }
 
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }

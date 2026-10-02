@@ -1,0 +1,23 @@
+---
+source: crates/mdh-ui/tests/fixtures.rs
+expression: "snapshot(concat! (stringify! (launcher), \"_api36\"))"
+---
+raw: 33 nodes, ~3409 tokens | compact: 17 nodes, ~152 tokens
+
+[e1] list scrollable #workspace
+  [e2] list "At a glance" scrollable #smartspace_card_pager
+    [e3] item #base_template_card_with_date
+      [e4] button "Fri, Oct 2" #date
+  [e5] item "Play Store" · "Play Store has 1 notification"
+  [e6] item "Gmail"
+  [e7] item "Photos"
+  [e8] item "YouTube"
+[e9] "Home"
+[e10] button "Phone"
+[e11] button "Messages"
+[e12] button "Chrome"
+[e13] button "Play Store" · "Play Store has 1 notification"
+[e14] button "Google search" #search_container_hotseat
+  [e15] button "Google app" #g_icon
+  [e16] button "Voice search" #mic_icon
+  [e17] button "Google Lens" #lens_icon

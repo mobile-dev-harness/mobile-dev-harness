@@ -2,9 +2,11 @@
 
 mod adb;
 mod sdk;
+mod uiautomator;
 
 pub use adb::Adb;
 pub use sdk::AndroidSdk;
+pub use uiautomator::parse_hierarchy;
 
 use async_trait::async_trait;
 use mdh_core::{Device, Platform, Result};

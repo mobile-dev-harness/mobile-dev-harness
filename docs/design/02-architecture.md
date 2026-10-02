@@ -239,6 +239,10 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 - **System dialogs:** every observation checks whether the foreground window belongs to the system (permission,
   ANR or crash dialogs) and flags it separately so the agent deals with it first.
 - Every wait has a timeout; timeout errors include the last observation so the agent can see where it got stuck.
+- **Launches that don't navigate:** when the target app already has a task, `am start` may only bring it to the
+  front and print `Warning: Activity not started, its current task has been brought to the front`. Launch and
+  deep-link navigation must detect this and, depending on the reset policy, retry with `-S` (stop first) or
+  report that navigation did not happen instead of claiming success.
 
 ## 7. Logs and crashes (`mdh-observe`)
 

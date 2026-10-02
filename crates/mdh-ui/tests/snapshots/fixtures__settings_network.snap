@@ -1,0 +1,21 @@
+---
+source: crates/mdh-ui/tests/fixtures.rs
+expression: "snapshot(concat! (stringify! (settings_network), \"_api36\"))"
+---
+raw: 67 nodes, ~6360 tokens | compact: 15 nodes, ~183 tokens
+
+[e1] list scrollable #content_parent
+  [e2] group "Internet" #collapsing_toolbar
+    [e3] button "Navigate up"
+    [e4] button "Fix connectivity"
+  [e5] progress #progress_bar_animation
+  [e6] list scrollable #recycler_view
+    [e7] item "T-Mobile" · "5G"
+      [e8] button "Settings" #settings_button
+    [e9] switch "Wi-Fi" on #switchWidget
+    [e10] item "AndroidWifi,Connected,Wifi signal full.,Open network" · "AndroidWifi · Connected · Settings"
+    [e11] "Searching for networks…"
+    [e12] item "Add network"
+    [e13] item "Network preferences" · "Wi‑Fi doesn't turn back on automatically"
+    [e14] item "Saved networks" · "1 network"
+    [e15] item "Non-carrier data usage" · "1.39 GB used Sep 4 – Oct 2"
