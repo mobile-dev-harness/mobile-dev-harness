@@ -202,7 +202,7 @@ domains and the shared foundation (ADR-0008):
 mdh doctor | devices
 mdh emulator list | start [avd] | stop
 mdh init                              # probe the project, write mdh.yaml
-mdh run [--route R] [--reset data|snapshot] [--no-build]
+mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]   # --route/--reset with M3
 mdh build | install | launch
 mdh observe [--diff] [--detail minimal|normal|full] [--screenshot [--annotate]]
 mdh screenshot [-o file] [--max-edge 1024]
@@ -243,7 +243,7 @@ than split into many small tools.
 | `mdh_wait` | Wait for a target to appear or disappear | wait | M1 ✅ |
 | `mdh_logs` | Recent logs and crash reports | logs | M1 ✅ |
 | `mdh_app` | Launch, stop, install | launch / stop / install | M1 ✅ |
-| `mdh_run` | Build → install → launch → first observation | run | M2 |
+| `mdh_run` | Build → install → launch → first observation, with progress | run | M2 ✅ |
 | `mdh_navigate` | Open a route or deep link | open | M3 |
 | `mdh_state` | Permissions, reset, snapshots, appearance, animations | state | M3 |
 | `mdh_verify` | Run assertions or a flow, return a verdict | verify / flow run | M4 |

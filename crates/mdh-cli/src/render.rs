@@ -1,6 +1,8 @@
 //! Human-readable forms of library results. JSON output serializes the same values.
 
-use mdh_control::{ActOutcome, LogsReport, Observation, Screenshot, SessionSummary, launch_text};
+use mdh_control::{
+    ActOutcome, LogsReport, Observation, RunReport, Screenshot, SessionSummary, launch_text,
+};
 use mdh_core::LaunchInfo;
 use serde::Serialize;
 
@@ -31,6 +33,12 @@ impl Human for Observation {
 }
 
 impl Human for ActOutcome {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}
+
+impl Human for RunReport {
     fn human(&self) -> String {
         self.text.clone()
     }

@@ -535,6 +535,7 @@ dependencies = [
  "mdh-core",
  "mdh-driver",
  "mdh-observe",
+ "mdh-project",
  "serde",
  "serde_json",
  "tokio",
@@ -596,6 +597,12 @@ version = "0.1.0"
 [[package]]
 name = "mdh-project"
 version = "0.1.0"
+dependencies = [
+ "mdh-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "mdh-verify"

@@ -98,6 +98,12 @@ mod tests {
             Timeout,
             AppCrashed,
             TargetObscured,
+            ProjectNotFound,
+            ProbeFailed,
+            AmbiguousBuildTarget,
+            UnknownBuildTarget,
+            BuildFailed,
+            NoApk,
             Io,
         ] {
             assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());

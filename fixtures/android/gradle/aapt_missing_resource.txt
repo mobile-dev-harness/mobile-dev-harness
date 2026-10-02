@@ -1,0 +1,56 @@
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :generateDebugResources
+> Task :packageDebugResources
+> Task :processDebugNavigationResources
+> Task :javaPreCompileDebug UP-TO-DATE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :mergeDebugAssets UP-TO-DATE
+> Task :compressDebugAssets UP-TO-DATE
+> Task :generateDebugGlobalSynthetics UP-TO-DATE
+> Task :checkDebugDuplicateClasses UP-TO-DATE
+> Task :desugarDebugFileDependencies UP-TO-DATE
+> Task :parseDebugLocalResources
+> Task :mergeExtDexDebug UP-TO-DATE
+> Task :generateDebugRFile UP-TO-DATE
+> Task :compileDebugKotlin UP-TO-DATE
+> Task :compileDebugJavaWithJavac NO-SOURCE
+> Task :processDebugJavaRes UP-TO-DATE
+> Task :mergeDebugJavaResource UP-TO-DATE
+> Task :mergeLibDexDebug UP-TO-DATE
+> Task :checkDebugAarMetadata UP-TO-DATE
+> Task :mapDebugSourceSetPaths
+> Task :compileDebugNavigationResources UP-TO-DATE
+> Task :createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :extractDeepLinksDebug UP-TO-DATE
+> Task :processDebugMainManifest UP-TO-DATE
+> Task :mergeDebugResources
+> Task :processDebugManifest UP-TO-DATE
+> Task :processDebugManifestForPackage UP-TO-DATE
+> Task :mergeDebugJniLibFolders UP-TO-DATE
+> Task :mergeDebugNativeLibs UP-TO-DATE
+> Task :stripDebugDebugSymbols UP-TO-DATE
+> Task :validateSigningDebug UP-TO-DATE
+> Task :writeDebugAppMetadata UP-TO-DATE
+> Task :writeDebugSigningConfigVersions UP-TO-DATE
+> Task :processDebugResources FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':processDebugResources'.
+> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
+   > Android resource linking failed
+     dev.mdh.sample-main-38:/layout/activity_login.xml:33: error: resource string/sign_in_label (aka dev.mdh.sample:string/sign_in_label) not found.
+     error: failed linking file resources.
+
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+32 actionable tasks: 7 executed, 25 up-to-date

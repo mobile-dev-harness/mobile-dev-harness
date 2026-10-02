@@ -2,12 +2,15 @@ mod doctor;
 mod output;
 mod render;
 
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use mdh_control::{ActOutcome, Action, Control, Direction, Observation, Session, Target};
+use mdh_control::{
+    ActOutcome, Action, Control, Direction, Observation, RunOptions, RunReport, Session, Target,
+};
 use mdh_core::output::Timings;
 use mdh_core::{Device, DeviceState, Error, LogLevel, Result};
 use mdh_driver::Driver;
@@ -117,6 +120,24 @@ enum Command {
         /// Most recent lines to show
         #[arg(long, default_value_t = 50)]
         lines: usize,
+    },
+    /// Build the app, install it if it changed, restart it and show its first screen
+    Run {
+        /// Directory inside the Gradle project
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Application module such as `app` (when the build has several)
+        #[arg(long)]
+        module: Option<String>,
+        /// Build variant such as `debug` or `freeDebug` (default: the debug variant)
+        #[arg(long)]
+        variant: Option<String>,
+        /// Use the last built APK instead of building
+        #[arg(long)]
+        no_build: bool,
+        /// Grant all runtime permissions on install
+        #[arg(short, long)]
+        grant: bool,
     },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
@@ -330,6 +351,30 @@ async fn run(
             Err(e) => Err(e),
         }),
         Command::Logs { level, lines } => report!(session.logs(level.into(), lines).await),
+        Command::Run {
+            project,
+            module,
+            variant,
+            no_build,
+            grant,
+        } => {
+            let options = RunOptions {
+                project,
+                module,
+                variant,
+                build: !no_build,
+                grant,
+            };
+            let report = session.run(options, timings, show_task).await;
+            if std::io::stderr().is_terminal() {
+                eprint!("\r\x1b[2K");
+            }
+            let (data, error) = split(report);
+            let error = error
+                .or_else(|| data.as_ref().and_then(RunReport::build_error))
+                .or_else(|| data.as_ref().and_then(crash_error));
+            finish(json, started, std::mem::take(timings), data, error)
+        }
         Command::Launch { app } => report!(session.launch(&app).await),
         Command::Stop { package } => report!(
             session
@@ -357,8 +402,22 @@ async fn run(
     }
 }
 
+/// Shows the running Gradle task on an interactive terminal; silent otherwise.
+fn show_task(task: &str) {
+    if std::io::stderr().is_terminal() {
+        let task: String = task.chars().take(70).collect();
+        eprint!("\r\x1b[2Kbuilding {task}");
+    }
+}
+
 trait HasLogs {
     fn logs(&self) -> Option<&LogDigest>;
+}
+
+impl HasLogs for RunReport {
+    fn logs(&self) -> Option<&LogDigest> {
+        self.observation.as_ref()?.logs.as_ref()
+    }
 }
 
 impl HasLogs for Observation {

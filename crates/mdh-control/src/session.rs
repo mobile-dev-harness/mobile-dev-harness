@@ -33,7 +33,7 @@ const STEPS_BEFORE_CRASH: usize = 3;
 const LOGS_WINDOW_MS: u64 = 10 * 60 * 1000;
 
 #[derive(Default, Serialize, Deserialize)]
-struct State {
+pub(crate) struct State {
     version: u32,
     device: String,
     refs: RefTable,
@@ -45,11 +45,14 @@ struct State {
     steps: Vec<RecordedStep>,
     /// Device time of the newest log entry already reported.
     #[serde(default)]
-    log_cursor_ms: Option<u64>,
+    pub(crate) log_cursor_ms: Option<u64>,
     /// The app the agent works on (set by `launch`); its logs and crashes are always watched,
     /// even when another app or the launcher is in front.
     #[serde(default)]
     app: Option<String>,
+    /// Package → hash of the APK `run` last installed, to skip unchanged installs.
+    #[serde(default)]
+    pub(crate) installed: HashMap<String, u64>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -104,8 +107,8 @@ pub struct SessionSummary {
 /// A [`Control`] plus session state. CLI invocations persist it to `path` between calls; the MCP
 /// server keeps one in memory per connection.
 pub struct Session {
-    control: Control,
-    state: State,
+    pub(crate) control: Control,
+    pub(crate) state: State,
     path: Option<PathBuf>,
 }
 
@@ -189,9 +192,27 @@ impl Session {
         let (snapshot, entries) = tokio::join!(self.control.snapshot(), self.logs_since(cursor));
         let snapshot = snapshot?;
         timings.record("observe", started);
+        self.observation_from(snapshot, entries?, diff_only).await
+    }
+
+    /// Starts the log cursor now unless it runs already, so what happens next is reported.
+    pub(crate) async fn start_log_cursor(&mut self) -> Result<()> {
+        if self.state.log_cursor_ms.is_none() {
+            self.state.log_cursor_ms = Some(self.control.clock_ms().await?);
+        }
+        Ok(())
+    }
+
+    /// Builds an observation from a snapshot and the log entries read with it.
+    pub(crate) async fn observation_from(
+        &mut self,
+        snapshot: Snapshot,
+        entries: Option<Vec<LogEntry>>,
+        diff_only: bool,
+    ) -> Result<Observation> {
         let source = snapshot.source;
         let view = self.adopt(snapshot);
-        let logs = self.digest_logs(entries?, &view).await?;
+        let logs = self.digest_logs(entries, &view).await?;
         let previous = if diff_only {
             self.state.last.as_ref()
         } else {
@@ -367,7 +388,7 @@ impl Session {
 
     /// Entries after the cursor; `None` before the first read, which only starts the cursor so a
     /// session doesn't report the device's whole history.
-    async fn logs_since(&self, cursor: Option<u64>) -> Result<Option<Vec<LogEntry>>> {
+    pub(crate) async fn logs_since(&self, cursor: Option<u64>) -> Result<Option<Vec<LogEntry>>> {
         match cursor {
             Some(since) => self.control.logs(since).await.map(Some),
             None => Ok(None),

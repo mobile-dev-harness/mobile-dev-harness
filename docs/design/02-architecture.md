@@ -306,35 +306,66 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 > Verified on API 36 with `am crash` (Java). Native crashes and ANRs are covered by synthetic fixtures until the
 > sample app can produce real ones.
 
-## 8. Gradle probing and diagnostics (`mdh-project`)
+## 8. Gradle probing, building and diagnostics (`mdh-project`)
 
 ### 8.1 Probing with an init script, not regexes
 
 Regex-parsing `build.gradle(.kts)` is unreliable because of version catalogs, convention plugins, dynamic
-applicationIds and so on. Instead, inject a Gradle init script:
+applicationIds and so on. Instead, mdh injects a Groovy init script (`crates/mdh-project/src/gradle/probe.gradle`):
 
 ```
-./gradlew -q --init-script <mdh-probe.gradle> mdhProbe
+./gradlew -q --init-script .mdh/cache/mdh-probe.gradle --no-configuration-cache --no-configure-on-demand mdhProbe
 ```
 
-For every project that applies `com.android.application`, the script uses AGP's `androidComponents.onVariants` to
-collect variant names, `applicationId` and artifact locations, and prints them as JSON. Results are cached in
-`.mdh/cache/`, keyed by a hash of all build files, `gradle.properties` and the wrapper version; on a cache hit
-Gradle isn't started at all.
+For every project applying `com.android.application`, the script registers an `androidComponents.onVariants`
+callback through dynamic calls (the init script's classpath has no AGP) and records each variant's name, build
+type and application id; the `mdhProbe` task prints them as one JSON line. Configuration cache and
+configure-on-demand are turned off for the probe so every module is configured. The model is cached in
+`.mdh/cache/gradle-model.json`, keyed by a hash of every settings, build, `gradle.properties`, version catalog and
+wrapper file, so Gradle only runs when one of them changes.
 
-> Risk: AGP APIs differ across versions and need a version matrix (e.g. AGP 7.4, 8.x, 9.x). The launch activity is
-> not part of the Gradle model; it is queried after install with `cmd package resolve-activity`.
+Verified on AGP 9.2.1 with a single-module app and a two-module build with product flavors (library modules are
+skipped; `applicationIdSuffix` is applied). Older AGP versions still need a test matrix.
 
-### 8.2 Building and diagnostics
+Selection: the only application module, or `--module`; the `debug` variant, or the only variant of build type
+debug, or `--variant`. Several candidates are an `AMBIGUOUS_BUILD_TARGET` listing them (exit 2).
 
-- Run `./gradlew :<module>:assemble<Variant>`, streaming output to `build.log` in the run directory.
-- Diagnostic parsers (pure functions with fixture tests):
-  - Kotlin: `e: file:///…/Foo.kt:12:5 Unresolved reference: bar`
-  - Java: `Foo.java:12: error: …`
-  - Resource and AAPT2 errors, manifest merger errors
-  - Gradle's `* What went wrong:` section (dependency resolution, plugin and configuration errors)
-- Output: the first N diagnostics in order (default 10), each with file, line, column and up to 3 lines of context;
-  cascading errors after the first one are deprioritized when recognizable.
+### 8.2 Building and locating the APK
+
+- `./gradlew <module>:assemble<Variant> --console=plain` (the wrapper when present), stdout and stderr interleaved
+  line by line into `.mdh/runs/<time>-build/build.log` (the latest 20 are kept). `> Task` lines feed progress:
+  the CLI shows the running task on a terminal, the MCP server sends progress notifications (at most two per
+  second) when the client provides a progress token.
+- The APK and its application id come from AGP's `output-metadata.json` under `<module>/build/outputs/apk/`, not
+  from guessing output paths.
+- "Up to date" means Gradle's summary reports every task up to date.
+
+### 8.3 Diagnostics
+
+Parsers are pure functions over the captured output, tested with real failures of the sample app
+(`fixtures/android/gradle/`). Formats are recognized by shape, not English keywords:
+
+| Kind | Format | Notes |
+|---|---|---|
+| Kotlin | `e: file:///…/Foo.kt:29:9 message` (`w:` for warnings) | the source line is read from disk |
+| Java | `/…/Foo.java:5: <severity>: message`, source line, caret, indented details | **javac is localized** (`错误:` with a Chinese locale, observed); the severity word is matched against known warnings, anything else is an error |
+| Resources | `dev.mdh.sample-main-38:/layout/x.xml:33: error: …` | the prefix is a resource set (`<package>-<source set>-<n>`), mapped back to `src/<source set>/res/…` |
+| Manifest | `/…/AndroidManifest.xml Error:` then tab-indented message and suggestions | suggestions are kept as notes |
+| Dependencies | `Could not find group:artifact:version.`, repeated once per dependency path | reported once, with the first `Required by` |
+| Anything else | the `* What went wrong:` paragraph | only when nothing more specific explains the failure |
+
+Gradle repeats compiler output under `* What went wrong:`; duplicates are dropped. Paths are reported relative to
+the project root. The report shows up to eight errors, each with its source line, and points to the full log.
+
+### 8.4 `run`
+
+Probe (cached) → select → build → install when the APK's hash differs from the last install or the package is
+missing (`pm path`) → force-stop and launch, with the log cursor started first so a crash during startup is
+reported → settle (splash screens, first loads) → observe. A failed build stops after the build report and
+returns `BUILD_FAILED` (exit 4) next to it.
+
+Measured on the sample app: first run 6.3 s (probe 0.9, build 2.7, install 0.8, launch 1.5); nothing changed:
+build "up to date" in 0.8 s and the install skipped; a one-line edit to the visible screen 3.2 s end to end.
 
 ## 9. State and directories
 

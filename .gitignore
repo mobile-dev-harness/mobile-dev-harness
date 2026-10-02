@@ -1,4 +1,4 @@
 /target
 .DS_Store
 # Per-project harness output (screenshots, logs, recorded flows live in user projects)
-/.mdh/
+.mdh/

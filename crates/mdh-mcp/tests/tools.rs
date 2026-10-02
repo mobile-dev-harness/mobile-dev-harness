@@ -99,7 +99,7 @@ fn text(content: &[ContentBlock]) -> String {
 }
 
 #[tokio::test]
-async fn lists_six_tools_with_object_schemas() {
+async fn lists_the_tools_with_object_schemas() {
     let client = connect().await;
     let tools = client.list_all_tools().await.unwrap();
     let mut names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -111,6 +111,7 @@ async fn lists_six_tools_with_object_schemas() {
             "mdh_app",
             "mdh_logs",
             "mdh_observe",
+            "mdh_run",
             "mdh_status",
             "mdh_wait"
         ]

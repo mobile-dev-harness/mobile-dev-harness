@@ -1,0 +1,59 @@
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :generateDebugResources UP-TO-DATE
+> Task :packageDebugResources UP-TO-DATE
+> Task :processDebugNavigationResources UP-TO-DATE
+> Task :parseDebugLocalResources UP-TO-DATE
+> Task :generateDebugRFile UP-TO-DATE
+> Task :javaPreCompileDebug UP-TO-DATE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :mergeDebugAssets UP-TO-DATE
+> Task :compressDebugAssets UP-TO-DATE
+> Task :generateDebugGlobalSynthetics UP-TO-DATE
+> Task :checkDebugDuplicateClasses UP-TO-DATE
+> Task :desugarDebugFileDependencies UP-TO-DATE
+> Task :mergeExtDexDebug UP-TO-DATE
+> Task :mergeLibDexDebug UP-TO-DATE
+> Task :checkDebugAarMetadata UP-TO-DATE
+> Task :mapDebugSourceSetPaths UP-TO-DATE
+> Task :compileDebugNavigationResources UP-TO-DATE
+> Task :compileDebugKotlin
+> Task :mergeDebugResources
+
+> Task :compileDebugJavaWithJavac
+/work/android-sample/src/main/java/dev/mdh/sample/Broken.java:5: 错误: 不兼容的类型: int无法转换为String
+        String s = 1;
+                   ^
+/work/android-sample/src/main/java/dev/mdh/sample/Broken.java:6: 错误: 找不到符号
+        return missing();
+               ^
+  符号:   方法 missing()
+  位置: 类 Broken
+2 个错误
+
+> Task :compileDebugJavaWithJavac FAILED
+
+[Incubating] Problems report is available at: file:///work/android-sample/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  /work/android-sample/src/main/java/dev/mdh/sample/Broken.java:5: 错误: 不兼容的类型: int无法转换为String
+          String s = 1;
+                     ^
+  /work/android-sample/src/main/java/dev/mdh/sample/Broken.java:6: 错误: 找不到符号
+          return missing();
+                 ^
+    符号:   方法 missing()
+    位置: 类 Broken
+  2 个错误
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 4s
+19 actionable tasks: 3 executed, 16 up-to-date

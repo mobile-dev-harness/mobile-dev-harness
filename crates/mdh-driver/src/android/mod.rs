@@ -221,6 +221,15 @@ impl Driver for AndroidDriver {
         am::parse_am_start(&component, &out)
     }
 
+    async fn is_installed(&self, device: &Device, package: &str) -> Result<bool> {
+        // `pm path` prints `package:/data/app/…` and exits with 1 when the package is unknown.
+        let out = self
+            .adb
+            .shell_stdout(&device.id, &format!("pm path {}", shell_quote(package)))
+            .await?;
+        Ok(out.lines().any(|l| l.starts_with("package:")))
+    }
+
     async fn clock_ms(&self, device: &Device) -> Result<u64> {
         let out = self.adb.shell(&device.id, "date +%s.%N").await?;
         logcat::parse_device_time(&out).ok_or(Error::Parse {

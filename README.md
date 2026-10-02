@@ -14,6 +14,8 @@ works. When it changes a mobile app, it usually can't: it edits code and hopes. 
 - **Crashes surface immediately.** New errors, crashes, native crashes and ANRs come with every result, with the
   app's own stack frames and the steps that led there.
 - **Fast.** A warm on-device helper reads the UI in ~10 ms (uiautomator takes ~2 s) and types any Unicode text.
+- **Build errors an agent can act on.** `mdh run` builds with Gradle, installs only what changed and restarts the
+  app; compiler, resource, manifest and dependency failures come back as `file:line` with the offending line.
 - **One engine, two interfaces.** A CLI for humans, scripts and shell-based agents, and an MCP server for agents
   such as Claude Code.
 
@@ -139,6 +141,23 @@ On first use, `mdh` installs a small helper app on the device (`dev.mdh.helper`,
 
 ## Quick start
 
+In your app's project directory:
+
+```sh
+mdh run                              # build, install if changed, restart, show the first screen
+```
+
+```
+build :assembleDebug → failed (1.2 s), 2 errors
+e: src/main/kotlin/dev/mdh/sample/LoginActivity.kt:29:9 Unresolved reference 'emial'.
+      29 |         emial.doAfterTextChanged { update() }
+e: src/main/kotlin/dev/mdh/sample/LoginActivity.kt:33:30 Assignment type mismatch: actual type is 'String', but 'Boolean' was expected.
+      33 |             signIn.isEnabled = "no"
+full log: .mdh/runs/1790948182148-build/build.log
+```
+
+Any installed app works too:
+
 ```sh
 mdh launch com.android.settings      # start an app; its logs and crashes are watched from now on
 mdh observe                          # see the screen
@@ -169,6 +188,7 @@ claude mcp add mdh -- mdh mcp
 
 | Tool | What it does |
 |---|---|
+| `mdh_run` | Build, install if changed, restart and show the first screen; build errors as `file:line` diagnostics |
 | `mdh_observe` | The current screen; optionally only what changed, or a screenshot |
 | `mdh_act` | One or more actions (`tap`, `long_press`, `type`, `swipe`, `scroll`, `key`), each reporting what changed |
 | `mdh_wait` | Wait until an element appears or disappears |
@@ -187,6 +207,7 @@ Agents that only have a shell can use the CLI directly — every command takes `
 | Command | Description |
 |---|---|
 | `mdh doctor` | Check the toolchain and devices |
+| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]` | Build with Gradle, install if changed, restart the app, show its first screen |
 | `mdh devices` | List connected devices and emulators |
 | `mdh observe [--diff]` | The current screen; `--diff` shows only what changed since you last looked |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | Save a downscaled JPEG |
@@ -233,7 +254,8 @@ Text output is meant to be read by agents and people. With `--json`, every comma
 | 0 | Success |
 | 1 | The app didn't match expectations: element not found, ambiguous, obscured, or a wait timed out |
 | 2 | Invalid arguments or target |
-| 3 | Environment problem: no SDK, no device, helper unavailable |
+| 3 | Environment problem: no SDK, no device, no Gradle project, helper unavailable |
+| 4 | The build failed |
 | 5 | The app crashed or stopped responding (ANR) |
 | 10 | Internal error |
 
@@ -272,13 +294,13 @@ Test account: `alice@example.com` / `correct-horse`.
 
 ## Status and roadmap
 
-Working today (Android): observing screens, acting on them, waiting, logs and crash reports, the CLI and the MCP
-server. Planned, organized around five quality domains:
+Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
+crash reports, the CLI and the MCP server. Planned, organized around five quality domains:
 
 | | Domain | What's planned |
 |---|---|---|
 | ✅ | **Control** | Drive the app reliably (done) |
-| ⏳ | **Build** | Build from source with readable compiler errors; one command to build, install and launch |
+| ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
 | ⏳ | **Verify** | Assertions, evidence-backed verdicts, recorded flows replayed as regression tests, Claude Code plugin |
 | ⏳ | **UI consistency** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
 | ⏳ | **Performance** | Startup time, jank, memory and CPU against baselines |

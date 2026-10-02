@@ -42,7 +42,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 |---|---|---|
 | **M0 Scaffold** ✅ | Workspace, CI, licenses, F1.1 `doctor`, F1.2 `devices` | CI green |
 | **M1 Control** (in progress) | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording), F4.6–F4.8 logs and crashes ✅, F9.1 MCP server ✅, `examples/android-sample` ✅ | An agent drives every sample-app scenario through MCP alone ✅. (The benchmark against mobile-mcp moved to the backlog.) |
-| **M2 Project** | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
+| **M2 Project** ✅ | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M3 State & config** | `mdh init`, `mdh.yaml`, F3.1–F3.8, F1.5 | Reach "logged in + specific screen" without manual tapping |
 | **M4 Verify** | F6.1–F6.3, F7.1–F7.4, F9.2 Claude Code plugin, F9.3 | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
 | **M5 UI consistency v1** | F13.1 baselines (structural + pixel), F13.3 cross-config layout checks on one device, F13.4 rule checks | A layout regression and a missing label in the sample app are caught with evidence |

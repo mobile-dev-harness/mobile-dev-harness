@@ -1,0 +1,52 @@
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :generateDebugResources
+> Task :packageDebugResources
+> Task :processDebugNavigationResources
+> Task :javaPreCompileDebug UP-TO-DATE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :mergeDebugAssets UP-TO-DATE
+> Task :compressDebugAssets UP-TO-DATE
+> Task :parseDebugLocalResources
+> Task :checkDebugDuplicateClasses UP-TO-DATE
+> Task :generateDebugRFile UP-TO-DATE
+> Task :compileDebugKotlin UP-TO-DATE
+> Task :compileDebugJavaWithJavac NO-SOURCE
+> Task :processDebugJavaRes UP-TO-DATE
+> Task :mergeDebugJavaResource UP-TO-DATE
+> Task :checkDebugAarMetadata UP-TO-DATE
+> Task :mapDebugSourceSetPaths
+> Task :compileDebugNavigationResources UP-TO-DATE
+> Task :createDebugCompatibleScreenManifests
+> Task :extractDeepLinksDebug UP-TO-DATE
+
+> Task :processDebugMainManifest FAILED
+/work/android-sample/src/main/AndroidManifest.xml Error:
+	uses-sdk:minSdkVersion 19 cannot be smaller than version 21 declared in library [androidx.compose.material3:material3-android:1.4.0] /home/dev/.gradle/caches/9.4.1/transforms/cddd7f08f312eb07497871e497af7873/transformed/material3/AndroidManifest.xml as the library might be using APIs not available in 19
+	Suggestion: use a compatible library with a minSdk of at most 19,
+		or increase this project's minSdk version to at least 21,
+		or use tools:overrideLibrary="androidx.compose.material3" to force usage (may lead to runtime failures)
+
+See https://developer.android.com/r/studio-ui/build/manifest-merger for more information about the manifest merger.
+
+
+> Task :mergeDebugResources
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':processDebugMainManifest'.
+> Manifest merger failed : uses-sdk:minSdkVersion 19 cannot be smaller than version 21 declared in library [androidx.compose.material3:material3-android:1.4.0] /home/dev/.gradle/caches/9.4.1/transforms/cddd7f08f312eb07497871e497af7873/transformed/material3/AndroidManifest.xml as the library might be using APIs not available in 19
+  	Suggestion: use a compatible library with a minSdk of at most 19,
+  		or increase this project's minSdk version to at least 21,
+  		or use tools:overrideLibrary="androidx.compose.material3" to force usage (may lead to runtime failures)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+19 actionable tasks: 8 executed, 11 up-to-date

@@ -15,8 +15,9 @@ first; iOS, React Native and Flutter later.
 steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-press`, `type`,
 `scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
 observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
-ADR-0005 output envelope; `examples/android-sample`. M1 is complete except the benchmark against
-mobile-mcp, which is in the backlog (docs/DESIGN.md). Next milestone: M2 (project/build).
+ADR-0005 output envelope; `examples/android-sample`; M2: `mdh run` / `mdh_run` (Gradle probe, build,
+structured diagnostics, install-if-changed, restart, first observation). The benchmark against
+mobile-mcp is in the backlog (docs/DESIGN.md). Next milestone: M3 (state and config).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
 ## Layout
@@ -26,7 +27,7 @@ crates/
   mdh-core/      foundation: shared types, errors and codes, output envelope, timings — no I/O
   mdh-driver/    foundation: Driver trait + android/ (SDK, adb, helper client, uiautomator, parsers)
   mdh-observe/   foundation: compact UI trees, stable refs, rendering, diffs, screenshots; logs next
-  mdh-project/   foundation: build adapters (Gradle first)                 — empty until M2
+  mdh-project/   foundation: Gradle probe (init script), builds, diagnostics, APK lookup
   mdh-control/   domain: device selection, observation, input, app lifecycle; session engine next
   mdh-verify/    domain: assertions, verdicts, flows                        — empty until M4
   mdh-visual/    domain: UI consistency                                     — empty until M5

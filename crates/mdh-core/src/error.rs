@@ -68,6 +68,31 @@ pub enum Error {
     )]
     TargetObscured { target: String },
 
+    #[error("no Gradle project in {dir} or its parents")]
+    ProjectNotFound { dir: String },
+
+    #[error("could not read the Gradle project: {message}")]
+    ProbeFailed { message: String },
+
+    #[error("several {what}s could be built: {}", candidates.join(", "))]
+    AmbiguousBuildTarget {
+        what: String,
+        candidates: Vec<String>,
+    },
+
+    #[error("no {what} `{name}`; available: {}", candidates.join(", "))]
+    UnknownBuildTarget {
+        what: String,
+        name: String,
+        candidates: Vec<String>,
+    },
+
+    #[error("`{task}` failed with {errors} error(s)")]
+    BuildFailed { task: String, errors: usize },
+
+    #[error("no built APK for variant `{variant}`")]
+    NoApk { variant: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -91,6 +116,12 @@ impl Error {
             Error::Timeout { .. } => ErrorCode::Timeout,
             Error::AppCrashed { .. } => ErrorCode::AppCrashed,
             Error::TargetObscured { .. } => ErrorCode::TargetObscured,
+            Error::ProjectNotFound { .. } => ErrorCode::ProjectNotFound,
+            Error::ProbeFailed { .. } => ErrorCode::ProbeFailed,
+            Error::AmbiguousBuildTarget { .. } => ErrorCode::AmbiguousBuildTarget,
+            Error::UnknownBuildTarget { .. } => ErrorCode::UnknownBuildTarget,
+            Error::BuildFailed { .. } => ErrorCode::BuildFailed,
+            Error::NoApk { .. } => ErrorCode::NoApk,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -149,6 +180,18 @@ impl Error {
                  system bars, that is a layout bug worth fixing"
                     .into()
             }
+            Error::ProjectNotFound { .. } => {
+                "run from the project directory or pass --project <dir> (a directory with settings.gradle or settings.gradle.kts)".into()
+            }
+            Error::ProbeFailed { .. } => {
+                "the Gradle build itself doesn't configure; run `./gradlew help` to see why".into()
+            }
+            Error::AmbiguousBuildTarget { what, .. } => format!("pick one with --{what}"),
+            Error::UnknownBuildTarget { what, .. } => format!("pass one of the available {what}s with --{what}"),
+            Error::BuildFailed { .. } => {
+                "fix the diagnostics in the output; the full Gradle log is listed there too".into()
+            }
+            Error::NoApk { .. } => "build it first: run without --no-build".into(),
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -175,6 +218,12 @@ pub enum ErrorCode {
     Timeout,
     AppCrashed,
     TargetObscured,
+    ProjectNotFound,
+    ProbeFailed,
+    AmbiguousBuildTarget,
+    UnknownBuildTarget,
+    BuildFailed,
+    NoApk,
     Io,
 }
 
@@ -198,6 +247,12 @@ impl ErrorCode {
             ErrorCode::Timeout => "TIMEOUT",
             ErrorCode::AppCrashed => "APP_CRASHED",
             ErrorCode::TargetObscured => "TARGET_OBSCURED",
+            ErrorCode::ProjectNotFound => "PROJECT_NOT_FOUND",
+            ErrorCode::ProbeFailed => "PROBE_FAILED",
+            ErrorCode::AmbiguousBuildTarget => "AMBIGUOUS_BUILD_TARGET",
+            ErrorCode::UnknownBuildTarget => "UNKNOWN_BUILD_TARGET",
+            ErrorCode::BuildFailed => "BUILD_FAILED",
+            ErrorCode::NoApk => "NO_APK",
             ErrorCode::Io => "IO",
         }
     }
@@ -210,7 +265,10 @@ impl ErrorCode {
             | ErrorCode::AmbiguousTarget
             | ErrorCode::Timeout
             | ErrorCode::TargetObscured => 1,
-            ErrorCode::InvalidTarget => 2,
+            ErrorCode::InvalidTarget
+            | ErrorCode::AmbiguousBuildTarget
+            | ErrorCode::UnknownBuildTarget => 2,
+            ErrorCode::BuildFailed | ErrorCode::ProbeFailed | ErrorCode::NoApk => 4,
             ErrorCode::AppCrashed => 5,
             ErrorCode::ToolNotFound
             | ErrorCode::CommandFailed
@@ -219,7 +277,8 @@ impl ErrorCode {
             | ErrorCode::AmbiguousDevice
             | ErrorCode::HelperUnavailable
             | ErrorCode::AppNotFound
-            | ErrorCode::LaunchFailed => 3,
+            | ErrorCode::LaunchFailed
+            | ErrorCode::ProjectNotFound => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }

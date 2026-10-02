@@ -123,7 +123,7 @@ function diagram(t) {
   parts.push(box(t, 30, 524, 1100, 130, "none", { weight: 1.2 }));
   parts.push(text(t, 50, 546, "shared foundation", { size: 17, anchor: "start", color: t.muted }));
   parts.push(card(t, 50, 562, 330, 78, t.base, "mdh-observe", ["compact tree · refs · diffs · logs"], { titleSize: 20 }));
-  parts.push(card(t, 400, 562, 240, 78, t.planned, "mdh-project", ["builds · diagnostics"], { dashed: true, titleSize: 20 }));
+  parts.push(card(t, 400, 562, 240, 78, t.base, "mdh-project", ["Gradle · diagnostics"], { titleSize: 20 }));
   parts.push(card(t, 660, 562, 240, 78, t.base, "mdh-driver", ["adb · helper client"], { titleSize: 20 }));
   parts.push(card(t, 920, 562, 190, 78, t.base, "mdh-core", ["types · errors"], { titleSize: 20 }));
 

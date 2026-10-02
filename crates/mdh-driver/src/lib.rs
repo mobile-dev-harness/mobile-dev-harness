@@ -35,6 +35,11 @@ pub trait Driver: Send + Sync {
 
     async fn stop(&self, device: &Device, package: &str) -> Result<()>;
 
+    /// Whether `package` is installed on the device.
+    async fn is_installed(&self, _device: &Device, _package: &str) -> Result<bool> {
+        Ok(false)
+    }
+
     /// The device clock in Unix milliseconds. Log cursors use it, never the host clock.
     async fn clock_ms(&self, _device: &Device) -> Result<u64> {
         Ok(0)

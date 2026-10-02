@@ -9,14 +9,18 @@ use std::time::Duration;
 
 use base64::Engine;
 use mdh_control::{
-    ActOutcome, Action, Control, Direction, Observation, Session, Target, launch_text,
+    ActOutcome, Action, Control, Direction, Observation, RunOptions, Session, Target, launch_text,
 };
 use mdh_core::output::Timings;
 use mdh_core::{Error, LogLevel, Result};
 use mdh_observe::{CrashKind, LogDigest};
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo};
+use rmcp::model::{
+    CallToolResult, ContentBlock, Implementation, Meta, ProgressNotificationParam,
+    ServerCapabilities, ServerInfo,
+};
+use rmcp::service::{Peer, RoleServer};
 use rmcp::transport::stdio;
 use rmcp::{ErrorData, ServerHandler, ServiceExt, schemars, tool, tool_handler, tool_router};
 use serde::Deserialize;
@@ -151,6 +155,20 @@ pub enum ScrollDirection {
     Down,
     Left,
     Right,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RunParams {
+    /// A directory inside the Gradle project; default: the server's working directory.
+    pub project: Option<String>,
+    /// Application module such as `app`, when the build has several.
+    pub module: Option<String>,
+    /// Build variant such as `debug` or `freeDebug`; default: the debug variant.
+    pub variant: Option<String>,
+    /// Build first (default true); false reuses the last built APK.
+    pub build: Option<bool>,
+    /// Grant all runtime permissions on install.
+    pub grant: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -309,6 +327,67 @@ impl MdhServer {
         Ok(CallToolResult::success(vec![ContentBlock::text(
             texts.join("\n\n"),
         )]))
+    }
+
+    #[tool(
+        description = "Build the app with Gradle, install it if it changed, restart it and report its first settled screen. Build failures come back as file:line diagnostics with the source line. Reports progress while building."
+    )]
+    async fn mdh_run(
+        &self,
+        Parameters(p): Parameters<RunParams>,
+        meta: Meta,
+        client: Peer<RoleServer>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let options = RunOptions {
+            project: p.project.map_or_else(|| ".".into(), Into::into),
+            module: p.module,
+            variant: p.variant,
+            build: p.build.unwrap_or(true),
+            grant: p.grant.unwrap_or(false),
+        };
+        // Gradle task lines become progress notifications, at most two per second.
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let progress = meta.get_progress_token().map(|token| {
+            tokio::spawn(async move {
+                let mut count = 0u32;
+                let mut last: Option<std::time::Instant> = None;
+                while let Some(task) = rx.recv().await {
+                    count += 1;
+                    if last.is_none_or(|l| l.elapsed() >= Duration::from_millis(500)) {
+                        last = Some(std::time::Instant::now());
+                        let note = ProgressNotificationParam::new(token.clone(), f64::from(count))
+                            .with_message(format!("building {task}"));
+                        let _ = client.notify_progress(note).await;
+                    }
+                }
+            })
+        });
+        let result = self
+            .with_session(async |s| {
+                s.run(options, &mut Timings::default(), |task| {
+                    let _ = tx.send(task.to_owned());
+                })
+                .await
+            })
+            .await;
+        drop(tx);
+        if let Some(progress) = progress {
+            let _ = progress.await;
+        }
+        Ok(match result {
+            Ok(report) => match report.build_error() {
+                Some(e) => CallToolResult::error(vec![ContentBlock::text(format!(
+                    "{}\n\n{}",
+                    report.text,
+                    error_text(&e)
+                ))]),
+                None => observed(
+                    &report.text,
+                    report.observation.as_ref().and_then(|o| o.logs.as_ref()),
+                ),
+            },
+            Err(e) => error_result(&e),
+        })
     }
 
     #[tool(

@@ -1,0 +1,32 @@
+// Injected by mdh with --init-script. Reports every Android application module, its variants and
+// their application ids as one JSON line, without changing the build. Uses only Gradle and the
+// AGP `androidComponents` API through dynamic calls, so it works without AGP on its classpath.
+def mdhApps = [:]
+
+allprojects { project ->
+    project.plugins.withId("com.android.application") {
+        def variants = []
+        mdhApps[project.path] = [dir: project.projectDir.absolutePath, variants: variants]
+        def components = project.extensions.getByName("androidComponents")
+        components.onVariants(components.selector().all(), { variant ->
+            variants << [name: variant.name, applicationId: variant.applicationId, buildType: variant.buildType]
+        } as Action)
+    }
+}
+
+rootProject { root ->
+    root.tasks.register("mdhProbe") {
+        doLast {
+            def apps = mdhApps.collect { path, app ->
+                [
+                    path: path,
+                    dir: app.dir,
+                    variants: app.variants.collect { v ->
+                        [name: v.name, applicationId: v.applicationId.getOrNull(), buildType: v.buildType]
+                    },
+                ]
+            }
+            println("MDH_PROBE " + groovy.json.JsonOutput.toJson([apps: apps]))
+        }
+    }
+}

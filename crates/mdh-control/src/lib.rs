@@ -5,12 +5,14 @@
 //! settle after actions, diffs against what the agent last saw, and a recording of every step.
 
 mod action;
+mod run;
 mod session;
 mod settle;
 mod target;
 mod text;
 
 pub use action::{ActOutcome, Action, Direction};
+pub use run::{InstallReport, RunOptions, RunReport};
 pub use session::{LogsReport, Observation, RecordedStep, Session, SessionSummary};
 pub use target::{Selector, Target, TextMatch, find_all, selector_for};
 pub use text::launch_text;
@@ -130,6 +132,10 @@ impl Control {
 
     pub async fn stop(&self, package: &str) -> Result<()> {
         self.driver.stop(&self.device, package).await
+    }
+
+    pub async fn is_installed(&self, package: &str) -> Result<bool> {
+        self.driver.is_installed(&self.device, package).await
     }
 
     pub async fn install(&self, apk: &Path, grant_permissions: bool) -> Result<()> {

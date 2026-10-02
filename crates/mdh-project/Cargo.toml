@@ -9,6 +9,10 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+mdh-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

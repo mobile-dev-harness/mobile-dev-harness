@@ -14,6 +14,8 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
 - **崩溃第一时间暴露**：新的错误日志、崩溃、native 崩溃和 ANR 会随每次结果一起返回，并附上 App 自己的堆栈和
   导致崩溃的操作步骤。
 - **快**：常驻在设备上的 helper 读取界面只要约 10ms（uiautomator 要约 2 秒），还能输入任意语言的文字。
+- **agent 能直接动手修的构建错误**：`mdh run` 用 Gradle 构建，只安装有变化的部分，并重启 App；编译、资源、Manifest
+  和依赖方面的错误都会以 `文件:行号` 加出错源码行的形式返回。
 - **一套引擎，两种接口**：给人、脚本和只有命令行的 agent 用的 CLI，以及给 Claude Code 等 agent 用的
   MCP server。
 
@@ -132,6 +134,23 @@ mdh doctor
 
 ## 快速上手
 
+在你的 App 工程目录下：
+
+```sh
+mdh run                              # 构建、有变化才安装、重启 App，并显示第一个界面
+```
+
+```
+build :assembleDebug → failed (1.2 s), 2 errors
+e: src/main/kotlin/dev/mdh/sample/LoginActivity.kt:29:9 Unresolved reference 'emial'.
+      29 |         emial.doAfterTextChanged { update() }
+e: src/main/kotlin/dev/mdh/sample/LoginActivity.kt:33:30 Assignment type mismatch: actual type is 'String', but 'Boolean' was expected.
+      33 |             signIn.isEnabled = "no"
+full log: .mdh/runs/1790948182148-build/build.log
+```
+
+任何已安装的 App 也可以直接操作：
+
 ```sh
 mdh launch com.android.settings      # 启动 App；从此开始关注它的日志和崩溃
 mdh observe                          # 看当前屏幕
@@ -162,6 +181,7 @@ claude mcp add mdh -- mdh mcp
 
 | 工具 | 作用 |
 |---|---|
+| `mdh_run` | 构建、有变化才安装、重启 App 并显示第一个界面；构建错误以 `文件:行号` 诊断的形式返回 |
 | `mdh_observe` | 当前屏幕；可选只看变化，或附带截图 |
 | `mdh_act` | 一个或多个动作（`tap`、`long_press`、`type`、`swipe`、`scroll`、`key`），每个都报告发生了什么变化 |
 | `mdh_wait` | 等待某个元素出现或消失 |
@@ -179,6 +199,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | 命令 | 说明 |
 |---|---|
 | `mdh doctor` | 检查工具链和设备 |
+| `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]` | 用 Gradle 构建，有变化才安装，重启 App 并显示第一个界面 |
 | `mdh devices` | 列出已连接的设备和模拟器 |
 | `mdh observe [--diff]` | 当前屏幕；`--diff` 只显示自上次查看以来的变化 |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | 保存一张缩小后的 JPEG 截图 |
@@ -224,7 +245,8 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | 0 | 成功 |
 | 1 | App 的状态不符合预期：找不到元素、匹配到多个、元素被遮挡，或等待超时 |
 | 2 | 参数或目标写法有误 |
-| 3 | 环境问题：没有 SDK、没有设备、helper 无法使用 |
+| 3 | 环境问题：没有 SDK、没有设备、找不到 Gradle 工程、helper 无法使用 |
+| 4 | 构建失败 |
 | 5 | App 崩溃或失去响应（ANR） |
 | 10 | 内部错误 |
 
@@ -259,12 +281,12 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：观测屏幕、操作界面、等待、日志和崩溃报告、CLI 以及 MCP server。后续计划围绕五个质量领域展开：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、CLI 以及 MCP server。后续计划围绕五个质量领域展开：
 
 | | 领域 | 计划内容 |
 |---|---|---|
 | ✅ | **控制** | 可靠地驱动 App（已完成） |
-| ⏳ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动 |
+| ✅ | **构建** | 从源码构建，编译错误清晰易读；一条命令完成构建、安装和启动（已完成） |
 | ⏳ | **校验** | 断言、带证据的验证结论、录制的操作流程可作为回归测试回放、Claude Code 插件 |
 | ⏳ | **UI 一致性** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
 | ⏳ | **性能** | 对照基线检查启动耗时、卡顿、内存和 CPU |
