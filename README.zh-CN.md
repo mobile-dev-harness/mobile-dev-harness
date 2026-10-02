@@ -2,7 +2,7 @@
 
 # mobile-dev-harness
 
-**让编程 agent 能运行、检查和调试你的 Android App，就像它们在浏览器里检查 Web 应用那样。**
+**为编程 agent 提供 Android 上的精准校验：比 agent 自己做更准确，也更省 token。**
 
 agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制台，确认改动是否生效。改完一个移动 App，它通常做不到：
 只能改完代码，然后祈祷没问题。`mobile-dev-harness`（命令 `mdh`）让 agent 能看到、也能操作真实设备或模拟器，
@@ -20,6 +20,17 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
   MCP server。
 
 > **状态：早期开发阶段。** 目前只支持 Android，已经可以端到端地驱动真实 App。详见[状态与路线图](#状态与路线图)。
+
+## 为什么用了它，agent 更擅长移动端开发
+
+大模型擅长推理，但不擅长感知和把握时机。在移动端开发中，agent 出错的地方很少是代码本身，大多是对运行中的 App 判断错了：
+编译通过就宣布完成，读到的是转场动画中途的截图，漏掉了 logcat 里的崩溃，或者只检查了自己改的那个按钮，却没发现另一个页面被改坏了。
+`mdh` 把"agent 自己看屏幕"换成结构化的事实和确定性的检查：
+
+- **更准确**：更少"误判通过"（以为好了其实没好），也更少"误判失败"（以为坏了其实没坏），因为 agent 看到的是稳定后的界面、
+  所有的连带变化和每一次崩溃。
+- **更省 token**：一屏约 150 token，而一张截图约 1,500 token、原始 XML 动辄几千 token；每次操作后只返回变化的部分。
+  这样每次改动后都校验一遍，agent 也负担得起。
 
 ## 效果
 
@@ -294,6 +305,7 @@ mdh launch dev.mdh.sample
 | ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |
 | ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |
+| ⏳ | **Benchmark** | 用预先埋好 bug 的任务，衡量误判通过率、误判失败率、任务成功率和 token：只有 agent、agent + adb 和截图、agent + mobile-mcp、agent + mdh 四种配置对比 |
 
 详细设计（英文）：[设计总览](docs/DESIGN.md)、[功能设计](docs/design/01-functional.md)、
 [技术架构](docs/design/02-architecture.md)、[架构决策记录](docs/adr/)。

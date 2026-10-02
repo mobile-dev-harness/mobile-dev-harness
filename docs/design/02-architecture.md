@@ -35,7 +35,8 @@
                         └─────────────┘
 ```
 
-Principles:
+Principles (the product's design principles — facts over pixels, never a stale state, the harness judges, … —
+are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural ones):
 
 1. **Entry points are thin shells.** CLI and MCP only parse input and render output; all logic lives in the
    library crates, so both behave identically.

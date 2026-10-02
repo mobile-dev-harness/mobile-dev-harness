@@ -17,9 +17,17 @@ steps; CLI sessions in `.mdh/session.json`), `observe [--diff]`, `tap`, `long-pr
 `scroll`, `swipe`, `key`, `wait`, `screenshot`, `launch`/`stop`/`install`, `session show|reset`, `logs`; log digests and crash reports on every
 observation (crash → exit 5); the MCP server (`mdh mcp`, six tools); the on-device helper; the
 ADR-0005 output envelope; `examples/android-sample`; M2: `mdh run` / `mdh_run` (Gradle probe, build,
-structured diagnostics, install-if-changed, restart, first observation). The benchmark against
-mobile-mcp is in the backlog (docs/DESIGN.md). Next milestone: M3 (state and config).
+structured diagnostics, install-if-changed, restart, first observation). Next: M4, the verification engine,
+together with the state capabilities flows need (state and config is a track that grows with each
+milestone). The benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
+
+## What we optimize for
+
+Precise verification: fewer false passes and false fails, fewer tokens. Before adding or changing
+a feature, check it against the design principles in [docs/DESIGN.md](docs/DESIGN.md#design-principles)
+(facts over pixels, never a stale state, report the unasked, the harness judges, every token earns
+its place, failures say what to do next).
 
 ## Layout
 

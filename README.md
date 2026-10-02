@@ -2,7 +2,7 @@
 
 # mobile-dev-harness
 
-**Let coding agents run, check and debug your Android app — the way they already check web apps in a browser.**
+**Precise verification for coding agents on Android: more accurate and fewer tokens than an agent manages on its own.**
 
 When an agent changes a web app, it can open a browser, click around, read the console and see whether the change
 works. When it changes a mobile app, it usually can't: it edits code and hopes. `mobile-dev-harness` (command:
@@ -21,6 +21,18 @@ works. When it changes a mobile app, it usually can't: it edits code and hopes. 
 
 > **Status: early development.** Android only for now; it already drives real apps end to end. See
 > [Status and roadmap](#status-and-roadmap).
+
+## Why agents get better at mobile with it
+
+Models reason well; they perceive and time poorly. On mobile, an agent's mistakes are rarely in the code it writes
+and mostly in what it believes about the running app: it calls a clean compile "done", reads a screenshot taken
+mid-transition, misses the crash in logcat, or checks the button it changed but not the screen it broke. `mdh`
+replaces *eyeballing a screen* with structured facts and deterministic checks:
+
+- **More accurate**: fewer false passes ("it works" when it doesn't) and fewer false fails ("it's broken" when it
+  isn't), because the agent sees settled states, every side effect and every crash.
+- **Fewer tokens**: a screen in ~150 tokens instead of a ~1,500-token screenshot or thousands of tokens of XML, and
+  only the diff after each action — so verifying after every change is affordable.
 
 ## What it looks like
 
@@ -309,6 +321,7 @@ matrix that repeats it across devices:
 | ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
 | ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
+| ⏳ | **Benchmark** | Seeded-bug tasks measuring false passes, false fails, success and tokens: agent alone vs. adb and screenshots vs. mobile-mcp vs. mdh |
 
 Details: [design overview](docs/DESIGN.md), [functional design](docs/design/01-functional.md),
 [architecture](docs/design/02-architecture.md), [decision records](docs/adr/).
