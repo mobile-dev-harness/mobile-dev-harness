@@ -8,8 +8,8 @@ use mdh_core::output::{Timings, millis};
 use mdh_core::ui::{Rect, ScreenInfo, TreeSource};
 use mdh_core::{Error, Input, LaunchInfo, LogEntry, LogLevel, Result};
 use mdh_observe::{
-    AppFilter, CrashReport, LogDigest, RefTable, Role, TreeDiff, UiNode, UiTree, diff, digest,
-    render, render_diff, render_line, render_logs, render_opaque, render_screen,
+    AppFilter, CrashKind, CrashReport, LogDigest, RefTable, Role, TreeDiff, UiNode, UiTree, diff,
+    digest, render, render_diff, render_line, render_logs, render_opaque, render_screen,
 };
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,9 @@ pub(crate) struct State {
     /// Device time of the newest log entry already reported.
     #[serde(default)]
     pub(crate) log_cursor_ms: Option<u64>,
+    /// Device time when the session started reading logs: the window `no_crash` checks.
+    #[serde(default)]
+    watching_since_ms: Option<u64>,
     /// The app the agent works on (set by `launch`); its logs and crashes are always watched,
     /// even when another app or the launcher is in front.
     #[serde(default)]
@@ -205,7 +208,9 @@ impl Session {
     /// Starts the log cursor now unless it runs already, so what happens next is reported.
     pub(crate) async fn start_log_cursor(&mut self) -> Result<()> {
         if self.state.log_cursor_ms.is_none() {
-            self.state.log_cursor_ms = Some(self.control.clock_ms().await?);
+            let now = self.control.clock_ms().await?;
+            self.state.log_cursor_ms = Some(now);
+            self.state.watching_since_ms.get_or_insert(now);
         }
         Ok(())
     }
@@ -356,6 +361,16 @@ impl Session {
         Ok(info)
     }
 
+    /// Opens a deep link; with `package`, only that app may handle it and it becomes the
+    /// session's app.
+    pub async fn open_uri(&mut self, uri: &str, package: Option<&str>) -> Result<LaunchInfo> {
+        let info = self.control.open_uri(uri, package).await?;
+        if let Some(p) = package {
+            self.state.app = Some(p.to_owned());
+        }
+        Ok(info)
+    }
+
     /// Recent logs of the app in front (and of the last seen screen's app), at least `level`;
     /// independent of what the session already reported.
     pub async fn logs(&mut self, level: LogLevel, lines: usize) -> Result<LogsReport> {
@@ -393,6 +408,44 @@ impl Session {
         })
     }
 
+    /// The session's app (set by `launch` and `run`), whose logs and crashes are always watched.
+    pub fn app(&self) -> Option<&str> {
+        self.state.app.as_deref()
+    }
+
+    /// The device's clock, which log times are on.
+    pub async fn device_time(&self) -> Result<u64> {
+        self.control.clock_ms().await
+    }
+
+    /// Crashes and ANRs of the app since `since_ms` (device time), whether or not they were
+    /// already reported; by default since the session started watching. What `no_crash` checks:
+    /// a crash the agent was shown and moved past still counts.
+    pub async fn app_crashes(&mut self, since_ms: Option<u64>) -> Result<Vec<CrashReport>> {
+        let now = self.control.clock_ms().await?;
+        let since = since_ms
+            .or(self.state.watching_since_ms)
+            .unwrap_or_else(|| now.saturating_sub(LOGS_WINDOW_MS));
+        let entries = self.control.logs(since).await?;
+        let screens: Vec<&ScreenInfo> = self
+            .state
+            .last
+            .as_ref()
+            .map(|v| &v.screen)
+            .into_iter()
+            .collect();
+        let packages = packages_of(self.state.app.as_deref(), &screens);
+        let filter = AppFilter {
+            pids: self.control.pids(&packages).await?.into_iter().collect(),
+            packages,
+        };
+        Ok(digest(&entries, &filter)
+            .crashes
+            .into_iter()
+            .filter(|c| c.of_app && c.kind != CrashKind::Died)
+            .collect())
+    }
+
     /// Entries after the cursor; `None` before the first read, which only starts the cursor so a
     /// session doesn't report the device's whole history.
     pub(crate) async fn logs_since(&self, cursor: Option<u64>) -> Result<Option<Vec<LogEntry>>> {
@@ -410,7 +463,9 @@ impl Session {
         before: &View,
     ) -> Result<Option<LogDigest>> {
         let Some(entries) = entries else {
-            self.state.log_cursor_ms = Some(self.control.clock_ms().await?);
+            let now = self.control.clock_ms().await?;
+            self.state.log_cursor_ms = Some(now);
+            self.state.watching_since_ms.get_or_insert(now);
             return Ok(None);
         };
         if let Some(newest) = entries.last() {

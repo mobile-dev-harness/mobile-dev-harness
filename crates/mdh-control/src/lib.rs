@@ -12,9 +12,9 @@ mod target;
 mod text;
 
 pub use action::{ActOutcome, Action, Direction};
-pub use run::{InstallReport, RunOptions, RunReport};
+pub use run::{InstallReport, RunOptions, RunReport, new_run_dir};
 pub use session::{LogsReport, Observation, RecordedStep, Session, SessionSummary};
-pub use target::{Selector, Target, TextMatch, find_all, selector_for};
+pub use target::{Selector, Target, TextMatch, find_all, find_matches, find_one, selector_for};
 pub use text::launch_text;
 
 use std::path::{Path, PathBuf};
@@ -128,6 +128,25 @@ impl Control {
 
     pub async fn launch(&self, app: &str) -> Result<LaunchInfo> {
         self.driver.launch(&self.device, app).await
+    }
+
+    pub async fn open_uri(&self, uri: &str, package: Option<&str>) -> Result<LaunchInfo> {
+        self.driver.open_uri(&self.device, uri, package).await
+    }
+
+    pub async fn clear_data(&self, package: &str) -> Result<()> {
+        self.driver.clear_data(&self.device, package).await
+    }
+
+    pub async fn set_permission(
+        &self,
+        package: &str,
+        permission: &str,
+        granted: bool,
+    ) -> Result<()> {
+        self.driver
+            .set_permission(&self.device, package, permission, granted)
+            .await
     }
 
     pub async fn stop(&self, package: &str) -> Result<()> {

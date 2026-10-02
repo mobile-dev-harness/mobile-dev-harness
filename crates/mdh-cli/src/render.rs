@@ -73,3 +73,15 @@ impl Human for mdh_impact::ImpactReport {
         mdh_impact::render(self)
     }
 }
+
+impl Human for mdh_verify::Verdict {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}
+
+impl Human for mdh_verify::FlowRuns {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}

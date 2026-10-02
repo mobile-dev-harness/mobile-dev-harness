@@ -46,6 +46,32 @@ pub trait Driver: Send + Sync {
         Ok(())
     }
 
+    /// Opens a deep link (a `VIEW` intent for `uri`), limited to `package` if given.
+    async fn open_uri(
+        &self,
+        _device: &Device,
+        _uri: &str,
+        _package: Option<&str>,
+    ) -> Result<LaunchInfo> {
+        Err(unsupported("opening deep links"))
+    }
+
+    /// Clears the app's data and stops it: a first launch again.
+    async fn clear_data(&self, _device: &Device, _package: &str) -> Result<()> {
+        Err(unsupported("clearing app data"))
+    }
+
+    /// Grants or revokes a runtime permission.
+    async fn set_permission(
+        &self,
+        _device: &Device,
+        _package: &str,
+        _permission: &str,
+        _granted: bool,
+    ) -> Result<()> {
+        Err(unsupported("changing permissions"))
+    }
+
     /// Supported ABIs, preferred first (e.g. `arm64-v8a`); empty when unknown.
     async fn abis(&self, _device: &Device) -> Result<Vec<String>> {
         Ok(Vec::new())
@@ -91,6 +117,12 @@ pub trait Driver: Send + Sync {
 }
 
 /// Picks the device to work on: the requested one, or the only online device.
+fn unsupported(operation: &str) -> Error {
+    Error::Unsupported {
+        operation: operation.to_owned(),
+    }
+}
+
 pub fn select_device(devices: Vec<Device>, requested: Option<&str>) -> Result<Device> {
     let mut online: Vec<Device> = devices
         .into_iter()

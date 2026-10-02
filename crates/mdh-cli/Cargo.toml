@@ -23,6 +23,7 @@ mdh-driver.workspace = true
 mdh-impact.workspace = true
 mdh-mcp.workspace = true
 mdh-observe.workspace = true
+mdh-verify.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

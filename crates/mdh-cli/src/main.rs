@@ -23,6 +23,8 @@ use crate::render::Done;
 
 /// Where CLI invocations keep session state between calls, relative to the working directory.
 const SESSION_FILE: &str = ".mdh/session.json";
+/// Saved flows, relative to the working directory (committed with the project).
+const FLOWS_DIR: &str = ".mdh/flows";
 
 #[derive(Parser)]
 #[command(name = "mdh", version, about)]
@@ -112,6 +114,17 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         timeout: u64,
     },
+    /// Check the app as it is now; prints a verdict with evidence (exit 1 if a check fails)
+    ///
+    /// CHECK: `visible TARGET`, `not visible TARGET`, `enabled|disabled|checked|unchecked|focused
+    /// TARGET`, `text TARGET == VALUE`, `text TARGET ~= VALUE`, `screen ACTIVITY`, `no crash`,
+    /// `log ~= TEXT`, `no log ~= TEXT`. `no crash` is always checked.
+    Verify {
+        checks: Vec<String>,
+        /// Seconds screen checks may take to start holding
+        #[arg(long, default_value_t = 3)]
+        timeout: u64,
+    },
     /// Recent logs and crash reports of the app in front
     Logs {
         /// Minimum level
@@ -168,6 +181,43 @@ enum Command {
     Session {
         #[command(subcommand)]
         command: SessionCommand,
+    },
+    /// Save the session's recorded steps as a flow, list flows, replay them
+    Flow {
+        #[command(subcommand)]
+        command: FlowCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum FlowCommand {
+    /// Save the recorded steps as .mdh/flows/NAME.yaml
+    Save {
+        name: String,
+        /// Only the last N recorded steps
+        #[arg(long)]
+        last: Option<usize>,
+        /// Checks to run after the last step (same syntax as `mdh verify`); repeatable
+        #[arg(long = "check")]
+        checks: Vec<String>,
+        /// Overwrite an existing flow
+        #[arg(long)]
+        force: bool,
+    },
+    /// List saved flows
+    List,
+    /// Print a flow's YAML
+    Show { name: String },
+    /// Replay flows and print a verdict per flow (exit 1 if any fails)
+    Run {
+        #[arg(required = true)]
+        names: Vec<String>,
+        /// Write a JUnit report
+        #[arg(long)]
+        junit: Option<PathBuf>,
+        /// Seconds each step waits for its target
+        #[arg(long, default_value_t = 10)]
+        step_timeout: u64,
     },
 }
 
@@ -241,6 +291,16 @@ async fn main() -> ExitCode {
         Command::Impact { project, base } => {
             report!(mdh_impact::analyze(&mdh_impact::Options { project, base }))
         }
+        Command::Flow {
+            command: FlowCommand::List,
+        } => report!(mdh_verify::FlowStore::new(FLOWS_DIR).list().map(Done::new)),
+        Command::Flow {
+            command: FlowCommand::Show { name },
+        } => report!(
+            mdh_verify::FlowStore::new(FLOWS_DIR)
+                .load(&name)
+                .map(|f| Done::new(f.to_yaml().trim_end()))
+        ),
         Command::Mcp => match mdh_mcp::serve_stdio(cli.device).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
@@ -366,6 +426,23 @@ async fn run(
             Err(e) => Err(e),
         }),
         Command::Logs { level, lines } => report!(session.logs(level.into(), lines).await),
+        Command::Verify { checks, timeout } => {
+            let checks: Result<Vec<mdh_verify::Assertion>> = checks
+                .iter()
+                .map(|c| mdh_verify::Assertion::parse(c))
+                .collect();
+            let options = mdh_verify::VerifyOptions {
+                timeout: Duration::from_secs(timeout),
+                ..mdh_verify::VerifyOptions::default()
+            };
+            let verdict = match checks {
+                Ok(checks) => mdh_verify::verify(session, checks, &options, timings).await,
+                Err(e) => Err(e),
+            };
+            let (data, error) = split(verdict);
+            let error = error.or_else(|| data.as_ref().and_then(mdh_verify::Verdict::failure));
+            finish(json, started, std::mem::take(timings), data, error)
+        }
         Command::Run {
             project,
             module,
@@ -407,6 +484,49 @@ async fn run(
                 .await
                 .map(|()| Done::new(format!("installed {}", apk.display())))
         ),
+        Command::Flow { command } => match command {
+            FlowCommand::Save {
+                name,
+                last,
+                checks,
+                force,
+            } => report!(
+                mdh_verify::save_flow(
+                    session,
+                    &mdh_verify::FlowStore::new(FLOWS_DIR),
+                    &name,
+                    last,
+                    &checks,
+                    force
+                )
+                .map(|saved| Done::new(saved.text))
+            ),
+            FlowCommand::Run {
+                names,
+                junit,
+                step_timeout,
+            } => {
+                let options = mdh_verify::FlowOptions {
+                    step_timeout: Duration::from_secs(step_timeout),
+                    ..mdh_verify::FlowOptions::default()
+                };
+                let store = mdh_verify::FlowStore::new(FLOWS_DIR);
+                let runs = mdh_verify::run_flows(session, &store, &names, &options, timings)
+                    .await
+                    .and_then(|runs| {
+                        if let Some(path) = &junit {
+                            std::fs::write(path, mdh_verify::junit("mdh", &runs.verdicts))?;
+                        }
+                        Ok(runs)
+                    });
+                let (data, error) = split(runs);
+                let error = error.or_else(|| data.as_ref().and_then(mdh_verify::FlowRuns::failure));
+                finish(json, started, std::mem::take(timings), data, error)
+            }
+            FlowCommand::List | FlowCommand::Show { .. } => {
+                unreachable!("handled before connecting")
+            }
+        },
         Command::Session { command } => match command {
             SessionCommand::Show => report!(Ok(session.summary())),
             SessionCommand::Reset => report!(

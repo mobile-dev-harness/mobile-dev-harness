@@ -13,7 +13,7 @@ use crate::session::{Installed, Observation, Session};
 use crate::settle::settle;
 use crate::text::launch_text;
 
-/// Build logs kept in `.mdh/runs/`.
+/// Run directories (build logs, verification evidence) kept in `.mdh/runs/`.
 const KEPT_RUNS: usize = 20;
 
 #[derive(Debug, Clone)]
@@ -100,7 +100,7 @@ impl Session {
         let mut report = RunReport::default();
         let apks = if options.build {
             let building = Instant::now();
-            let log = new_run_dir(&mdh_dir.join("runs"))?.join("build.log");
+            let log = new_run_dir(&mdh_dir.join("runs"), "build")?.join("build.log");
             let outcome = project.build(app, variant, &log, on_task).await?;
             timings.record("build", building);
             report.push(render_build(&outcome, project.root()));
@@ -217,8 +217,8 @@ fn file_hash(path: &Path) -> Result<u64> {
     Ok(h.finish())
 }
 
-/// `.mdh/runs/<unix ms>-build/`, removing the oldest beyond `KEPT_RUNS`.
-fn new_run_dir(runs: &Path) -> Result<PathBuf> {
+/// `.mdh/runs/<unix ms>-<kind>/`, removing the oldest beyond `KEPT_RUNS`.
+pub fn new_run_dir(runs: &Path, kind: &str) -> Result<PathBuf> {
     std::fs::create_dir_all(runs)?;
     let mut existing: Vec<PathBuf> = std::fs::read_dir(runs)?
         .flatten()
@@ -233,7 +233,7 @@ fn new_run_dir(runs: &Path) -> Result<PathBuf> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis());
-    let dir = runs.join(format!("{now}-build"));
+    let dir = runs.join(format!("{now}-{kind}"));
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }

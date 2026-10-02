@@ -100,6 +100,27 @@ pub enum Error {
         detail: String,
     },
 
+    #[error("{operation} is not supported on this device")]
+    Unsupported { operation: String },
+
+    #[error("invalid check `{assertion}`: {reason}")]
+    InvalidAssertion { assertion: String, reason: String },
+
+    #[error("invalid flow `{flow}`: {reason}")]
+    InvalidFlow { flow: String, reason: String },
+
+    #[error("no flow `{name}`")]
+    FlowNotFound {
+        name: String,
+        available: Vec<String>,
+    },
+
+    #[error("environment variable `{name}` is not set")]
+    MissingSecret { name: String },
+
+    #[error("verification failed: {failed} of {total} checks")]
+    VerificationFailed { failed: usize, total: usize },
+
     #[error("{dir} is not inside a git repository")]
     NotARepository { dir: String },
 
@@ -136,6 +157,12 @@ impl Error {
             Error::BuildFailed { .. } => ErrorCode::BuildFailed,
             Error::NoApk { .. } => ErrorCode::NoApk,
             Error::InstallFailed { .. } => ErrorCode::InstallFailed,
+            Error::Unsupported { .. } => ErrorCode::Unsupported,
+            Error::InvalidAssertion { .. } => ErrorCode::InvalidAssertion,
+            Error::VerificationFailed { .. } => ErrorCode::VerificationFailed,
+            Error::InvalidFlow { .. } => ErrorCode::InvalidFlow,
+            Error::FlowNotFound { .. } => ErrorCode::FlowNotFound,
+            Error::MissingSecret { .. } => ErrorCode::MissingSecret,
             Error::NotARepository { .. } => ErrorCode::NotARepository,
             Error::UnknownRevision { .. } => ErrorCode::UnknownRevision,
             Error::Io(_) => ErrorCode::Io,
@@ -209,6 +236,27 @@ impl Error {
             }
             Error::NoApk { .. } => "build it first (run without --no-build), or build an APK for this device".into(),
             Error::InstallFailed { reason, .. } => install_hint(reason).into(),
+            Error::Unsupported { .. } => "use an Android emulator or device".into(),
+            Error::InvalidAssertion { .. } => {
+                "write checks like `visible \"Sign in\"`, `enabled id=sign_in`, `text id=title == \"Inbox\"`, \
+                 `screen .MainActivity`, `no crash` or `log ~= timeout`"
+                    .into()
+            }
+            Error::InvalidFlow { .. } => {
+                "fix the flow file; the format is in docs/design/01-functional.md §4.6".into()
+            }
+            Error::FlowNotFound { available, .. } if available.is_empty() => {
+                "no flows saved yet; record one by acting on the app, then `mdh flow save <name>`".into()
+            }
+            Error::FlowNotFound { available, .. } => format!("saved flows: {}", available.join(", ")),
+            Error::MissingSecret { name } => {
+                format!("the flow types `${{env:{name}}}`; set {name} in the environment of mdh")
+            }
+            Error::VerificationFailed { .. } => {
+                "the verdict shows what was observed for each failed check; evidence (screenshot, tree, \
+                 logs) is in the run directory it names"
+                    .into()
+            }
             Error::NotARepository { .. } => {
                 "impact analysis compares against git; run it inside the repository (or `git init` \
                  and commit a baseline first)"
@@ -250,6 +298,12 @@ pub enum ErrorCode {
     BuildFailed,
     NoApk,
     InstallFailed,
+    Unsupported,
+    InvalidAssertion,
+    VerificationFailed,
+    InvalidFlow,
+    FlowNotFound,
+    MissingSecret,
     NotARepository,
     UnknownRevision,
     Io,
@@ -282,6 +336,12 @@ impl ErrorCode {
             ErrorCode::BuildFailed => "BUILD_FAILED",
             ErrorCode::NoApk => "NO_APK",
             ErrorCode::InstallFailed => "INSTALL_FAILED",
+            ErrorCode::Unsupported => "UNSUPPORTED",
+            ErrorCode::InvalidAssertion => "INVALID_ASSERTION",
+            ErrorCode::VerificationFailed => "VERIFICATION_FAILED",
+            ErrorCode::InvalidFlow => "INVALID_FLOW",
+            ErrorCode::FlowNotFound => "FLOW_NOT_FOUND",
+            ErrorCode::MissingSecret => "MISSING_SECRET",
             ErrorCode::NotARepository => "NOT_A_REPOSITORY",
             ErrorCode::UnknownRevision => "UNKNOWN_REVISION",
             ErrorCode::Io => "IO",
@@ -293,10 +353,15 @@ impl ErrorCode {
     pub fn exit_code(self) -> u8 {
         match self {
             ErrorCode::ElementNotFound
+            | ErrorCode::VerificationFailed
             | ErrorCode::AmbiguousTarget
             | ErrorCode::Timeout
             | ErrorCode::TargetObscured => 1,
             ErrorCode::InvalidTarget
+            | ErrorCode::InvalidAssertion
+            | ErrorCode::InvalidFlow
+            | ErrorCode::FlowNotFound
+            | ErrorCode::MissingSecret
             | ErrorCode::AmbiguousBuildTarget
             | ErrorCode::UnknownBuildTarget
             | ErrorCode::UnknownRevision => 2,
@@ -312,7 +377,8 @@ impl ErrorCode {
             | ErrorCode::LaunchFailed
             | ErrorCode::ProjectNotFound
             | ErrorCode::InstallFailed
-            | ErrorCode::NotARepository => 3,
+            | ErrorCode::NotARepository
+            | ErrorCode::Unsupported => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }

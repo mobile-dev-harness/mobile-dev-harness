@@ -258,6 +258,59 @@ impl Driver for AndroidDriver {
         am::parse_am_start(&component, &out)
     }
 
+    async fn open_uri(
+        &self,
+        device: &Device,
+        uri: &str,
+        package: Option<&str>,
+    ) -> Result<LaunchInfo> {
+        let mut command = format!(
+            "am start -W -a android.intent.action.VIEW -d {}",
+            shell_quote(uri)
+        );
+        if let Some(p) = package {
+            command.push(' ');
+            command.push_str(&shell_quote(p));
+        }
+        let out = self.adb.shell_stdout(&device.id, &command).await?;
+        am::parse_am_start(uri, &out)
+    }
+
+    async fn clear_data(&self, device: &Device, package: &str) -> Result<()> {
+        let out = self
+            .adb
+            .shell_stdout(&device.id, &format!("pm clear {}", shell_quote(package)))
+            .await?;
+        if out.trim() == "Success" {
+            Ok(())
+        } else {
+            Err(Error::AppNotFound {
+                package: package.to_owned(),
+            })
+        }
+    }
+
+    async fn set_permission(
+        &self,
+        device: &Device,
+        package: &str,
+        permission: &str,
+        granted: bool,
+    ) -> Result<()> {
+        let verb = if granted { "grant" } else { "revoke" };
+        self.adb
+            .shell(
+                &device.id,
+                &format!(
+                    "pm {verb} {} {}",
+                    shell_quote(package),
+                    shell_quote(permission)
+                ),
+            )
+            .await
+            .map(drop)
+    }
+
     async fn installed_path(&self, device: &Device, package: &str) -> Result<Option<String>> {
         // `pm path` prints `package:/data/app/~~…==/pkg-…==/base.apk` (plus split APKs) and exits
         // with 1 when the package is unknown.

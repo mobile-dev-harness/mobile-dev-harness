@@ -9,6 +9,17 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+async-trait.workspace = true
+mdh-control.workspace = true
+mdh-core.workspace = true
+mdh-observe.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_norway = "0.9.42"
+tokio.workspace = true
+
+[dev-dependencies]
+mdh-driver.workspace = true
 
 [lints]
 workspace = true

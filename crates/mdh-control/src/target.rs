@@ -229,6 +229,37 @@ fn resolve_selector<'a>(sel: &Selector, tree: &'a UiTree, shown: &str) -> Result
     }
 }
 
+/// The one element `target` names, for checks on it: a ref on the current screen or a selector with
+/// a single match (preferring a control over the text that labels it, like actions do).
+pub fn find_one<'a>(target: &Target, tree: &'a UiTree) -> Result<&'a UiNode> {
+    match target {
+        Target::Ref(r) => tree.find(r).ok_or_else(|| Error::ElementNotFound {
+            target: r.clone(),
+            candidates: Vec::new(),
+        }),
+        Target::Point { .. } => Err(invalid(
+            &target.to_string(),
+            "checks need an element, not coordinates",
+        )),
+        Target::Selector(sel) => resolve_selector(sel, tree, &sel.to_string()),
+    }
+}
+
+/// Every element `target` names on the current screen.
+pub fn find_matches<'a>(target: &Target, tree: &'a UiTree) -> Vec<&'a UiNode> {
+    match target {
+        Target::Ref(r) => tree.find(r).into_iter().collect(),
+        Target::Point { .. } => Vec::new(),
+        Target::Selector(sel) => {
+            let all = find_all(sel, tree);
+            match sel.index {
+                Some(i) => all.get(i).copied().into_iter().collect(),
+                None => all,
+            }
+        }
+    }
+}
+
 /// All nodes matching `sel`, in screen (pre-)order.
 pub fn find_all<'a>(sel: &Selector, tree: &'a UiTree) -> Vec<&'a UiNode> {
     let base = |n: &&UiNode| {

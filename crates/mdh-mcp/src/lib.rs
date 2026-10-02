@@ -34,10 +34,13 @@ Targets are a ref, coordinates (\"100,200\"), a selector (\"id=login\", \"text=S
 to settle and returns only what changed (+ added, ~ changed, - removed), or the whole tree when the \
 screen changed; don't observe again after an action. Lines starting with !! are crashes of the app: \
 fix them before anything else. Prefer refs and labels over coordinates. After changing code, call \
-mdh_impact to learn which screens the change reaches, then verify each of them, not only the one you \
-edited.";
+mdh_impact to learn which screens the change reaches, then verify each of them with mdh_verify, not \
+only the one you edited; a change is done when the verdict passes. Save what you did as a flow \
+(mdh_flow) so the check can be repeated.";
 
 const SCREENSHOT_EDGE: u32 = 1024;
+/// Saved flows, relative to the server's working directory.
+const FLOWS_DIR: &str = ".mdh/flows";
 
 /// One MCP connection: a lazily connected session.
 #[derive(Clone)]
@@ -173,6 +176,40 @@ pub struct RunParams {
     pub grant: Option<bool>,
     /// Uninstall first: replaces an app signed with another key or a newer version; clears its data.
     pub reinstall: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct VerifyParams {
+    /// Checks on the app as it is now: `visible "Sign in"`, `not visible id=error`,
+    /// `enabled|disabled|checked|unchecked|focused TARGET`, `text TARGET == "value"`,
+    /// `text TARGET ~= "part"`, `screen .LoginActivity`, `log ~= "text"`, `no log ~= "text"`.
+    /// `no crash` is always checked.
+    pub checks: Option<Vec<String>>,
+    /// Saved flows to replay instead (names in .mdh/flows); each gets its own verdict.
+    pub flows: Option<Vec<String>>,
+    /// Seconds checks may take to start holding, default 3.
+    pub timeout_s: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FlowParams {
+    pub command: FlowCommand,
+    /// `save`, `show`: the flow's name (letters, digits, `-`, `_`).
+    pub name: Option<String>,
+    /// `save`: only the last N recorded steps (default: all of the session's steps).
+    pub last: Option<usize>,
+    /// `save`: checks to run after the last step, same syntax as mdh_verify.
+    pub checks: Option<Vec<String>>,
+    /// `save`: overwrite an existing flow.
+    pub force: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum FlowCommand {
+    Save,
+    List,
+    Show,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -465,6 +502,91 @@ impl MdhServer {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(text_result(result.map(|r| mdh_impact::render(&r))))
+    }
+
+    #[tool(
+        description = "Verify the app and get a verdict: checks on the current screen and logs, or saved flows replayed from a fresh start. Each check shows what was observed when it fails; evidence (screenshot, tree, logs) is saved to .mdh/runs. A change is done when its verdict passes."
+    )]
+    async fn mdh_verify(
+        &self,
+        Parameters(p): Parameters<VerifyParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let timeout = Duration::from_secs(p.timeout_s.unwrap_or(3));
+        let verify = mdh_verify::VerifyOptions {
+            timeout,
+            ..mdh_verify::VerifyOptions::default()
+        };
+        let result = match (p.flows.filter(|f| !f.is_empty()), p.checks) {
+            (Some(names), _) => {
+                let options = mdh_verify::FlowOptions {
+                    verify,
+                    ..mdh_verify::FlowOptions::default()
+                };
+                self.with_session(async |s| {
+                    let store = mdh_verify::FlowStore::new(FLOWS_DIR);
+                    let mut timings = Timings::default();
+                    Ok(
+                        mdh_verify::run_flows(s, &store, &names, &options, &mut timings)
+                            .await?
+                            .text,
+                    )
+                })
+                .await
+            }
+            (None, checks) => {
+                let checks: Result<Vec<mdh_verify::Assertion>> = checks
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|c| mdh_verify::Assertion::parse(c))
+                    .collect();
+                match checks {
+                    Ok(checks) => {
+                        self.with_session(async |s| {
+                            let mut timings = Timings::default();
+                            Ok(mdh_verify::verify(s, checks, &verify, &mut timings)
+                                .await?
+                                .text)
+                        })
+                        .await
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+        };
+        Ok(text_result(result))
+    }
+
+    #[tool(
+        description = "Flows are replayable tests made from what you did in this session: save the recorded steps (with checks to run at the end), list saved flows, or show one's YAML (in .mdh/flows; edit the file to change it). Replay them with mdh_verify."
+    )]
+    async fn mdh_flow(
+        &self,
+        Parameters(p): Parameters<FlowParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let store = mdh_verify::FlowStore::new(FLOWS_DIR);
+        let name = || {
+            p.name.clone().ok_or_else(|| Error::InvalidFlow {
+                flow: String::new(),
+                reason: "pass `name`".into(),
+            })
+        };
+        let result = match p.command {
+            FlowCommand::List => store.list(),
+            FlowCommand::Show => name().and_then(|n| store.load(&n)).map(|f| f.to_yaml()),
+            FlowCommand::Save => match name() {
+                Ok(n) => {
+                    let checks = p.checks.clone().unwrap_or_default();
+                    let (last, force) = (p.last, p.force.unwrap_or(false));
+                    self.with_session(async |s| {
+                        mdh_verify::save_flow(s, &store, &n, last, &checks, force)
+                            .map(|saved| saved.text)
+                    })
+                    .await
+                }
+                Err(e) => Err(e),
+            },
+        };
+        Ok(text_result(result))
     }
 
     #[tool(description = "Launch, stop or install an app.")]
