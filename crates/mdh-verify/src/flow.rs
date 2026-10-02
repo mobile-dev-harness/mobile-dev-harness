@@ -26,6 +26,10 @@ pub struct Flow {
     pub app: Option<String>,
     #[serde(default, skip_serializing_if = "Setup::is_empty")]
     pub setup: Setup,
+    /// Activities the flow passes (simple class names), recorded when it was saved; change impact
+    /// uses them to pick the flows a change needs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screens: Vec<String>,
     pub steps: Vec<Step>,
     /// Checked after the last step; `no crash` is always checked too.
     #[serde(default, rename = "assert", skip_serializing_if = "Vec::is_empty")]
@@ -47,6 +51,9 @@ pub struct Setup {
     /// Restart the app before the steps (default); false continues from the current screen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub launch: Option<bool>,
+    /// System animations during the run: off by default (restored afterwards), `true` keeps them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animations: Option<bool>,
 }
 
 impl Setup {
@@ -301,8 +308,20 @@ impl Flow {
         name: &str,
         app: Option<&str>,
         steps: &[RecordedStep],
+        last_screen: Option<&str>,
         checks: Vec<Assertion>,
     ) -> (Flow, Vec<String>) {
+        let mut screens: Vec<String> = Vec::new();
+        for activity in steps
+            .iter()
+            .filter_map(|s| s.screen.as_deref())
+            .chain(last_screen)
+        {
+            let simple = activity_name(activity).to_owned();
+            if !screens.contains(&simple) {
+                screens.push(simple);
+            }
+        }
         let mut secrets = Vec::new();
         let steps = steps
             .iter()
@@ -378,6 +397,7 @@ impl Flow {
             name: name.to_owned(),
             app: app.map(str::to_owned),
             setup: Setup::default(),
+            screens,
             steps,
             checks: checks.into_iter().map(FlowCheck).collect(),
         };
@@ -515,6 +535,11 @@ pub async fn run_flow(
         .transpose()?;
     let mut findings = Vec::new();
     let mut completed = 0;
+    // Animations off for the run (best effort: not every device allows it), restored afterwards
+    // unless the session had already turned them off.
+    let restore_animations = flow.setup.animations != Some(true)
+        && !session.animations_off()
+        && session.animations(false).await.is_ok();
 
     let setup = setup(session, flow).await;
     let mut failed = setup.is_err();
@@ -565,6 +590,9 @@ pub async fn run_flow(
         Some(dir) => collect_evidence(cx.session, dir, cx.timings).await,
         None => Vec::new(),
     };
+    if restore_animations {
+        let _ = cx.session.animations(true).await;
+    }
     let mut verdict = Verdict::new(
         Some(flow.name.clone()),
         findings,
@@ -730,6 +758,12 @@ async fn run_step(
     }
 }
 
+/// `dev.app/.LoginActivity` → `LoginActivity`.
+pub(crate) fn activity_name(component: &str) -> &str {
+    let class = component.split_once('/').map_or(component, |(_, c)| c);
+    class.rsplit('.').next().unwrap_or(class)
+}
+
 fn step_failure(step: Option<usize>, check: String, observed: String) -> Finding {
     Finding {
         kind: CheckKind::Functional,
@@ -835,6 +869,7 @@ assert:
             at_ms: 0,
             action,
             description: String::new(),
+            screen: Some("dev.mdh.sample/.MainActivity".into()),
         };
         let (flow, secrets) = Flow::from_recording(
             "login",
@@ -853,13 +888,14 @@ assert:
                     name: "BACK".into(),
                 }),
             ],
+            Some("dev.mdh.sample/.MessagesActivity"),
             vec![Assertion::parse("screen .MessagesActivity").unwrap()],
         );
         assert_eq!(secrets, ["MDH_PASSWORD"]);
         let yaml = flow.to_yaml();
         assert_eq!(
             yaml,
-            "name: login\napp: dev.mdh.sample\nsteps:\n- tap: Log in\n- type:\n    text: ${env:MDH_PASSWORD}\n    into: id=password\n- key: back\nassert:\n- screen .MessagesActivity\n"
+            "name: login\napp: dev.mdh.sample\nscreens:\n- MainActivity\n- MessagesActivity\nsteps:\n- tap: Log in\n- type:\n    text: ${env:MDH_PASSWORD}\n    into: id=password\n- key: back\nassert:\n- screen .MessagesActivity\n"
         );
         assert_eq!(Flow::parse("login", &yaml).unwrap(), flow);
     }

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mdh": {
+      "command": "mdh",
+      "args": ["mcp"]
+    }
+  }
+}

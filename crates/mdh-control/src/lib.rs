@@ -138,6 +138,14 @@ impl Control {
         self.driver.clear_data(&self.device, package).await
     }
 
+    pub async fn animation_scales(&self) -> Result<Vec<(String, Option<String>)>> {
+        self.driver.animation_scales(&self.device).await
+    }
+
+    pub async fn set_animation_scales(&self, scales: &[(String, Option<String>)]) -> Result<()> {
+        self.driver.set_animation_scales(&self.device, scales).await
+    }
+
     pub async fn set_permission(
         &self,
         package: &str,

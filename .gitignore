@@ -1,4 +1,5 @@
 /target
 .DS_Store
-# Per-project harness output (screenshots, logs, recorded flows live in user projects)
-.mdh/
+# Per-project harness state and output; flows are committed (the sample app's back the e2e job)
+**/.mdh/*
+!**/.mdh/flows/

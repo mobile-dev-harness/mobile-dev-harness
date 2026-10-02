@@ -6,6 +6,7 @@
 //! store, and reports (JUnit). Functional checks — assertions on screens and logs — are built in;
 //! UI consistency (`mdh-visual`) and performance (`mdh-perf`) plug in as further check kinds.
 
+pub mod agent;
 mod assertion;
 mod check;
 mod flow;
@@ -204,7 +205,13 @@ pub fn save_flow(
         .iter()
         .map(|c| Assertion::parse(c))
         .collect::<Result<Vec<_>>>()?;
-    let (flow, secrets) = Flow::from_recording(name, session.app(), steps, checks);
+    let (flow, secrets) = Flow::from_recording(
+        name,
+        session.app(),
+        steps,
+        session.current_activity(),
+        checks,
+    );
     let path = store.save(&flow)?;
     let plural = |n: usize, what: &str| format!("{n} {what}{}", if n == 1 { "" } else { "s" });
     let mut text = format!(
@@ -245,4 +252,65 @@ pub async fn run_flows(
         verdicts.push(run_flow(session, flow, options, timings).await?);
     }
     Ok(FlowRuns::new(verdicts))
+}
+
+/// Saved flows a change needs (functional design F14.6): those passing an affected screen or the
+/// activity hosting it; all of them when the build configuration changed.
+pub fn flows_for(report: &mdh_impact::ImpactReport, store: &FlowStore) -> Result<Vec<String>> {
+    let build_changed = report.other_files.iter().any(|f| f.kind == "build");
+    let affected: Vec<&str> = report
+        .screens
+        .iter()
+        .flat_map(|s| std::iter::once(s.screen.as_str()).chain(s.host.as_deref()))
+        .collect();
+    let mut names = Vec::new();
+    for name in store.names()? {
+        let Ok(flow) = store.load(&name) else {
+            continue;
+        };
+        if build_changed || flow.screens.iter().any(|s| affected.contains(&s.as_str())) {
+            names.push(name);
+        }
+    }
+    Ok(names)
+}
+
+/// Replays the saved flows the change since `base` needs (see [`flows_for`]).
+pub async fn run_changed(
+    session: &mut Session,
+    store: &FlowStore,
+    project: &Path,
+    base: &str,
+    options: &FlowOptions,
+    timings: &mut Timings,
+) -> Result<FlowRuns> {
+    let report = mdh_impact::analyze(&mdh_impact::Options {
+        project: project.to_owned(),
+        base: base.to_owned(),
+    })?;
+    let names = flows_for(&report, store)?;
+    if names.is_empty() {
+        let screens: Vec<&str> = report.screens.iter().map(|s| s.screen.as_str()).collect();
+        let text = if report.files_changed == 0 {
+            format!("no changes against {base}; nothing to replay")
+        } else if screens.is_empty() {
+            "the change reaches no screen; no flow to replay (check it with `verify`)".to_owned()
+        } else {
+            format!(
+                "no saved flow passes the affected screens ({}); check them with `verify`, or save a flow",
+                screens.join(", ")
+            )
+        };
+        return Ok(FlowRuns {
+            verdicts: Vec::new(),
+            text,
+        });
+    }
+    let mut runs = run_flows(session, store, &names, options, timings).await?;
+    runs.text = format!(
+        "replaying {} for the change since {base}\n\n{}",
+        names.join(", "),
+        runs.text
+    );
+    Ok(runs)
 }

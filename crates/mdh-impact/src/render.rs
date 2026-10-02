@@ -133,6 +133,7 @@ pub fn render(r: &ImpactReport) -> String {
         ("performance", &v.performance),
         ("compatibility", &v.compatibility),
         ("tests", &v.tests),
+        ("flows", &v.flows),
     ];
     if rows.iter().any(|(_, items)| !items.is_empty()) {
         out.push("verify".into());
@@ -140,7 +141,7 @@ pub fn render(r: &ImpactReport) -> String {
             if items.is_empty() {
                 continue;
             }
-            if name == "functional" || name == "tests" {
+            if matches!(name, "functional" | "tests" | "flows") {
                 out.push(format!(
                     "  {name:<13}  {}",
                     short_list(items, ITEMS * 2, false)

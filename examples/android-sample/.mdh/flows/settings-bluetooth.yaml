@@ -1,0 +1,13 @@
+name: settings-bluetooth
+app: dev.mdh.sample
+setup:
+  open: mdhsample://settings
+screens:
+- SettingsActivity
+steps:
+- assert:
+  - disabled role=switch;text=Nearby share
+- tap: role=switch;text=Bluetooth
+assert:
+- checked role=switch;text=Bluetooth
+- enabled role=switch;text=Nearby share

@@ -24,6 +24,7 @@ use std::time::Instant;
 
 use mdh_core::{Error, Result};
 
+pub use git::Status as FileStatus;
 pub use index::Confidence;
 pub use model::DeclKind;
 pub use render::render;
@@ -83,6 +84,21 @@ pub fn analyze(options: &Options) -> Result<ImpactReport> {
     report.stats.index_ms = index_ms;
     report.stats.analysis_ms = millis(analysis);
     Ok(report)
+}
+
+/// The Gradle root containing `dir` and the app files (sources, resources, manifests, build
+/// scripts) that differ from `HEAD`, uncommitted or untracked, relative to that root.
+pub fn changed_app_files(dir: &Path) -> Result<(PathBuf, Vec<String>)> {
+    let root = project_root(dir)?;
+    let repo = git::Repo::open(&root)?;
+    let files = repo
+        .changes("HEAD")?
+        .into_iter()
+        .filter(|c| c.status != git::Status::Deleted)
+        .map(|c| c.path)
+        .filter(|p| classify(p).kind != FileKind::Other)
+        .collect();
+    Ok((root, files))
 }
 
 /// The directory of the Gradle build containing `dir` (with `settings.gradle(.kts)`), else `dir`.

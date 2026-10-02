@@ -1,0 +1,19 @@
+name: login-success
+app: dev.mdh.sample
+screens:
+- MainActivity
+- LoginActivity
+- MessagesActivity
+steps:
+- tap: Log in
+- type:
+    text: alice@example.com
+    into: Email
+- type:
+    text: ${env:MDH_PASSWORD}
+    into: Password
+- tap: id=sign_in
+- wait: Message 1
+assert:
+- screen .MessagesActivity
+- visible "Message 2"

@@ -124,6 +124,7 @@ impl Repo {
                 });
             }
         }
+        changes.retain(|c| !harness_file(&c.path));
         changes.sort_by(|a, b| a.path.cmp(&b.path));
         Ok(changes)
     }
@@ -145,6 +146,7 @@ impl Repo {
             .map(str::to_owned)
             .collect();
         files.dedup();
+        files.retain(|f| !harness_file(f));
         Ok(files)
     }
 
@@ -206,6 +208,11 @@ impl Repo {
         }
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
+}
+
+/// mdh's own files (`.mdh/`: session, runs, cache, flows) are not part of the app.
+fn harness_file(path: &str) -> bool {
+    path.split('/').any(|part| part == ".mdh")
 }
 
 fn git_missing(e: std::io::Error) -> Error {

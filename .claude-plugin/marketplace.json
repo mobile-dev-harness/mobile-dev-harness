@@ -1,0 +1,15 @@
+{
+  "name": "mobile-dev-harness",
+  "owner": {
+    "name": "qkmaosjtu",
+    "url": "https://github.com/qkmaosjtu"
+  },
+  "description": "mobile-dev-harness: precise verification for coding agents on Android",
+  "plugins": [
+    {
+      "name": "mobile-dev-harness",
+      "source": "./integrations/claude-code",
+      "description": "MCP tools to see and drive Android apps, evidence-backed verdicts, change impact and replayable flows, with a verify protocol and a reminder before stopping with unverified changes"
+    }
+  ]
+}

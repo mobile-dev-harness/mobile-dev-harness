@@ -53,6 +53,10 @@ pub(crate) struct State {
     /// even when another app or the launcher is in front.
     #[serde(default)]
     app: Option<String>,
+    /// The animation scales found before `animations(false)` turned them off; restored by
+    /// `animations(true)` and on reset.
+    #[serde(default)]
+    saved_animations: Option<Vec<(String, Option<String>)>>,
     /// Package → what `run` last installed, to skip unchanged installs.
     #[serde(default)]
     pub(crate) installed: HashMap<String, Installed>,
@@ -79,6 +83,9 @@ pub struct RecordedStep {
     /// Text typed into password fields is recorded as `<secret>`.
     pub action: Action,
     pub description: String,
+    /// The activity the action was performed on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -162,6 +169,10 @@ impl Session {
     /// Forgets refs, history and recording, and stops the device helper so other tools can use
     /// UiAutomation.
     pub async fn reset(&mut self) -> Result<()> {
+        // Leave the device as it was found.
+        if self.state.saved_animations.is_some() {
+            let _ = self.animations(true).await;
+        }
         self.state = State {
             version: STATE_VERSION,
             device: self.control.device().id.clone(),
@@ -268,6 +279,7 @@ impl Session {
             at_ms: now_ms(),
             action: recorded,
             description: description.clone(),
+            screen: before.screen.activity.clone(),
         });
 
         let reading = Instant::now();
@@ -406,6 +418,99 @@ impl Session {
             lines: shown,
             crashes,
         })
+    }
+
+    /// Turns system animations off (remembering their scales) or back to what they were. Off,
+    /// screens settle sooner and transitions can't be caught midway.
+    pub async fn animations(&mut self, enabled: bool) -> Result<String> {
+        if enabled {
+            let saved = self.state.saved_animations.take();
+            let scales = match &saved {
+                Some(s) => s.clone(),
+                // Nothing to restore: normal speed.
+                None => self
+                    .control
+                    .animation_scales()
+                    .await?
+                    .into_iter()
+                    .map(|(name, _)| (name, Some("1".to_owned())))
+                    .collect(),
+            };
+            if let Err(e) = self.control.set_animation_scales(&scales).await {
+                self.state.saved_animations = saved;
+                return Err(e);
+            }
+            return Ok(if saved.is_some() {
+                "animations restored".into()
+            } else {
+                "animations on".into()
+            });
+        }
+        if self.state.saved_animations.is_none() {
+            self.state.saved_animations = Some(self.control.animation_scales().await?);
+        }
+        let off: Vec<(String, Option<String>)> = self
+            .state
+            .saved_animations
+            .iter()
+            .flatten()
+            .map(|(name, _)| (name.clone(), Some("0".to_owned())))
+            .collect();
+        self.control.set_animation_scales(&off).await?;
+        Ok(
+            "animations off; `session reset` or turning them on restores the previous scales"
+                .into(),
+        )
+    }
+
+    /// The package to act on: `package`, else the session's app.
+    pub fn package_or_app(&self, package: Option<&str>) -> Result<String> {
+        package
+            .or(self.state.app.as_deref())
+            .map(str::to_owned)
+            .ok_or_else(|| Error::AppNotFound {
+                package: "(none given, and the session has no app yet: launch or run one)".into(),
+            })
+    }
+
+    /// Clears the app's data (`package`, else the session's app): a first launch again.
+    pub async fn clear_data(&mut self, package: Option<&str>) -> Result<String> {
+        let package = self.package_or_app(package)?;
+        self.control.clear_data(&package).await?;
+        Ok(format!("cleared the data of {package}"))
+    }
+
+    /// Grants or revokes a runtime permission of `package`, else of the session's app.
+    pub async fn set_permission(
+        &mut self,
+        package: Option<&str>,
+        permission: &str,
+        granted: bool,
+    ) -> Result<String> {
+        let package = self.package_or_app(package)?;
+        let permission = if permission.contains('.') {
+            permission.to_owned()
+        } else {
+            format!("android.permission.{permission}")
+        };
+        self.control
+            .set_permission(&package, &permission, granted)
+            .await?;
+        Ok(format!(
+            "{} {permission} {} {package}",
+            if granted { "granted" } else { "revoked" },
+            if granted { "to" } else { "from" }
+        ))
+    }
+
+    /// The activity the agent last saw, `package/.Activity`.
+    pub fn current_activity(&self) -> Option<&str> {
+        self.state.last.as_ref()?.screen.activity.as_deref()
+    }
+
+    /// Animations were turned off by this session.
+    pub fn animations_off(&self) -> bool {
+        self.state.saved_animations.is_some()
     }
 
     /// The session's app (set by `launch` and `run`), whose logs and crashes are always watched.

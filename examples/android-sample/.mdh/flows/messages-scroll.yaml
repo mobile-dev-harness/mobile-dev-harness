@@ -1,0 +1,13 @@
+name: messages-scroll
+app: dev.mdh.sample
+setup:
+  open: mdhsample://messages
+screens:
+- MessagesActivity
+steps:
+- scroll:
+    direction: down
+    until: Message 40
+- tap: Message 40
+assert:
+- no log ~= "FATAL"

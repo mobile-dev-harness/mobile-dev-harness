@@ -29,6 +29,13 @@ use crate::Driver;
 /// Upper bound on log lines fetched per read, so a long pause between calls can't flood memory.
 const MAX_LOG_LINES: usize = 5000;
 
+/// Global settings that scale window, transition and animator animations.
+const ANIMATION_SCALES: [&str; 3] = [
+    "window_animation_scale",
+    "transition_animation_scale",
+    "animator_duration_scale",
+];
+
 pub struct AndroidDriver {
     adb: Adb,
     sdk_root: Option<PathBuf>,
@@ -288,6 +295,48 @@ impl Driver for AndroidDriver {
                 package: package.to_owned(),
             })
         }
+    }
+
+    async fn animation_scales(&self, device: &Device) -> Result<Vec<(String, Option<String>)>> {
+        let command: Vec<String> = ANIMATION_SCALES
+            .iter()
+            .map(|s| format!("settings get global {s}"))
+            .collect();
+        let out = self.adb.shell(&device.id, &command.join("; ")).await?;
+        let values: Vec<&str> = out.lines().map(str::trim).collect();
+        if values.len() != ANIMATION_SCALES.len() {
+            return Err(Error::Parse {
+                tool: "settings".into(),
+                detail: out,
+            });
+        }
+        Ok(ANIMATION_SCALES
+            .iter()
+            .zip(values)
+            .map(|(name, v)| ((*name).to_owned(), (v != "null").then(|| v.to_owned())))
+            .collect())
+    }
+
+    async fn set_animation_scales(
+        &self,
+        device: &Device,
+        scales: &[(String, Option<String>)],
+    ) -> Result<()> {
+        let command: Vec<String> = scales
+            .iter()
+            .map(|(name, value)| match value {
+                Some(v) => format!(
+                    "settings put global {} {}",
+                    shell_quote(name),
+                    shell_quote(v)
+                ),
+                None => format!("settings delete global {}", shell_quote(name)),
+            })
+            .collect();
+        self.adb
+            .shell(&device.id, &command.join("; "))
+            .await
+            .map(drop)
     }
 
     async fn set_permission(

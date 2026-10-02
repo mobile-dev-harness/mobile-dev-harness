@@ -375,3 +375,38 @@ async fn a_step_that_cannot_run_stops_the_flow_and_says_why() {
     // The final checks don't run after a failed step; `no crash` does.
     assert_eq!(verdict.findings.len(), 2, "{}", verdict.text);
 }
+
+#[test]
+fn a_change_selects_the_flows_that_pass_its_screens() {
+    let dir = std::env::temp_dir().join(format!("mdh-flows-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let store = mdh_verify::FlowStore::new(&dir);
+    for (name, screens) in [("login", "[LoginActivity, InboxActivity]"), ("settings", "[SettingsActivity]")] {
+        let yaml = format!("name: {name}\nscreens: {screens}\nsteps:\n- key: back\n");
+        store.save(&Flow::parse(name, &yaml).unwrap()).unwrap();
+    }
+    let screen = |name: &str, host: Option<&str>| mdh_impact::ScreenImpact {
+        screen: name.into(),
+        kind: mdh_impact::ScreenKind::Activity,
+        file: String::new(),
+        via: Vec::new(),
+        confidence: mdh_impact::Confidence::Exact,
+        host: host.map(str::to_owned),
+        changes: 1,
+        reach: Vec::new(),
+    };
+    let mut report = mdh_impact::ImpactReport {
+        screens: vec![screen("InboxScreen", Some("InboxActivity"))],
+        ..Default::default()
+    };
+    assert_eq!(mdh_verify::flows_for(&report, &store).unwrap(), ["login"]);
+    report.screens = vec![screen("AboutActivity", None)];
+    assert!(mdh_verify::flows_for(&report, &store).unwrap().is_empty());
+    report.other_files.push(mdh_impact::OtherFile {
+        path: "app/build.gradle.kts".into(),
+        status: mdh_impact::FileStatus::Modified,
+        kind: "build",
+    });
+    assert_eq!(mdh_verify::flows_for(&report, &store).unwrap(), ["login", "settings"]);
+    std::fs::remove_dir_all(&dir).unwrap();
+}

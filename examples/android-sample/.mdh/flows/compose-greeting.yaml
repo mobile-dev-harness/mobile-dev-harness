@@ -1,0 +1,16 @@
+name: compose-greeting
+app: dev.mdh.sample
+screens:
+- MainActivity
+- ComposeActivity
+steps:
+- tap: Compose screen
+- type:
+    text: Bob
+    into: id=name_field
+- assert:
+  - visible "Hello, Bob"
+  - enabled id=save
+- tap: id=save
+assert:
+- visible "Saved Bob"

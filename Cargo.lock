@@ -658,6 +658,7 @@ dependencies = [
  "mdh-control",
  "mdh-core",
  "mdh-driver",
+ "mdh-impact",
  "mdh-observe",
  "serde",
  "serde_json",

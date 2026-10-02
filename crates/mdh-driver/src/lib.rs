@@ -61,6 +61,20 @@ pub trait Driver: Send + Sync {
         Err(unsupported("clearing app data"))
     }
 
+    /// The system's animation scales by name, `None` where unset; what to restore later.
+    async fn animation_scales(&self, _device: &Device) -> Result<Vec<(String, Option<String>)>> {
+        Err(unsupported("reading animation settings"))
+    }
+
+    /// Sets animation scales (`None` resets one to the system default).
+    async fn set_animation_scales(
+        &self,
+        _device: &Device,
+        _scales: &[(String, Option<String>)],
+    ) -> Result<()> {
+        Err(unsupported("changing animation settings"))
+    }
+
     /// Grants or revokes a runtime permission.
     async fn set_permission(
         &self,

@@ -127,6 +127,9 @@ pub struct Verify {
     pub compatibility: Vec<String>,
     /// Test classes that use changed or affected code.
     pub tests: Vec<String>,
+    /// Saved flows that pass an affected screen; filled in by the verification engine, which owns
+    /// flows.
+    pub flows: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

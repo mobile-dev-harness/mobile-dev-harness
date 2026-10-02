@@ -55,8 +55,15 @@ pub struct MdhServer {
 pub async fn serve_stdio(
     device: Option<String>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let service = MdhServer::new(device).serve(stdio()).await?;
+    let server = MdhServer::new(device);
+    let service = server.clone().serve(stdio()).await?;
     service.waiting().await?;
+    // Leave the device as it was found.
+    if let Some(session) = server.session.lock().await.as_mut()
+        && session.animations_off()
+    {
+        let _ = session.animations(true).await;
+    }
     Ok(())
 }
 
@@ -96,6 +103,9 @@ pub struct StatusParams {
     pub device: Option<String>,
     /// Forget refs and recorded steps and stop the on-device helper (frees UiAutomation for other tools).
     pub reset: Option<bool>,
+    /// false turns system animations off (screens settle sooner); true restores them. Restored
+    /// when the session resets or the connection closes.
+    pub animations: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -187,6 +197,9 @@ pub struct VerifyParams {
     pub checks: Option<Vec<String>>,
     /// Saved flows to replay instead (names in .mdh/flows); each gets its own verdict.
     pub flows: Option<Vec<String>>,
+    /// Replay the saved flows that pass the screens the uncommitted change reaches (as found by
+    /// mdh_impact).
+    pub changed: Option<bool>,
     /// Seconds checks may take to start holding, default 3.
     pub timeout_s: Option<u64>,
 }
@@ -254,19 +267,26 @@ pub enum Level {
 pub struct AppParams {
     pub command: AppCommand,
     /// `launch`: a package (its launcher activity) or `package/activity`; it becomes the session's
-    /// app, whose logs and crashes are always watched. `stop`: a package. `install`: an APK path on
-    /// the host.
-    pub app: String,
+    /// app, whose logs and crashes are always watched. `stop`, `clear_data`, `grant`, `revoke`: a
+    /// package (default: the session's app). `install`: an APK path on the host. `open`: a deep
+    /// link such as `myapp://settings`.
+    pub app: Option<String>,
     /// `install` only: grant all runtime permissions.
     pub grant: Option<bool>,
+    /// `grant`, `revoke`: the permission, e.g. `CAMERA` or `android.permission.POST_NOTIFICATIONS`.
+    pub permission: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum AppCommand {
     Launch,
     Stop,
     Install,
+    Open,
+    ClearData,
+    Grant,
+    Revoke,
 }
 
 #[tool_router]
@@ -283,12 +303,17 @@ impl MdhServer {
             *self.session.lock().await = None;
         }
         let reset = p.reset.unwrap_or(false);
+        let animations = p.animations;
         let result = self
             .with_session(async |s| {
                 if reset {
                     s.reset().await?;
                 }
-                Ok(s.summary().text())
+                let mut text = s.summary().text();
+                if let Some(on) = animations {
+                    text = format!("{}\n{text}", s.animations(on).await?);
+                }
+                Ok(text)
             })
             .await;
         Ok(text_result(result))
@@ -498,9 +523,14 @@ impl MdhServer {
             project: p.project.map_or_else(|| ".".into(), Into::into),
             base: p.base.unwrap_or_else(|| "HEAD".into()),
         };
-        let result = tokio::task::spawn_blocking(move || mdh_impact::analyze(&options))
-            .await
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let result = tokio::task::spawn_blocking(move || {
+            let mut report = mdh_impact::analyze(&options)?;
+            report.verify.flows =
+                mdh_verify::flows_for(&report, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
+            Ok(report)
+        })
+        .await
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(text_result(result.map(|r| mdh_impact::render(&r))))
     }
 
@@ -517,6 +547,23 @@ impl MdhServer {
             ..mdh_verify::VerifyOptions::default()
         };
         let result = match (p.flows.filter(|f| !f.is_empty()), p.checks) {
+            _ if p.changed == Some(true) => {
+                let options = mdh_verify::FlowOptions {
+                    verify,
+                    ..mdh_verify::FlowOptions::default()
+                };
+                self.with_session(async |s| {
+                    let store = mdh_verify::FlowStore::new(FLOWS_DIR);
+                    let mut timings = Timings::default();
+                    let project = std::path::Path::new(".");
+                    Ok(
+                        mdh_verify::run_changed(s, &store, project, "HEAD", &options, &mut timings)
+                            .await?
+                            .text,
+                    )
+                })
+                .await
+            }
             (Some(names), _) => {
                 let options = mdh_verify::FlowOptions {
                     verify,
@@ -589,23 +636,48 @@ impl MdhServer {
         Ok(text_result(result))
     }
 
-    #[tool(description = "Launch, stop or install an app.")]
+    #[tool(
+        description = "App lifecycle and state: launch, stop, install, open a deep link, clear its data, grant or revoke a permission."
+    )]
     async fn mdh_app(
         &self,
         Parameters(p): Parameters<AppParams>,
     ) -> std::result::Result<CallToolResult, ErrorData> {
+        let needs = |what: &str| Error::InvalidTarget {
+            target: String::new(),
+            reason: format!("pass `{what}`"),
+        };
         let result = self
-            .with_session(async |s| match p.command {
-                AppCommand::Launch => Ok(launch_text(&s.launch(&p.app).await?)),
-                AppCommand::Stop => {
-                    s.control().stop(&p.app).await?;
-                    Ok(format!("stopped {}", p.app))
-                }
-                AppCommand::Install => {
-                    s.control()
-                        .install(std::path::Path::new(&p.app), p.grant.unwrap_or(false))
-                        .await?;
-                    Ok(format!("installed {}", p.app))
+            .with_session(async |s| {
+                let app = p.app.as_deref();
+                match p.command {
+                    AppCommand::Launch => Ok(launch_text(
+                        &s.launch(app.ok_or_else(|| needs("app"))?).await?,
+                    )),
+                    AppCommand::Stop => {
+                        let package = s.package_or_app(app)?;
+                        s.control().stop(&package).await?;
+                        Ok(format!("stopped {package}"))
+                    }
+                    AppCommand::Install => {
+                        let apk = app.ok_or_else(|| needs("app"))?;
+                        s.control()
+                            .install(std::path::Path::new(apk), p.grant.unwrap_or(false))
+                            .await?;
+                        Ok(format!("installed {apk}"))
+                    }
+                    AppCommand::Open => {
+                        let uri = app.ok_or_else(|| needs("app"))?;
+                        let package = s.app().map(str::to_owned);
+                        Ok(launch_text(&s.open_uri(uri, package.as_deref()).await?))
+                    }
+                    AppCommand::ClearData => s.clear_data(app).await,
+                    AppCommand::Grant | AppCommand::Revoke => {
+                        let permission =
+                            p.permission.as_deref().ok_or_else(|| needs("permission"))?;
+                        s.set_permission(app, permission, matches!(p.command, AppCommand::Grant))
+                            .await
+                    }
                 }
             })
             .await;

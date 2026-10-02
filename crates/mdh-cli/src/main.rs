@@ -3,7 +3,7 @@ mod output;
 mod render;
 
 use std::io::IsTerminal;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
@@ -47,6 +47,19 @@ struct Cli {
 enum Command {
     /// Check that the local toolchain (SDK, adb, emulator, JDK) is ready
     Doctor,
+    /// Set the project up for mdh: .mdh/ (flows committed, state ignored) and a "how to verify"
+    /// section in AGENTS.md for coding agents
+    Init {
+        /// Directory inside the project (default: the current one)
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Leave AGENTS.md alone
+        #[arg(long)]
+        no_agents_md: bool,
+    },
+    /// Claude Code hooks (used by the plugin): read the hook's JSON on stdin, answer on stdout
+    #[command(hide = true)]
+    Hook { event: HookEvent },
     /// List connected devices and running emulators
     Devices,
     /// Show the current screen as a compact UI tree
@@ -166,6 +179,18 @@ enum Command {
     },
     /// Launch an app by package (launcher activity) or package/activity
     Launch { app: String },
+    /// Open a deep link, e.g. myapp://settings
+    Open {
+        uri: String,
+        /// Only this app may handle it (default: the session's app, if any)
+        #[arg(long)]
+        package: Option<String>,
+    },
+    /// Device and app state: animations, permissions, app data
+    State {
+        #[command(subcommand)]
+        command: StateCommand,
+    },
     /// Force-stop an app
     Stop { package: String },
     /// Install an APK
@@ -190,6 +215,39 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum StateCommand {
+    /// Turn system animations off (screens settle sooner) or back on; off is restored on session reset
+    Animations { mode: OnOff },
+    /// Grant a runtime permission, e.g. CAMERA or android.permission.POST_NOTIFICATIONS
+    Grant {
+        permission: String,
+        /// Default: the session's app
+        #[arg(long)]
+        package: Option<String>,
+    },
+    /// Revoke a runtime permission
+    Revoke {
+        permission: String,
+        #[arg(long)]
+        package: Option<String>,
+    },
+    /// Clear the app's data (a first launch again)
+    ClearData { package: Option<String> },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum HookEvent {
+    SessionStart,
+    Stop,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum OnOff {
+    On,
+    Off,
+}
+
+#[derive(Subcommand)]
 enum FlowCommand {
     /// Save the recorded steps as .mdh/flows/NAME.yaml
     Save {
@@ -210,8 +268,14 @@ enum FlowCommand {
     Show { name: String },
     /// Replay flows and print a verdict per flow (exit 1 if any fails)
     Run {
-        #[arg(required = true)]
+        #[arg(required_unless_present = "changed")]
         names: Vec<String>,
+        /// Replay the flows that pass the screens the uncommitted change reaches (see `mdh impact`)
+        #[arg(long, conflicts_with = "names")]
+        changed: bool,
+        /// With --changed: compare with this revision instead of HEAD
+        #[arg(long, default_value = "HEAD", requires = "changed")]
+        base: String,
         /// Write a JUnit report
         #[arg(long)]
         junit: Option<PathBuf>,
@@ -288,8 +352,19 @@ async fn main() -> ExitCode {
             finish(json, started, timings, Some(checks), error)
         }
         Command::Devices => report!(devices().await),
+        Command::Init {
+            project,
+            no_agents_md,
+        } => report!(init(&project, !no_agents_md)),
+        Command::Hook { event } => hook(event).await,
         Command::Impact { project, base } => {
-            report!(mdh_impact::analyze(&mdh_impact::Options { project, base }))
+            report!(
+                mdh_impact::analyze(&mdh_impact::Options { project, base }).and_then(|mut r| {
+                    r.verify.flows =
+                        mdh_verify::flows_for(&r, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
+                    Ok(r)
+                })
+            )
         }
         Command::Flow {
             command: FlowCommand::List,
@@ -355,7 +430,12 @@ async fn run(
     let target = |s: &str| Target::parse(s);
 
     match command {
-        Command::Doctor | Command::Devices | Command::Impact { .. } | Command::Mcp => {
+        Command::Doctor
+        | Command::Devices
+        | Command::Init { .. }
+        | Command::Hook { .. }
+        | Command::Impact { .. }
+        | Command::Mcp => {
             unreachable!("handled before connecting")
         }
         Command::Observe { diff } => report_crash!(session.observe(diff, timings).await),
@@ -470,6 +550,33 @@ async fn run(
             finish(json, started, std::mem::take(timings), data, error)
         }
         Command::Launch { app } => report!(session.launch(&app).await),
+        Command::Open { uri, package } => {
+            let package = package.or_else(|| session.app().map(str::to_owned));
+            report!(session.open_uri(&uri, package.as_deref()).await)
+        }
+        Command::State { command } => report!(
+            match command {
+                StateCommand::Animations { mode } => {
+                    session.animations(matches!(mode, OnOff::On)).await
+                }
+                StateCommand::Grant {
+                    permission,
+                    package,
+                } =>
+                    session
+                        .set_permission(package.as_deref(), &permission, true)
+                        .await,
+                StateCommand::Revoke {
+                    permission,
+                    package,
+                } =>
+                    session
+                        .set_permission(package.as_deref(), &permission, false)
+                        .await,
+                StateCommand::ClearData { package } => session.clear_data(package.as_deref()).await,
+            }
+            .map(Done::new)
+        ),
         Command::Stop { package } => report!(
             session
                 .control()
@@ -503,6 +610,8 @@ async fn run(
             ),
             FlowCommand::Run {
                 names,
+                changed,
+                base,
                 junit,
                 step_timeout,
             } => {
@@ -511,14 +620,25 @@ async fn run(
                     ..mdh_verify::FlowOptions::default()
                 };
                 let store = mdh_verify::FlowStore::new(FLOWS_DIR);
-                let runs = mdh_verify::run_flows(session, &store, &names, &options, timings)
+                let runs = if changed {
+                    mdh_verify::run_changed(
+                        session,
+                        &store,
+                        Path::new("."),
+                        &base,
+                        &options,
+                        timings,
+                    )
                     .await
-                    .and_then(|runs| {
-                        if let Some(path) = &junit {
-                            std::fs::write(path, mdh_verify::junit("mdh", &runs.verdicts))?;
-                        }
-                        Ok(runs)
-                    });
+                } else {
+                    mdh_verify::run_flows(session, &store, &names, &options, timings).await
+                };
+                let runs = runs.and_then(|runs| {
+                    if let Some(path) = &junit {
+                        std::fs::write(path, mdh_verify::junit("mdh", &runs.verdicts))?;
+                    }
+                    Ok(runs)
+                });
                 let (data, error) = split(runs);
                 let error = error.or_else(|| data.as_ref().and_then(mdh_verify::FlowRuns::failure));
                 finish(json, started, std::mem::take(timings), data, error)
@@ -619,4 +739,83 @@ impl Human for DeviceList {
 async fn devices() -> Result<DeviceList> {
     let sdk = AndroidSdk::locate()?;
     Ok(DeviceList(AndroidDriver::new(&sdk).devices().await?))
+}
+
+fn init(project: &Path, agents_md: bool) -> Result<Done> {
+    let dir = project.canonicalize()?;
+    let root = dir
+        .ancestors()
+        .find(|d| d.join("settings.gradle.kts").is_file() || d.join("settings.gradle").is_file())
+        .unwrap_or(&dir);
+    let done = mdh_verify::agent::init(root, agents_md)?;
+    Ok(Done::new(if done.is_empty() {
+        "already set up".to_owned()
+    } else {
+        done.join("\n")
+    }))
+}
+
+/// Claude Code hook handlers. They never fail the session: on any problem they stay silent.
+async fn hook(event: HookEvent) -> ExitCode {
+    let mut input = String::new();
+    let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input);
+    let input: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
+    let cwd = input["cwd"]
+        .as_str()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let gradle_root = cwd
+        .ancestors()
+        .find(|d| d.join("settings.gradle.kts").is_file() || d.join("settings.gradle").is_file())
+        .map(Path::to_path_buf);
+    let Some(root) = gradle_root else {
+        return ExitCode::SUCCESS;
+    };
+    match event {
+        HookEvent::SessionStart => {
+            let devices = match devices().await {
+                Ok(DeviceList(list)) => {
+                    let online: Vec<String> = list
+                        .iter()
+                        .filter(|d| d.state == DeviceState::Online)
+                        .map(|d| d.id.clone())
+                        .collect();
+                    if online.is_empty() {
+                        "no device online: start an emulator before verifying".to_owned()
+                    } else {
+                        format!("devices online: {}", online.join(", "))
+                    }
+                }
+                Err(e) => format!("devices unknown ({e})"),
+            };
+            let flows = mdh_verify::FlowStore::new(root.join(".mdh/flows"))
+                .names()
+                .map(|n| n.len())
+                .unwrap_or(0);
+            let context = format!(
+                "This is an Android project verified with mobile-dev-harness (mdh): a change is done \
+                 when it has a passing verdict (see the `verify` skill). {devices}; saved flows: {flows}."
+            );
+            let out = serde_json::json!({
+                "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": context }
+            });
+            println!("{out}");
+        }
+        HookEvent::Stop => {
+            // Already continuing because of this hook: one reminder is enough.
+            if input["stop_hook_active"].as_bool() == Some(true) {
+                return ExitCode::SUCCESS;
+            }
+            let since = input["transcript_path"]
+                .as_str()
+                .and_then(|p| std::fs::metadata(p).ok()?.created().ok());
+            if let Some(reason) = mdh_verify::agent::stop_reason(&cwd, since) {
+                println!(
+                    "{}",
+                    serde_json::json!({ "decision": "block", "reason": reason })
+                );
+            }
+        }
+    }
+    ExitCode::SUCCESS
 }

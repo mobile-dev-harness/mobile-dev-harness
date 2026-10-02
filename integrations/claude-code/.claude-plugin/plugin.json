@@ -1,0 +1,14 @@
+{
+  "name": "mobile-dev-harness",
+  "displayName": "mobile-dev-harness",
+  "version": "0.1.0",
+  "description": "Precise verification for Android apps: see and drive the app, get evidence-backed verdicts, know which screens a change reaches, replay flows",
+  "author": {
+    "name": "qkmaosjtu",
+    "url": "https://github.com/qkmaosjtu"
+  },
+  "homepage": "https://github.com/qkmaosjtu/mobile-dev-harness",
+  "repository": "https://github.com/qkmaosjtu/mobile-dev-harness",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["android", "mobile", "verification", "testing", "mcp"]
+}
