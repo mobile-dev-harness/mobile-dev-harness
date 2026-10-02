@@ -55,10 +55,10 @@ impl Target {
         if is_ref(t) {
             return Ok(Target::Ref(t.to_owned()));
         }
-        if let Some((x, y)) = t.split_once(',') {
-            if let (Ok(x), Ok(y)) = (x.trim().parse(), y.trim().parse()) {
-                return Ok(Target::Point { x, y });
-            }
+        if let Some((x, y)) = t.split_once(',')
+            && let (Ok(x), Ok(y)) = (x.trim().parse(), y.trim().parse())
+        {
+            return Ok(Target::Point { x, y });
         }
         let first_key = t.split_once('=').map(|(k, _)| k.trim());
         if matches!(first_key, Some("id" | "text" | "text~" | "role" | "index")) {

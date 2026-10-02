@@ -76,8 +76,8 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 
 ## Conventions
 
-- **Rust edition 2024, MSRV 1.85.** Don't use std APIs stabilized after 1.85 even if your local
-  toolchain is newer.
+- **Rust edition 2024, MSRV 1.88** (the oldest toolchain the dependencies build on; CI checks it).
+  Don't use std APIs or language features stabilized later, even if your local toolchain is newer.
 - **Shared dependency versions live in the root `Cargo.toml`** under `[workspace.dependencies]`;
   crates reference them with `foo.workspace = true`. Every crate sets `[lints] workspace = true`.
 - **Errors:** all crates return `mdh_core::Result` with typed `mdh_core::Error` variants. Every

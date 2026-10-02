@@ -106,11 +106,11 @@ pub fn render_line(node: &UiNode) -> String {
             s.push_str(word);
         }
     }
-    if let Some(id) = &node.id {
-        if node.role != Role::Text {
-            s.push_str(" #");
-            s.push_str(id);
-        }
+    if let Some(id) = &node.id
+        && node.role != Role::Text
+    {
+        s.push_str(" #");
+        s.push_str(id);
     }
     s
 }

@@ -140,11 +140,11 @@ fn java(lines: &[&str]) -> Option<(Vec<Diagnostic>, usize)> {
         d.source = Some(source.trim_end().to_owned());
         consumed += 1;
     }
-    if let Some(caret) = lines.get(2) {
-        if caret.trim() == "^" {
-            d.column = u32::try_from(caret.find('^').unwrap_or(0) + 1).ok();
-            consumed += 1;
-        }
+    if let Some(caret) = lines.get(2)
+        && caret.trim() == "^"
+    {
+        d.column = u32::try_from(caret.find('^').unwrap_or(0) + 1).ok();
+        consumed += 1;
     }
     while let Some(next) = lines.get(consumed) {
         let indented = next.starts_with("  ") && !next.trim_start().contains(".java:");

@@ -93,10 +93,10 @@ impl ApkSet {
         if let Some(o) = self.outputs.iter().find(|o| o.abis.is_empty()) {
             return Ok(pick(o, None));
         }
-        if device_abis.is_empty() {
-            if let Some(o) = self.outputs.first() {
-                return Ok(pick(o, None));
-            }
+        if device_abis.is_empty()
+            && let Some(o) = self.outputs.first()
+        {
+            return Ok(pick(o, None));
         }
         let built: Vec<String> = self.outputs.iter().flat_map(|o| o.abis.clone()).collect();
         Err(Error::NoApk {
@@ -337,13 +337,13 @@ impl GradleProject {
             if let Ok(relative) = path.strip_prefix(&self.root) {
                 d.file = Some(relative.display().to_string());
             }
-            if d.source.is_none() {
-                if let (Some(n), Ok(text)) = (d.line, std::fs::read_to_string(&path)) {
-                    d.source = text
-                        .lines()
-                        .nth(n.saturating_sub(1) as usize)
-                        .map(str::to_owned);
-                }
+            if d.source.is_none()
+                && let (Some(n), Ok(text)) = (d.line, std::fs::read_to_string(&path))
+            {
+                d.source = text
+                    .lines()
+                    .nth(n.saturating_sub(1) as usize)
+                    .map(str::to_owned);
             }
         }
     }

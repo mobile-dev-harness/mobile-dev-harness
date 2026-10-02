@@ -131,7 +131,7 @@ way as the planned performance, compatibility and visual checks do far more work
 - [Android SDK platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`); `mdh` finds
   the SDK through `ANDROID_HOME`, `ANDROID_SDK_ROOT` or the default Android Studio location
 - An emulator or a device with USB debugging, Android 8.0 (API 26) or newer
-- [Rust](https://rustup.rs) 1.85 or newer, to install from source (prebuilt binaries are planned)
+- [Rust](https://rustup.rs) 1.88 or newer, to install from source (prebuilt binaries are planned)
 
 ## Install
 

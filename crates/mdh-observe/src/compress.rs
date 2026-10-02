@@ -118,10 +118,12 @@ fn app_covers(roots: &[RawNode], screen: Rect) -> Vec<Cover> {
     fn walk(n: &RawNode, next: &mut usize, screen: Rect, out: &mut Vec<Cover>) {
         let start = *next;
         *next += 1;
-        if let Some(bounds) = n.bounds.intersect(&screen) {
-            if !n.children.is_empty() && bounds.area() * 2 < screen.area() && has_content(n) {
-                out.push(Cover { bounds, start });
-            }
+        if let Some(bounds) = n.bounds.intersect(&screen)
+            && !n.children.is_empty()
+            && bounds.area() * 2 < screen.area()
+            && has_content(n)
+        {
+            out.push(Cover { bounds, start });
         }
         for c in &n.children {
             walk(c, next, screen, out);
@@ -445,13 +447,12 @@ fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>) {
 /// label this way, and only when it has none: Compose renders a field's label as a child text.
 fn absorb_texts(node: &mut UiNode, children: &mut Vec<UiNode>) {
     if node.role == Role::Textbox {
-        if node.label.is_none() {
-            if let Some(i) = children
+        if node.label.is_none()
+            && let Some(i) = children
                 .iter()
                 .position(|c| c.role == Role::Text && c.children.is_empty())
-            {
-                node.label = children.remove(i).label;
-            }
+        {
+            node.label = children.remove(i).label;
         }
         return;
     }

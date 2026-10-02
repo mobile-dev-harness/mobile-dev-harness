@@ -176,20 +176,21 @@ fn crashes(entries: &[LogEntry], app_packages: &[String]) -> Vec<CrashReport> {
     // A death right after a crash is the crash itself; report only unexplained deaths.
     let explained: HashSet<u32> = reports.iter().filter_map(|r| r.pid).collect();
     for e in entries {
-        if let Some((package, pid)) = death(e) {
-            if !explained.contains(&pid) && app_packages.contains(&package) {
-                reports.push(CrashReport {
-                    kind: CrashKind::Died,
-                    of_app: true,
-                    package: Some(package),
-                    pid: Some(pid),
-                    time_ms: e.time_ms,
-                    summary: truncate(&e.message),
-                    frames: Vec::new(),
-                    folded_frames: 0,
-                    caused_by: Vec::new(),
-                });
-            }
+        if let Some((package, pid)) = death(e)
+            && !explained.contains(&pid)
+            && app_packages.contains(&package)
+        {
+            reports.push(CrashReport {
+                kind: CrashKind::Died,
+                of_app: true,
+                package: Some(package),
+                pid: Some(pid),
+                time_ms: e.time_ms,
+                summary: truncate(&e.message),
+                frames: Vec::new(),
+                folded_frames: 0,
+                caused_by: Vec::new(),
+            });
         }
     }
     for r in &mut reports {

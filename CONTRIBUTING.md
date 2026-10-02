@@ -12,7 +12,7 @@ cargo fmt --all
 cargo clippy --all-targets -- -D warnings
 ```
 
-Requirements: stable Rust (MSRV 1.85), and for manual testing an Android SDK with platform-tools
+Requirements: stable Rust (MSRV 1.88), and for manual testing an Android SDK with platform-tools
 and at least one AVD. Run `cargo run -- doctor` to check your setup.
 
 ## Conventions

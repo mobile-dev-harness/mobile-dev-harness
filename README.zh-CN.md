@@ -123,7 +123,7 @@ harness 本身不再额外增加开销，并且在后续计划中的性能、兼
 - [Android SDK platform-tools](https://developer.android.com/tools/releases/platform-tools)（`adb`）；`mdh` 会通过
   `ANDROID_HOME`、`ANDROID_SDK_ROOT` 或 Android Studio 的默认位置找到 SDK
 - 一台模拟器，或打开了 USB 调试的真机，Android 8.0（API 26）及以上
-- [Rust](https://rustup.rs) 1.85 及以上，用于从源码安装（预编译版本在计划中）
+- [Rust](https://rustup.rs) 1.88 及以上，用于从源码安装（预编译版本在计划中）
 
 ## 安装
 
