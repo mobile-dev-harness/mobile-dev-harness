@@ -36,6 +36,7 @@ class TroublesActivity : ComponentActivity() {
             }, 2_000)
         }
         click(R.id.overlap) { startActivity(android.content.Intent(this, OverlapActivity::class.java)) }
+        findViewById<android.widget.ImageButton>(R.id.share).setOnClickListener { status.text = "Shared" }
         click(R.id.log_errors) {
             repeat(3) { Log.e("SampleNetwork", "timeout after 10000 ms") }
             Log.w("SampleAuth", "token cache miss")

@@ -207,11 +207,36 @@ enum Command {
         #[command(subcommand)]
         command: SessionCommand,
     },
+    /// UI consistency: rule checks and structural baselines of the current screen
+    Visual {
+        #[command(subcommand)]
+        command: VisualCommand,
+    },
     /// Save the session's recorded steps as a flow, list flows, replay them
     Flow {
         #[command(subcommand)]
         command: FlowCommand,
     },
+}
+
+#[derive(Subcommand)]
+enum VisualCommand {
+    /// Check the current screen: rules (touch targets, labels, overlap, obscured, duplicate
+    /// labels) and, with --baseline, its structural baseline (exit 1 on failure)
+    Check {
+        /// Compare with (or record) the baseline kept under this name
+        #[arg(long)]
+        baseline: Option<String>,
+        /// Rules to check, comma-separated, or `all` / `none`
+        #[arg(long, default_value = "all")]
+        rules: String,
+        /// Elements to leave out of the baseline comparison (dynamic content); repeatable
+        #[arg(long)]
+        ignore: Vec<String>,
+    },
+    /// Make the candidates left by failed baseline comparisons the new baselines (all, or one
+    /// flow's or name's)
+    Approve { scope: Option<String> },
 }
 
 #[derive(Subcommand)]
@@ -369,6 +394,9 @@ async fn main() -> ExitCode {
                 })
             )
         }
+        Command::Visual {
+            command: VisualCommand::Approve { scope },
+        } => report!(mdh_visual::approve(scope.as_deref()).map(Done::new)),
         Command::Flow {
             command: FlowCommand::List,
         } => report!(mdh_verify::FlowStore::new(FLOWS_DIR).list().map(Done::new)),
@@ -516,6 +544,7 @@ async fn run(
                 .collect();
             let options = mdh_verify::VerifyOptions {
                 timeout: Duration::from_secs(timeout),
+                checks: check_kinds(),
                 ..mdh_verify::VerifyOptions::default()
             };
             let verdict = match checks {
@@ -594,6 +623,37 @@ async fn run(
                 .await
                 .map(|()| Done::new(format!("installed {}", apk.display())))
         ),
+        Command::Visual { command } => match command {
+            VisualCommand::Check {
+                baseline,
+                rules,
+                ignore,
+            } => {
+                let rules: serde_json::Value = match rules.as_str() {
+                    "all" | "none" => rules.clone().into(),
+                    list => list
+                        .split(',')
+                        .map(|r| r.trim().to_owned())
+                        .collect::<Vec<_>>()
+                        .into(),
+                };
+                let options = mdh_verify::VerifyOptions {
+                    checks: check_kinds(),
+                    config: Some(serde_json::json!({
+                        "rules": rules,
+                        "baseline": baseline.is_some(),
+                        "ignore": ignore,
+                    })),
+                    scope: baseline,
+                    ..mdh_verify::VerifyOptions::default()
+                };
+                let verdict = mdh_verify::verify(session, Vec::new(), &options, timings).await;
+                let (data, error) = split(verdict);
+                let error = error.or_else(|| data.as_ref().and_then(mdh_verify::Verdict::failure));
+                finish(json, started, std::mem::take(timings), data, error)
+            }
+            VisualCommand::Approve { .. } => unreachable!("handled before connecting"),
+        },
         Command::Flow { command } => match command {
             FlowCommand::Save {
                 name,
@@ -623,6 +683,7 @@ async fn run(
                     step_timeout: Duration::from_secs(step_timeout),
                     verify: mdh_verify::VerifyOptions {
                         timeout: Duration::from_secs(timeout),
+                        checks: check_kinds(),
                         ..mdh_verify::VerifyOptions::default()
                     },
                 };
@@ -825,4 +886,9 @@ async fn hook(event: HookEvent) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+/// Check kinds that run next to the functional checks in every verification.
+fn check_kinds() -> Vec<std::sync::Arc<dyn mdh_verify::Check>> {
+    vec![std::sync::Arc::new(mdh_visual::Visual::default())]
 }

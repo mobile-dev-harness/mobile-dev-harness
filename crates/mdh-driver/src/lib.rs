@@ -61,6 +61,11 @@ pub trait Driver: Send + Sync {
         Err(unsupported("clearing app data"))
     }
 
+    /// Screen density in dots per inch (160 = 1 px per dp), to measure layouts in dp.
+    async fn density(&self, _device: &Device) -> Result<u32> {
+        Err(unsupported("reading the screen density"))
+    }
+
     /// The system's animation scales by name, `None` where unset; what to restore later.
     async fn animation_scales(&self, _device: &Device) -> Result<Vec<(String, Option<String>)>> {
         Err(unsupported("reading animation settings"))

@@ -138,6 +138,10 @@ impl Control {
         self.driver.clear_data(&self.device, package).await
     }
 
+    pub async fn density(&self) -> Result<u32> {
+        self.driver.density(&self.device).await
+    }
+
     pub async fn animation_scales(&self) -> Result<Vec<(String, Option<String>)>> {
         self.driver.animation_scales(&self.device).await
     }

@@ -31,6 +31,9 @@ pub struct Flow {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub screens: Vec<String>,
     pub steps: Vec<Step>,
+    /// Configuration of the UI consistency checks (`mdh-visual`), passed to them as is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual: Option<serde_json::Value>,
     /// Checked after the last step; `no crash` is always checked too.
     #[serde(default, rename = "assert", skip_serializing_if = "Vec::is_empty")]
     pub checks: Vec<FlowCheck>,
@@ -398,6 +401,7 @@ impl Flow {
             app: app.map(str::to_owned),
             setup: Setup::default(),
             screens,
+            visual: None,
             steps,
             checks: checks.into_iter().map(FlowCheck).collect(),
         };
@@ -550,16 +554,13 @@ pub async fn run_flow(
         if failed {
             break;
         }
-        let result = run_step(
-            session,
-            step,
-            i,
+        let replay = Replay {
+            flow,
             since,
-            run_dir.as_deref(),
+            run_dir: run_dir.as_deref(),
             options,
-            timings,
-        )
-        .await?;
+        };
+        let result = run_step(session, &replay, step, i, timings).await?;
         failed = result.iter().any(|f| f.outcome >= Outcome::Fail);
         if !failed {
             completed += 1;
@@ -578,6 +579,9 @@ pub async fn run_flow(
         run_dir: run_dir.as_deref(),
         step: None,
         since_ms: Some(since),
+        scope: Some(&flow.name),
+        checkpoint: "final",
+        config: flow.visual.as_ref(),
         timings,
     };
     let finals = Functional {
@@ -585,6 +589,12 @@ pub async fn run_flow(
         timeout: options.verify.timeout,
     };
     findings.extend(finals.run(&mut cx).await?);
+    // Other check kinds look at the screen the flow ends on, unless it never got there.
+    if !failed {
+        for check in &options.verify.checks {
+            findings.extend(check.run(&mut cx).await?);
+        }
+    }
 
     let evidence = match &run_dir {
         Some(dir) => collect_evidence(cx.session, dir, cx.timings).await,
@@ -593,6 +603,7 @@ pub async fn run_flow(
     if restore_animations {
         let _ = cx.session.animations(true).await;
     }
+    dedupe_warnings(&mut findings);
     let mut verdict = Verdict::new(
         Some(flow.name.clone()),
         findings,
@@ -633,15 +644,28 @@ async fn setup(session: &mut Session, flow: &Flow) -> Result<()> {
     Ok(())
 }
 
+/// What every step of one replay shares.
+struct Replay<'a> {
+    flow: &'a Flow,
+    /// Device time the replay started.
+    since: u64,
+    run_dir: Option<&'a Path>,
+    options: &'a FlowOptions,
+}
+
 async fn run_step(
     session: &mut Session,
+    replay: &Replay<'_>,
     step: &Step,
     index: usize,
-    since: u64,
-    run_dir: Option<&Path>,
-    options: &FlowOptions,
     timings: &mut Timings,
 ) -> Result<Vec<Finding>> {
+    let Replay {
+        flow,
+        since,
+        run_dir,
+        options,
+    } = *replay;
     let fail = |message: String| vec![step_failure(Some(index), step.to_string(), message)];
     // Steps aimed at an element first wait for it, so replay doesn't depend on timing.
     let target = match step {
@@ -699,18 +723,26 @@ async fn run_step(
             );
         }
         Step::Assert(checks) => {
+            let checkpoint = format!("step-{}", index + 1);
             let mut cx = CheckContext {
                 session,
                 run_dir,
                 step: Some(index),
                 since_ms: Some(since),
+                scope: Some(&flow.name),
+                checkpoint: &checkpoint,
+                config: flow.visual.as_ref(),
                 timings,
             };
             let check = Functional {
                 assertions: checks.iter().map(|c| c.0.clone()).collect(),
                 timeout: options.verify.timeout,
             };
-            return check.run(&mut cx).await;
+            let mut findings = check.run(&mut cx).await?;
+            for extra in &options.verify.checks {
+                findings.extend(extra.run(&mut cx).await?);
+            }
+            return Ok(findings);
         }
         Step::Tap(e) => Action::Tap {
             target: e.0.clone(),
@@ -756,6 +788,34 @@ async fn run_step(
         }
         Err(e) => Ok(fail(e.to_string())),
     }
+}
+
+/// A warning about the same elements at several checkpoints (the same screen asserted twice) is
+/// reported once.
+fn dedupe_warnings(findings: &mut Vec<Finding>) {
+    let elements = |f: &Finding| -> Vec<String> {
+        let mut ids: Vec<String> = std::iter::once(f.observed.as_deref().unwrap_or(""))
+            .chain(f.evidence.iter().map(String::as_str))
+            .flat_map(|t| t.split_whitespace())
+            .filter(|w| w.starts_with('#'))
+            .map(|w| w.trim_end_matches(':').to_owned())
+            .collect();
+        ids.sort();
+        ids
+    };
+    let mut seen: Vec<(String, Vec<String>)> = Vec::new();
+    findings.retain(|f| {
+        if f.outcome != Outcome::Warn {
+            return true;
+        }
+        let key = (f.check.clone(), elements(f));
+        if seen.contains(&key) {
+            false
+        } else {
+            seen.push(key);
+            true
+        }
+    });
 }
 
 /// `dev.app/.LoginActivity` → `LoginActivity`.

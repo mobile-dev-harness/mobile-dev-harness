@@ -297,6 +297,14 @@ impl Driver for AndroidDriver {
         }
     }
 
+    async fn density(&self, device: &Device) -> Result<u32> {
+        let out = self.adb.shell(&device.id, "wm density").await?;
+        am::parse_density(&out).ok_or(Error::Parse {
+            tool: "wm density".into(),
+            detail: out,
+        })
+    }
+
     async fn animation_scales(&self, device: &Device) -> Result<Vec<(String, Option<String>)>> {
         let command: Vec<String> = ANIMATION_SCALES
             .iter()

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "activity": "dev.mdh.sample/.TroublesActivity",
+  "screen": [
+    448,
+    997
+  ],
+  "elements": [
+    {
+      "identity": "button #crash_java",
+      "role": "button",
+      "label": "CRASH (JAVA)",
+      "id": "crash_java",
+      "bounds": [
+        16,
+        69,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "button #crash_native",
+      "role": "button",
+      "label": "CRASH (NATIVE)",
+      "id": "crash_native",
+      "bounds": [
+        16,
+        117,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "button #freeze",
+      "role": "button",
+      "label": "FREEZE (ANR)",
+      "id": "freeze",
+      "bounds": [
+        16,
+        165,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "button #slow",
+      "role": "button",
+      "label": "SLOW LOAD",
+      "id": "slow",
+      "bounds": [
+        16,
+        213,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "button #log_errors",
+      "role": "button",
+      "label": "LOG ERRORS",
+      "id": "log_errors",
+      "bounds": [
+        16,
+        261,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "button #overlap",
+      "role": "button",
+      "label": "LAYOUT BUG (OVERLAP)",
+      "id": "overlap",
+      "bounds": [
+        16,
+        309,
+        416,
+        48
+      ]
+    },
+    {
+      "identity": "text #status",
+      "role": "text",
+      "label": "Ready",
+      "id": "status",
+      "bounds": [
+        16,
+        357,
+        416,
+        35
+      ]
+    },
+    {
+      "identity": "button #share",
+      "role": "button",
+      "id": "share",
+      "bounds": [
+        16,
+        392,
+        36,
+        36
+      ]
+    }
+  ]
+}

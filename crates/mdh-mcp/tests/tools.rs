@@ -116,6 +116,7 @@ async fn lists_the_tools_with_object_schemas() {
             "mdh_run",
             "mdh_status",
             "mdh_verify",
+            "mdh_visual",
             "mdh_wait"
         ]
     );

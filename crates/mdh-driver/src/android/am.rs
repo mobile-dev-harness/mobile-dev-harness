@@ -41,9 +41,30 @@ pub fn parse_focused_app(dumpsys: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// `wm density`: `Physical density: 420`, plus `Override density: 400` when changed in settings
+/// (the override is what apps lay out with).
+pub fn parse_density(out: &str) -> Option<u32> {
+    let value = |prefix: &str| {
+        out.lines()
+            .find_map(|l| l.trim().strip_prefix(prefix))
+            .and_then(|v| v.trim().parse().ok())
+    };
+    value("Override density:").or_else(|| value("Physical density:"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_density() {
+        assert_eq!(parse_density("Physical density: 420\n"), Some(420));
+        assert_eq!(
+            parse_density("Physical density: 420\nOverride density: 480\n"),
+            Some(480)
+        );
+        assert_eq!(parse_density("nonsense"), None);
+    }
 
     // Captured from an API 36 emulator.
     const COLD: &str = "Starting: Intent { cmp=com.android.settings/.Settings }

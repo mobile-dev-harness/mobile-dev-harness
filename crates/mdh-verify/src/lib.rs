@@ -16,6 +16,7 @@ mod verdict;
 mod yaml;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use mdh_control::{Session, new_run_dir};
@@ -37,12 +38,33 @@ const SCREENSHOT_EDGE: u32 = 1024;
 /// Log lines kept as evidence.
 const EVIDENCE_LOG_LINES: usize = 300;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VerifyOptions {
     /// How long screen checks may take to start holding.
     pub timeout: Duration,
     /// `.mdh/runs`: where evidence is written; `None` keeps none.
     pub runs: Option<PathBuf>,
+    /// Further check kinds (UI consistency, performance) run at every checkpoint, after the
+    /// functional checks.
+    pub checks: Vec<Arc<dyn Check>>,
+    /// For a single verification: the name its baselines are kept under, and the check kinds'
+    /// configuration (flows bring their own).
+    pub scope: Option<String>,
+    pub config: Option<serde_json::Value>,
+}
+
+impl std::fmt::Debug for VerifyOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VerifyOptions")
+            .field("timeout", &self.timeout)
+            .field("runs", &self.runs)
+            .field(
+                "checks",
+                &self.checks.iter().map(|c| c.kind()).collect::<Vec<_>>(),
+            )
+            .field("scope", &self.scope)
+            .finish()
+    }
 }
 
 impl Default for VerifyOptions {
@@ -50,6 +72,9 @@ impl Default for VerifyOptions {
         VerifyOptions {
             timeout: Duration::from_secs(3),
             runs: Some(PathBuf::from(".mdh/runs")),
+            checks: Vec::new(),
+            scope: None,
+            config: None,
         }
     }
 }
@@ -66,10 +91,11 @@ pub async fn verify(
     if !assertions.contains(&Assertion::NoCrash) {
         assertions.push(Assertion::NoCrash);
     }
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(Functional {
+    let mut checks: Vec<Arc<dyn Check>> = vec![Arc::new(Functional {
         assertions,
         timeout: options.timeout,
     })];
+    checks.extend(options.checks.iter().cloned());
     let run_dir = options
         .runs
         .as_deref()
@@ -81,6 +107,9 @@ pub async fn verify(
         run_dir: run_dir.as_deref(),
         step: None,
         since_ms: None,
+        scope: options.scope.as_deref(),
+        checkpoint: "screen",
+        config: options.config.as_ref(),
         timings,
     };
     for check in &checks {

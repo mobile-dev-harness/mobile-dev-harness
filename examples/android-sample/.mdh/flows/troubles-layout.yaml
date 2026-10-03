@@ -1,0 +1,13 @@
+name: troubles-layout
+app: dev.mdh.sample
+screens:
+- MainActivity
+- TroublesActivity
+visual:
+  baseline: true
+  rules: none
+steps:
+- tap: Troubles
+- wait: id=share
+assert:
+- screen .TroublesActivity

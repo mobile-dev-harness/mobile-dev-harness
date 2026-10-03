@@ -205,6 +205,26 @@ pub struct VerifyParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct VisualParams {
+    pub command: VisualCommand,
+    /// `check`: compare the screen with (or record) the structural baseline kept under this name.
+    /// `approve`: the name or flow whose candidate baselines become the baselines (default: all).
+    pub baseline: Option<String>,
+    /// `check`: rules to apply — `touch_target`, `label`, `overlap`, `obscured`, `duplicate_label`;
+    /// default all.
+    pub rules: Option<Vec<String>>,
+    /// `check`: elements to leave out of the baseline comparison (dynamic content), as targets.
+    pub ignore: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum VisualCommand {
+    Check,
+    Approve,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FlowParams {
     pub command: FlowCommand,
     /// `save`, `show`: the flow's name (letters, digits, `-`, `_`).
@@ -544,6 +564,7 @@ impl MdhServer {
         let timeout = Duration::from_secs(p.timeout_s.unwrap_or(3));
         let verify = mdh_verify::VerifyOptions {
             timeout,
+            checks: check_kinds(),
             ..mdh_verify::VerifyOptions::default()
         };
         let result = match (p.flows.filter(|f| !f.is_empty()), p.checks) {
@@ -600,6 +621,41 @@ impl MdhServer {
                 }
             }
         };
+        Ok(text_result(result))
+    }
+
+    #[tool(
+        description = "UI consistency of the current screen: rule checks (touch targets ≥ 48 dp, labels, overlapping controls, controls under the system bars, duplicate labels) and, with `baseline`, a structural comparison with the stored baseline that reports elements added, missing, moved, resized or with changed text. `approve` accepts the deviations as the new baseline. Flows run these checks too (configured by the flow's `visual:` section)."
+    )]
+    async fn mdh_visual(
+        &self,
+        Parameters(p): Parameters<VisualParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        if let VisualCommand::Approve = p.command {
+            return Ok(text_result(mdh_visual::approve(p.baseline.as_deref())));
+        }
+        let rules: serde_json::Value = match p.rules {
+            Some(list) => list.into(),
+            None => "all".into(),
+        };
+        let options = mdh_verify::VerifyOptions {
+            checks: check_kinds(),
+            config: Some(serde_json::json!({
+                "rules": rules,
+                "baseline": p.baseline.is_some(),
+                "ignore": p.ignore.unwrap_or_default(),
+            })),
+            scope: p.baseline,
+            ..mdh_verify::VerifyOptions::default()
+        };
+        let result = self
+            .with_session(async |s| {
+                let mut timings = Timings::default();
+                Ok(mdh_verify::verify(s, Vec::new(), &options, &mut timings)
+                    .await?
+                    .text)
+            })
+            .await;
         Ok(text_result(result))
     }
 
@@ -787,4 +843,9 @@ fn error_result(e: &Error) -> CallToolResult {
 /// `error[ELEMENT_NOT_FOUND]: …` and a hint; the stable code lets agents branch on it.
 fn error_text(e: &Error) -> String {
     format!("error[{}]: {e}\nhint: {}", e.code().as_str(), e.hint())
+}
+
+/// Check kinds that run next to the functional checks in every verification.
+fn check_kinds() -> Vec<std::sync::Arc<dyn mdh_verify::Check>> {
+    vec![std::sync::Arc::new(mdh_visual::Visual::default())]
 }

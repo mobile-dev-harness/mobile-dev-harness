@@ -54,6 +54,13 @@ pub struct CheckContext<'a> {
     /// Device time the verification started; crashes and logs are looked for since then
     /// (`None`: since the session started).
     pub since_ms: Option<u64>,
+    /// What is being verified: the flow's name, or a name given for a single verification.
+    /// Check kinds with baselines key them by it.
+    pub scope: Option<&'a str>,
+    /// Where in the scope: `final`, `step-3`, `screen`.
+    pub checkpoint: &'a str,
+    /// The check kind's section of the flow file (`visual:`), uninterpreted by the engine.
+    pub config: Option<&'a serde_json::Value>,
     pub timings: &'a mut Timings,
 }
 

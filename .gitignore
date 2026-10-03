@@ -1,5 +1,7 @@
 /target
 .DS_Store
-# Per-project harness state and output; flows are committed (the sample app's back the e2e job)
+# Per-project harness state and output; flows and baselines are committed (the sample app's back the
+# e2e job)
 **/.mdh/*
 !**/.mdh/flows/
+!**/.mdh/baselines/

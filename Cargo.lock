@@ -619,6 +619,7 @@ dependencies = [
  "mdh-impact",
  "mdh-observe",
  "mdh-verify",
+ "mdh-visual",
  "rmcp",
  "serde",
  "serde_json",
@@ -669,6 +670,17 @@ dependencies = [
 [[package]]
 name = "mdh-visual"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "mdh-control",
+ "mdh-core",
+ "mdh-driver",
+ "mdh-observe",
+ "mdh-verify",
+ "serde",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "memchr"
@@ -719,6 +731,7 @@ dependencies = [
  "mdh-mcp",
  "mdh-observe",
  "mdh-verify",
+ "mdh-visual",
  "serde",
  "serde_json",
  "tokio",

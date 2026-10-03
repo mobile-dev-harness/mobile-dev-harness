@@ -26,5 +26,5 @@ run() {
 
 run devices "$mdh" devices
 run "mdh run" "$mdh" run
-run flows "$mdh" flow run login-success login-wrong-password settings-bluetooth compose-greeting messages-scroll \
+run flows "$mdh" flow run login-success login-wrong-password settings-bluetooth compose-greeting messages-scroll troubles-layout \
   --junit flows.xml --step-timeout 30 --timeout 10

@@ -194,6 +194,7 @@ fn options() -> VerifyOptions {
     VerifyOptions {
         timeout: Duration::from_millis(300),
         runs: None,
+        ..VerifyOptions::default()
     }
 }
 
