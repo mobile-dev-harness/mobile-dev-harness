@@ -302,7 +302,8 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh doctor` | Check the toolchain and devices |
 | `mdh init [--project DIR] [--no-agents-md]` | Set the project up: `.mdh/` (flows committed, state ignored) and a "how to verify" section in `AGENTS.md` |
 | `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | Build with Gradle, install if changed (the right ABI split), restart the app, show its first screen; `--reinstall` replaces an app signed with another key |
-| `mdh devices` | List connected devices and emulators |
+| `mdh devices` · `mdh devices use DEVICE` | Connected devices and the emulators that can be started; `use` sets this project's default (serial or AVD name) |
+| `mdh emulator start [AVD] [--headless]` · `mdh emulator stop [DEVICE]` | Start an emulator and wait until it has booted; shut one down |
 | `mdh observe [--diff]` | The current screen; `--diff` shows only what changed since you last looked |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | Save a downscaled JPEG |
 | `mdh tap TARGET` | Tap an element |
@@ -325,7 +326,12 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh session show` · `mdh session reset` | Inspect or reset the session |
 | `mdh mcp` | Serve the tools over MCP |
 
-Global options: `--device SERIAL` (when several devices are connected) and `--json`.
+Global options: `--device SERIAL|AVD` and `--json`.
+
+Which device: `--device`, else this project's default (`.mdh/device.json`), else the only one online; with a phone
+and an emulator connected, the emulator. When it can't tell, `mdh` asks at the terminal (and remembers the answer);
+with nothing connected it offers to start an emulator and starts one only if you say yes. Agents get the options in
+the error and ask you.
 
 ### Targets
 

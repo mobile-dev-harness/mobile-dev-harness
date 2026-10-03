@@ -832,3 +832,29 @@ test case per flow, the first failed check as the failure message and the verdic
 runs `mdh run` and replays the sample's flows (`examples/android-sample/.mdh/flows`) with `--junit`, keeping the
 report and the run directories as artifacts.
 
+## 25. Devices and emulators (`mdh-control::devices`, `mdh-driver`)
+
+F1.2–F1.4. The driver reports devices with their AVD (`ro.boot.qemu.avd_name`, else the emulator console's
+`avd name`) and API level, and the AVDs that can be started (`emulator -list-avds`; API level from `<avd>.ini`'s
+`target` or the system image path in `config.ini`).
+
+**Choosing** (`resolve`, pure over the driver): an explicit `--device` (serial or AVD name) wins; then the project's
+default from `.mdh/device.json`; then the only online device; with several online, the only emulator among phones
+(functional verification prefers an emulator: resettable, the same every run); otherwise someone has to choose.
+With nothing online the startable AVDs are offered, the project's first, then the newest system image. The result
+is `Ready`, `Start` (an AVD the user named), `Choose` or `Offline`.
+
+**Asking** is left to the entry point through the `Ask` trait: the CLI asks at a terminal (stdin and stderr are
+TTYs) with a numbered list or `Start <AVD>? [Y/n]`, end of input counting as no; the answer becomes the project's
+default. Without a terminal — agents' shells, CI, MCP — nothing is started or guessed: `NO_DEVICE` lists the
+startable AVDs and `AMBIGUOUS_DEVICE` the candidates, with a hint to ask the user and then use `mdh emulator start`
+or `mdh devices use` (MCP: `mdh_status` with `start_emulator` or `device`). How the device was chosen, when it isn't
+obvious, is said once at the top of the next observation (`Session::notify`).
+
+**Starting** (`emulator -avd X -netdelay none -netspeed full`, `-no-window -no-audio -no-boot-anim` headless): the
+process runs in its own process group with output in a temporary log, so it outlives mdh. The new emulator is the
+online emulator serial that wasn't connected before and runs that AVD; it is ready when `sys.boot_completed` is 1
+(timeout 240 s, after which the process is killed). If the process exits, the error carries its `PANIC`/`ERROR`
+line. An AVD that already runs is used as is. A CLI session kept for the serial is discarded after a boot.
+**Stopping** (`emu kill`) only applies to emulators and waits until adb no longer lists the serial.
+

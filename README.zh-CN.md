@@ -290,7 +290,8 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh doctor` | 检查工具链和设备 |
 | `mdh init [--project DIR] [--no-agents-md]` | 初始化项目：创建 `.mdh/`（flow 提交到仓库，状态文件忽略），并在 `AGENTS.md` 中加入"如何校验"一节 |
 | `mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g] [--reinstall]` | 用 Gradle 构建，有变化才安装（自动选择匹配设备 ABI 的 APK），重启 App 并显示第一个界面；`--reinstall` 用于替换由另一把密钥签名的旧版本 |
-| `mdh devices` | 列出已连接的设备和模拟器 |
+| `mdh devices` · `mdh devices use DEVICE` | 列出已连接的设备和可以启动的模拟器；`use` 设置本项目的默认设备（serial 或 AVD 名称） |
+| `mdh emulator start [AVD] [--headless]` · `mdh emulator stop [DEVICE]` | 启动模拟器并等它开机完成；关闭模拟器 |
 | `mdh observe [--diff]` | 当前屏幕；`--diff` 只显示自上次查看以来的变化 |
 | `mdh screenshot [-o FILE] [--max-edge 1024]` | 保存一张缩小后的 JPEG 截图 |
 | `mdh tap TARGET` | 点击元素 |
@@ -313,7 +314,11 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh session show` · `mdh session reset` | 查看或重置会话 |
 | `mdh mcp` | 以 MCP 协议提供工具 |
 
-全局参数：`--device SERIAL`（连接了多台设备时使用）和 `--json`。
+全局参数：`--device SERIAL|AVD` 和 `--json`。
+
+用哪台设备：先看 `--device`，再看本项目的默认设备（`.mdh/device.json`），再看是否只有一台在线；真机和模拟器同时
+在线时用模拟器。判断不了时，`mdh` 会在终端里问你（并记住答案）；一台都没连时，它会问要不要启动模拟器，你同意了
+才启动。agent 使用时，错误信息里会列出可选项，由 agent 来问你。
 
 ### 目标的写法
 

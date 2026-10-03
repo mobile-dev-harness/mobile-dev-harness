@@ -26,4 +26,44 @@ pub struct Device {
     pub state: DeviceState,
     pub model: Option<String>,
     pub is_emulator: bool,
+    /// The virtual device an emulator runs (stable across restarts, unlike its serial).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avd: Option<String>,
+    /// OS API level, e.g. 36.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api: Option<u32>,
+}
+
+impl Device {
+    /// `emulator-5554 (Pixel_9_Pro_XL, API 36)`, `R5CT… (SM-S918B, API 34)`.
+    pub fn describe(&self) -> String {
+        let name = self.avd.as_deref().or(self.model.as_deref());
+        match (name, self.api) {
+            (Some(n), Some(api)) => format!("{} ({n}, API {api})", self.id),
+            (Some(n), None) => format!("{} ({n})", self.id),
+            (None, Some(api)) => format!("{} (API {api})", self.id),
+            (None, None) => self.id.clone(),
+        }
+    }
+}
+
+/// A virtual device that can be started.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Avd {
+    pub name: String,
+    /// From its system image; `None` when the AVD's config can't be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api: Option<u32>,
+    /// The serial of the emulator running it, if one is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub running: Option<String>,
+}
+
+impl Avd {
+    pub fn describe(&self) -> String {
+        match self.api {
+            Some(api) => format!("{} (API {api})", self.name),
+            None => self.name.clone(),
+        }
+    }
 }

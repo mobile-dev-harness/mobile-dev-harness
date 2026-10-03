@@ -103,6 +103,7 @@ configuration and snapshots, and the config file grows with them.
 |---|---|
 | Display size from the helper | `ScreenInfo.size` is derived from window bounds; while a dialog is the only window (crash dialog, permission prompt) it is too small. The helper should report the display's real size. |
 | Compose content without semantics | Drawn Compose content (a canvas without semantics) is absent from the accessibility tree, so opaque-region detection can't see it. Candidate: screenshot-based detection of unexplained drawn areas (M5, `mdh-visual`). |
+| Device recommendation from impact | Let `mdh impact` suggest which devices or configurations a change needs (a manifest `minSdk` change → the lowest API level; a tablet layout → a large screen; a `values-ar` change → RTL), feeding the device choice and later the matrix. |
 | Calls while the app is frozen | Settling abandons tree reads after 2 s, but the helper keeps serving the blocked request; the next call can wait up to ~10 s. A per-request deadline inside the helper would bound it. |
 
 ## Open questions

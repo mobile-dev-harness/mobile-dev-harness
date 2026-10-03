@@ -18,7 +18,9 @@ This app is verified with [mobile-dev-harness](https://github.com/qkmaosjtu/mobi
 compiles.
 
 1. `mdh impact` — which screens the change reaches, how to get there and what to check (no device).
-2. `mdh run` — build, install and start the app; build errors come back as `file:line`.
+2. `mdh run` — build, install and start the app; build errors come back as `file:line`. With no
+   device online the error lists startable emulators: ask the user before `mdh emulator start`.
+   `mdh devices use <id>` sets the device for this project.
 3. Drive each affected screen: `mdh observe`, `mdh tap "Sign in"`, `mdh type "text" --into Email`,
    `mdh scroll down --until "Item 30"`. Every action reports what changed, plus any crash.
 4. `mdh verify 'screen .LoginActivity' 'enabled id=sign_in' 'visible "Welcome"'` — a verdict with

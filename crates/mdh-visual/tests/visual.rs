@@ -64,6 +64,8 @@ fn device() -> Device {
         state: DeviceState::Online,
         model: None,
         is_emulator: true,
+        avd: None,
+        api: None,
     }
 }
 

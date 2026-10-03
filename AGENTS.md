@@ -153,6 +153,13 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   checks this. Document parameters with doc comments — they become the schema descriptions agents read.
 - Keep the tool count and descriptions small; every definition costs agent context on every turn.
 
+## Devices
+
+- Never start an emulator or pick between equal devices without a person saying so: the CLI asks at
+  a terminal (`Ask`), everything else returns `NO_DEVICE` / `AMBIGUOUS_DEVICE` with the options.
+- Selection logic is `mdh_control::resolve` (pure over the driver, unit-tested with a fake); keep
+  prompting in the entry points.
+
 ## Verification engine
 
 - Verification is tested against the scripted fake driver in `crates/mdh-verify/tests/verify.rs`

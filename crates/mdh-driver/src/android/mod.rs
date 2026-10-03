@@ -2,6 +2,7 @@
 
 mod adb;
 mod am;
+mod emulator;
 mod helper;
 mod install;
 mod logcat;
@@ -22,7 +23,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::{RawTree, TreeSource};
-use mdh_core::{Device, Error, Input, LaunchInfo, LogEntry, Platform, Result};
+use mdh_core::{Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result};
 
 use crate::Driver;
 
@@ -39,6 +40,7 @@ const ANIMATION_SCALES: [&str; 3] = [
 pub struct AndroidDriver {
     adb: Adb,
     sdk_root: Option<PathBuf>,
+    emulator: Option<PathBuf>,
     /// Helpers already verified in this process, by device serial.
     helpers: Mutex<HashMap<String, Arc<Helper>>>,
 }
@@ -48,6 +50,7 @@ impl AndroidDriver {
         Self {
             adb: Adb::new(sdk.adb.clone()),
             sdk_root: sdk.root.clone(),
+            emulator: sdk.emulator.clone(),
             helpers: Mutex::default(),
         }
     }
@@ -136,7 +139,83 @@ impl Driver for AndroidDriver {
     }
 
     async fn devices(&self) -> Result<Vec<Device>> {
-        self.adb.devices().await
+        let mut devices = self.adb.devices().await?;
+        for d in devices
+            .iter_mut()
+            .filter(|d| d.state == mdh_core::DeviceState::Online)
+        {
+            let (avd, api) = emulator::identity(&self.adb, &d.id).await;
+            d.avd = avd.filter(|_| d.is_emulator);
+            d.api = api;
+        }
+        Ok(devices)
+    }
+
+    async fn avds(&self) -> Result<Vec<Avd>> {
+        let names = AndroidSdk {
+            root: self.sdk_root.clone(),
+            adb: PathBuf::new(),
+            emulator: self.emulator.clone(),
+        }
+        .avds()
+        .await?;
+        let running = self.devices().await?;
+        Ok(names
+            .into_iter()
+            .map(|name| Avd {
+                api: emulator::avd_api(&name),
+                running: running
+                    .iter()
+                    .find(|d| d.avd.as_deref() == Some(name.as_str()))
+                    .map(|d| d.id.clone()),
+                name,
+            })
+            .collect())
+    }
+
+    async fn start_emulator(&self, avd: &str, headless: bool) -> Result<Device> {
+        if let Some(serial) = self
+            .avds()
+            .await?
+            .into_iter()
+            .find(|a| a.name == avd)
+            .and_then(|a| a.running)
+        {
+            return self
+                .devices()
+                .await?
+                .into_iter()
+                .find(|d| d.id == serial)
+                .ok_or(Error::DeviceNotFound { id: serial });
+        }
+        let path = self.emulator.as_deref().ok_or_else(|| Error::EmulatorFailed {
+            avd: avd.to_owned(),
+            reason: "the Android Emulator isn't installed (Android Studio → SDK Manager → SDK Tools)".into(),
+        })?;
+        emulator::start(&self.adb, path, avd, headless).await
+    }
+
+    async fn stop_emulator(&self, device: &Device) -> Result<()> {
+        if !device.is_emulator {
+            return Err(Error::InvalidTarget {
+                target: device.id.clone(),
+                reason: "not an emulator; physical devices aren't shut down".into(),
+            });
+        }
+        self.helpers
+            .lock()
+            .expect("not poisoned")
+            .remove(&device.id);
+        self.adb.on(&device.id, &["emu", "kill"]).await?;
+        // `emu kill` returns at once; the emulator lingers in `adb devices` while it shuts down.
+        for _ in 0..40 {
+            let gone = self.adb.devices().await?.iter().all(|d| d.id != device.id);
+            if gone {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        Ok(())
     }
 
     async fn ui_tree(&self, device: &Device) -> Result<RawTree> {

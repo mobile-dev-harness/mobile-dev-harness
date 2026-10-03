@@ -63,9 +63,9 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 | ID | Feature | Behavior |
 |---|---|---|
 | F1.1 | `doctor` | Checks SDK, adb, emulator/AVDs, JDK, devices; each item reports ok/warn/fail with a fix hint ✅ |
-| F1.2 | `devices` | Lists devices and their states ✅ |
-| F1.3 | Emulator management | `emulator list/start/stop`; headless boot; returns only after `sys.boot_completed=1` |
-| F1.4 | Device selection | Priority: `--device` flag > config > the only online device > boot the configured AVD > error listing candidates |
+| F1.2 | `devices` | Lists devices (AVD, API level, state) and the emulators that can be started, marking the project's default ✅ |
+| F1.3 | Emulator management ✅ | `emulator start [AVD] [--headless]` / `stop [device]`; returns only after `sys.boot_completed=1`, telling the new emulator apart from those already connected; the emulator outlives mdh; a failed start reports the emulator's own reason |
+| F1.4 | Device selection ✅ | `--device` (serial or AVD name; a named AVD that isn't running is started) > the project's default (`.mdh/device.json`, local: an emulator by AVD, a phone by serial) > the only online device > the only emulator when phones are online too (functional checks prefer an emulator) > ask. Asking: at a terminal, a numbered choice that becomes the default; with nothing online, "start <AVD>? [Y/n]" (never started unasked). Without a terminal (agents, CI, MCP) the error lists the options and the agent asks its user |
 | F1.5 | Physical-device guard | Destructive operations on physical devices (clearing data, changing global settings) require `--allow-device-changes` |
 
 ### F2 Build, install, launch
@@ -228,8 +228,9 @@ just the one it was editing. Static and syntax-level: no device, no build, works
 ### 4.1 CLI command tree
 
 ```
-mdh doctor | devices
-mdh emulator list | start [avd] | stop
+mdh doctor
+mdh devices [use <serial|avd>]
+mdh emulator start [AVD] [--headless] | stop [serial|avd]
 mdh init [--project DIR] [--no-agents-md]   # .mdh/ and the AGENTS.md section; mdh.yaml with the config track
 mdh run [--project DIR] [--module M] [--variant V] [--no-build] [-g]   # --route/--reset with M3
 mdh build | install | launch
@@ -269,7 +270,7 @@ than split into many small tools.
 
 | Tool | Purpose | CLI equivalent | Since |
 |---|---|---|---|
-| `mdh_status` | Device and session overview; switch device, reset the session, animations on/off | devices / session / state animations | M1 ✅ |
+| `mdh_status` | Device and session overview; switch device (remembered), start an emulator the user agreed to, reset the session, animations on/off | devices / emulator / session / state animations | M1 ✅ |
 | `mdh_observe` | Observe (diff, screenshot) | observe / screenshot | M1 ✅ |
 | `mdh_act` | Run one or more actions, each returning what changed | tap / type / scroll / … | M1 ✅ |
 | `mdh_wait` | Wait for a target to appear or disappear | wait | M1 ✅ |

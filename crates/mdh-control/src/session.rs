@@ -127,6 +127,8 @@ pub struct Session {
     pub(crate) control: Control,
     pub(crate) state: State,
     path: Option<PathBuf>,
+    /// Said once, at the top of the next observation: how the device was chosen or started.
+    notice: Option<String>,
 }
 
 impl Session {
@@ -147,7 +149,13 @@ impl Session {
             control,
             state,
             path,
+            notice: None,
         }
+    }
+
+    /// Something to tell the agent once, with the next observation or action.
+    pub fn notify(&mut self, notice: impl Into<String>) {
+        self.notice = Some(notice.into());
     }
 
     pub fn control(&self) -> &Control {
@@ -589,13 +597,19 @@ impl Session {
 
     /// Header, screen line, crash block with the steps that led to it, body, log line.
     fn compose(
-        &self,
+        &mut self,
         header: Option<&str>,
         view: &View,
         body: &str,
         logs: Option<&LogDigest>,
     ) -> String {
-        let mut parts: Vec<String> = header.map(str::to_owned).into_iter().collect();
+        let mut parts: Vec<String> = self
+            .notice
+            .take()
+            .map(|n| format!("note: {n}"))
+            .into_iter()
+            .collect();
+        parts.extend(header.map(str::to_owned));
         parts.push(render_screen(&view.screen));
         let rendered = logs.map(render_logs).unwrap_or_default();
         let (log_line, crash): (Vec<&str>, Vec<&str>) =

@@ -9,7 +9,7 @@ pub mod output;
 pub mod ui;
 
 pub use app::LaunchInfo;
-pub use device::{Device, DeviceState, Platform};
+pub use device::{Avd, Device, DeviceState, Platform};
 pub use error::{Error, ErrorCode, Result};
 pub use input::Input;
 pub use log::{LogEntry, LogLevel};

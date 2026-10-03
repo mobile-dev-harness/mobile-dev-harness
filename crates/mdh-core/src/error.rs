@@ -20,8 +20,14 @@ pub enum Error {
     #[error("environment not ready: {}", failed.join(", "))]
     EnvironmentNotReady { failed: Vec<String> },
 
-    #[error("no online device")]
-    NoDevice,
+    #[error("no device online{}", if avds.is_empty() { String::new() } else { format!("; emulators that can be started: {}", avds.join(", ")) })]
+    NoDevice {
+        /// Startable virtual devices, `Pixel_9 (API 36)`.
+        avds: Vec<String>,
+    },
+
+    #[error("emulator `{avd}` didn't start: {reason}")]
+    EmulatorFailed { avd: String, reason: String },
 
     #[error("device `{id}` is not connected")]
     DeviceNotFound { id: String },
@@ -138,7 +144,8 @@ impl Error {
             Error::CommandFailed { .. } => ErrorCode::CommandFailed,
             Error::Parse { .. } => ErrorCode::UnexpectedOutput,
             Error::EnvironmentNotReady { .. } => ErrorCode::EnvironmentNotReady,
-            Error::NoDevice | Error::DeviceNotFound { .. } => ErrorCode::DeviceNotFound,
+            Error::NoDevice { .. } | Error::DeviceNotFound { .. } => ErrorCode::DeviceNotFound,
+            Error::EmulatorFailed { .. } => ErrorCode::EmulatorFailed,
             Error::AmbiguousDevice { .. } => ErrorCode::AmbiguousDevice,
             Error::HelperUnavailable { .. } => ErrorCode::HelperUnavailable,
             Error::HelperCommand { .. } => ErrorCode::HelperError,
@@ -181,10 +188,27 @@ impl Error {
                     .into()
             }
             Error::EnvironmentNotReady { .. } => "fix the failing checks, then rerun `mdh doctor`".into(),
-            Error::NoDevice | Error::DeviceNotFound { .. } => {
+            Error::NoDevice { avds } if avds.is_empty() => {
+                "connect a phone with USB debugging on, or create an emulator in Android Studio's Device \
+                 Manager; then check `mdh devices`"
+                    .into()
+            }
+            Error::NoDevice { .. } => {
+                "ask the user whether to start one (it takes a while and uses memory), then \
+                 `mdh emulator start <AVD>` (MCP: mdh_status with start_emulator)"
+                    .into()
+            }
+            Error::DeviceNotFound { .. } => {
                 "start an emulator or connect a device, then check `mdh devices`".into()
             }
-            Error::AmbiguousDevice { .. } => "pick one with `--device <id>`".into(),
+            Error::EmulatorFailed { avd, .. } => format!(
+                "start it from Android Studio's Device Manager or with `emulator -avd {avd}` to see what's wrong"
+            ),
+            Error::AmbiguousDevice { .. } => {
+                "ask the user which one to use; pass `--device <id>`, or remember one for this project \
+                 with `mdh devices use <id>` (MCP: mdh_status with device)"
+                    .into()
+            }
             Error::HelperUnavailable { .. } => {
                 "only one UiAutomation client can run per device; stop uiautomator, Appium, Maestro or \
                  mobile-mcp sessions on it and retry"
@@ -280,6 +304,7 @@ pub enum ErrorCode {
     UnexpectedOutput,
     EnvironmentNotReady,
     DeviceNotFound,
+    EmulatorFailed,
     AmbiguousDevice,
     HelperUnavailable,
     HelperError,
@@ -319,6 +344,7 @@ impl ErrorCode {
             ErrorCode::EnvironmentNotReady => "ENVIRONMENT_NOT_READY",
             ErrorCode::DeviceNotFound => "DEVICE_NOT_FOUND",
             ErrorCode::AmbiguousDevice => "AMBIGUOUS_DEVICE",
+            ErrorCode::EmulatorFailed => "EMULATOR_FAILED",
             ErrorCode::HelperUnavailable => "HELPER_UNAVAILABLE",
             ErrorCode::HelperError => "HELPER_ERROR",
             ErrorCode::AppNotFound => "APP_NOT_FOUND",
@@ -371,6 +397,7 @@ impl ErrorCode {
             | ErrorCode::CommandFailed
             | ErrorCode::EnvironmentNotReady
             | ErrorCode::DeviceNotFound
+            | ErrorCode::EmulatorFailed
             | ErrorCode::AmbiguousDevice
             | ErrorCode::HelperUnavailable
             | ErrorCode::AppNotFound

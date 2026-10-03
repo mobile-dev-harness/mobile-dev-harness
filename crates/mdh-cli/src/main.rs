@@ -9,14 +9,12 @@ use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use mdh_control::{
-    ActOutcome, Action, Control, Direction, Observation, RunOptions, RunReport, Session, Target,
+    ActOutcome, Action, Ask, ConnectOptions, Control, DEFAULT_DEVICE_FILE, Direction, Inventory,
+    Observation, RunOptions, RunReport, Session, Target,
 };
 use mdh_core::output::Timings;
-use mdh_core::{Device, DeviceState, Error, LogLevel, Result};
-use mdh_driver::Driver;
-use mdh_driver::android::{AndroidDriver, AndroidSdk};
+use mdh_core::{Avd, Device, DeviceState, Error, LogLevel, Result};
 use mdh_observe::{CrashKind, LogDigest};
-use serde::Serialize;
 
 use crate::output::{Human, finish};
 use crate::render::Done;
@@ -60,8 +58,16 @@ enum Command {
     /// Claude Code hooks (used by the plugin): read the hook's JSON on stdin, answer on stdout
     #[command(hide = true)]
     Hook { event: HookEvent },
-    /// List connected devices and running emulators
-    Devices,
+    /// List connected devices and the emulators that can be started; `use` sets the default
+    Devices {
+        #[command(subcommand)]
+        command: Option<DevicesCommand>,
+    },
+    /// Start or stop emulators
+    Emulator {
+        #[command(subcommand)]
+        command: EmulatorCommand,
+    },
     /// Show the current screen as a compact UI tree
     Observe {
         /// Only what changed since the last observation or action
@@ -217,6 +223,25 @@ enum Command {
         #[command(subcommand)]
         command: FlowCommand,
     },
+}
+
+#[derive(Subcommand)]
+enum DevicesCommand {
+    /// Use this device (serial, or an emulator's AVD name) by default in this project
+    Use { device: String },
+}
+
+#[derive(Subcommand)]
+enum EmulatorCommand {
+    /// Start an emulator and wait until it has booted (default: the project's, else the newest)
+    Start {
+        avd: Option<String>,
+        /// No window (CI, servers)
+        #[arg(long)]
+        headless: bool,
+    },
+    /// Shut an emulator down (default: the project's, else the only one running)
+    Stop { device: Option<String> },
 }
 
 #[derive(Subcommand)]
@@ -379,7 +404,33 @@ async fn main() -> ExitCode {
             let (checks, error) = doctor::run().await;
             finish(json, started, timings, Some(checks), error)
         }
-        Command::Devices => report!(devices().await),
+        Command::Devices { command: None } => {
+            report!(Inventory::load(Path::new(DEFAULT_DEVICE_FILE)).await)
+        }
+        Command::Devices {
+            command: Some(DevicesCommand::Use { device }),
+        } => report!(
+            mdh_control::use_device(&device, Path::new(DEFAULT_DEVICE_FILE))
+                .await
+                .map(Done::new)
+        ),
+        Command::Emulator { command } => {
+            let file = Path::new(DEFAULT_DEVICE_FILE);
+            report!(match command {
+                EmulatorCommand::Start { avd, headless } => {
+                    if std::io::stderr().is_terminal() {
+                        eprintln!("starting the emulator… (a cold boot can take a few minutes)");
+                    }
+                    mdh_control::start_emulator(avd.as_deref(), headless, file)
+                        .await
+                        .map(|(_, text)| Done::new(text))
+                }
+                EmulatorCommand::Stop { device } =>
+                    mdh_control::stop_emulator(device.as_deref(), file)
+                        .await
+                        .map(Done::new),
+            })
+        }
         Command::Init {
             project,
             no_agents_md,
@@ -415,11 +466,27 @@ async fn main() -> ExitCode {
             }
         },
         command => {
-            let control = match Control::connect(cli.device.as_deref()).await {
-                Ok(control) => control,
+            let terminal = TerminalAsk;
+            let interactive = std::io::stdin().is_terminal() && std::io::stderr().is_terminal();
+            let connected = Control::connect_with(ConnectOptions {
+                requested: cli.device.as_deref(),
+                default_file: Path::new(DEFAULT_DEVICE_FILE),
+                ask: interactive.then_some(&terminal as &dyn Ask),
+                headless: false,
+            })
+            .await;
+            let connected = match connected {
+                Ok(c) => c,
                 Err(e) => return finish::<Done>(json, started, timings, None, Some(e)),
             };
-            let mut session = Session::open(control, Some(PathBuf::from(SESSION_FILE)));
+            // A freshly booted emulator shares nothing with the session kept for its serial.
+            if connected.started {
+                let _ = std::fs::remove_file(SESSION_FILE);
+            }
+            let mut session = Session::open(connected.control, Some(PathBuf::from(SESSION_FILE)));
+            if let Some(notice) = connected.notice {
+                session.notify(notice);
+            }
             let code = run(command, &mut session, json, started, &mut timings).await;
             if let Err(e) = session.save() {
                 eprintln!("warning: could not save the session to {SESSION_FILE}: {e}");
@@ -462,7 +529,8 @@ async fn run(
 
     match command {
         Command::Doctor
-        | Command::Devices
+        | Command::Devices { .. }
+        | Command::Emulator { .. }
         | Command::Init { .. }
         | Command::Hook { .. }
         | Command::Impact { .. }
@@ -777,36 +845,65 @@ fn split<T>(result: Result<T>) -> (Option<T>, Option<mdh_core::Error>) {
     }
 }
 
-#[derive(Serialize)]
-#[serde(transparent)]
-struct DeviceList(Vec<Device>);
+/// Asks at the terminal when no device can be picked alone.
+struct TerminalAsk;
 
-impl Human for DeviceList {
-    fn human(&self) -> String {
-        if self.0.is_empty() {
-            return "No devices connected. Start an emulator or plug in a device.".into();
+impl TerminalAsk {
+    fn read(prompt: &str, max: usize, default: Option<usize>) -> Option<usize> {
+        eprint!("{prompt}");
+        let mut line = String::new();
+        // End of input is no answer, not consent.
+        if std::io::stdin().read_line(&mut line).ok()? == 0 {
+            return None;
         }
-        self.0
-            .iter()
-            .map(|d| {
-                let state = match &d.state {
-                    DeviceState::Online => "online",
-                    DeviceState::Offline => "offline",
-                    DeviceState::Unauthorized => "unauthorized (accept the USB debugging prompt)",
-                    DeviceState::Other(s) => s,
-                };
-                let kind = if d.is_emulator { "emulator" } else { "device" };
-                let model = d.model.as_deref().unwrap_or("-");
-                format!("{:<20} {:<9} {:<24} {}", d.id, kind, model, state)
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+        let answer = line.trim().to_lowercase();
+        match answer.as_str() {
+            "" => default,
+            "y" | "yes" => default,
+            "n" | "no" | "q" => None,
+            n => n
+                .parse::<usize>()
+                .ok()
+                .filter(|i| (1..=max).contains(i))
+                .map(|i| i - 1),
+        }
     }
 }
 
-async fn devices() -> Result<DeviceList> {
-    let sdk = AndroidSdk::locate()?;
-    Ok(DeviceList(AndroidDriver::new(&sdk).devices().await?))
+impl Ask for TerminalAsk {
+    fn choose(&self, devices: &[Device]) -> Option<usize> {
+        eprintln!("Several devices are connected:");
+        for (i, d) in devices.iter().enumerate() {
+            eprintln!("  [{}] {}", i + 1, d.describe());
+        }
+        Self::read(
+            &format!("Use which one for this project? [1-{}] ", devices.len()),
+            devices.len(),
+            None,
+        )
+    }
+
+    fn start(&self, avds: &[Avd]) -> Option<usize> {
+        eprintln!("No device is connected. Emulators you can start:");
+        for (i, a) in avds.iter().enumerate() {
+            eprintln!("  [{}] {}", i + 1, a.describe());
+        }
+        Self::read(
+            &format!("Start {}? [Y/n, or 1-{}] ", avds[0].name, avds.len()),
+            avds.len(),
+            Some(0),
+        )
+    }
+
+    fn starting(&self, avd: &str) {
+        eprintln!("starting {avd}… (a cold boot can take a few minutes)");
+    }
+}
+
+impl Human for Inventory {
+    fn human(&self) -> String {
+        self.text()
+    }
 }
 
 fn init(project: &Path, agents_md: bool) -> Result<Done> {
@@ -841,17 +938,23 @@ async fn hook(event: HookEvent) -> ExitCode {
     };
     match event {
         HookEvent::SessionStart => {
-            let devices = match devices().await {
-                Ok(DeviceList(list)) => {
-                    let online: Vec<String> = list
+            let devices = match Inventory::load(&cwd.join(DEFAULT_DEVICE_FILE)).await {
+                Ok(inv) => {
+                    let online: Vec<String> = inv
+                        .devices
                         .iter()
                         .filter(|d| d.state == DeviceState::Online)
-                        .map(|d| d.id.clone())
+                        .map(Device::describe)
                         .collect();
-                    if online.is_empty() {
-                        "no device online: start an emulator before verifying".to_owned()
-                    } else {
-                        format!("devices online: {}", online.join(", "))
+                    let avds: Vec<String> = inv.avds.iter().map(Avd::describe).collect();
+                    match (online.is_empty(), avds.is_empty()) {
+                        (false, _) => format!("devices online: {}", online.join(", ")),
+                        (true, false) => format!(
+                            "no device online; emulators that can be started: {} — ask the user before \
+                             starting one (mdh_status with start_emulator, or `mdh emulator start`)",
+                            avds.join(", ")
+                        ),
+                        (true, true) => "no device online and no emulator set up".to_owned(),
                     }
                 }
                 Err(e) => format!("devices unknown ({e})"),

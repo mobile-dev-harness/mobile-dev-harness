@@ -4,12 +4,14 @@
 //! the same compact text the CLI prints. `structuredContent` is not sent: clients commonly forward
 //! it to the model next to the text, which would double the tokens of every observation.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use base64::Engine;
 use mdh_control::{
-    ActOutcome, Action, Control, Direction, Observation, RunOptions, Session, Target, launch_text,
+    ActOutcome, Action, ConnectOptions, Control, DEFAULT_DEVICE_FILE, Direction, Observation,
+    RunOptions, Session, Target, launch_text,
 };
 use mdh_core::output::Timings;
 use mdh_core::{Error, LogLevel, Result};
@@ -88,10 +90,20 @@ impl MdhServer {
         let mut guard = self.session.lock().await;
         if guard.is_none() {
             let device = self.device.lock().await.clone();
-            *guard = Some(Session::open(
-                Control::connect(device.as_deref()).await?,
-                None,
-            ));
+            // No one to ask here: the agent gets the options in the error and asks its user.
+            let connected = Control::connect_with(ConnectOptions {
+                requested: device.as_deref(),
+                default_file: Path::new(DEFAULT_DEVICE_FILE),
+                ask: None,
+                headless: false,
+            })
+            .await?;
+            let mut session = Session::open(connected.control, None);
+            let _ = connected.started; // MCP sessions live in memory: always fresh on connect.
+            if let Some(notice) = connected.notice {
+                session.notify(notice);
+            }
+            *guard = Some(session);
         }
         f(guard.as_mut().expect("connected above")).await
     }
@@ -99,8 +111,12 @@ impl MdhServer {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct StatusParams {
-    /// Switch to this device (adb serial). Starts a new session.
+    /// Switch to this device (adb serial, or a running emulator's AVD name) and make it the
+    /// project's default. Starts a new session.
     pub device: Option<String>,
+    /// Start this emulator (AVD name; empty for the project's or the newest one) and switch to it.
+    /// Only after the user agreed: it takes up to a few minutes and uses memory.
+    pub start_emulator: Option<String>,
     /// Forget refs and recorded steps and stop the on-device helper (frees UiAutomation for other tools).
     pub reset: Option<bool>,
     /// false turns system animations off (screens settle sooner); true restores them. Restored
@@ -312,13 +328,30 @@ pub enum AppCommand {
 #[tool_router]
 impl MdhServer {
     #[tool(
-        description = "Device and session status: which device, the last screen, recorded steps. Can switch devices or reset the session."
+        description = "Device and session status: which device, the last screen, recorded steps. Switches devices (remembered for the project), starts an emulator once the user agreed, resets the session, turns animations off. When no device or several are online, other tools fail with the options; ask the user, then call this."
     )]
     async fn mdh_status(
         &self,
         Parameters(p): Parameters<StatusParams>,
     ) -> std::result::Result<CallToolResult, ErrorData> {
+        let default_file = Path::new(DEFAULT_DEVICE_FILE);
+        let mut notes = Vec::new();
+        if let Some(avd) = p.start_emulator {
+            let avd = Some(avd).filter(|a| !a.trim().is_empty());
+            match mdh_control::start_emulator(avd.as_deref(), false, default_file).await {
+                Ok((device, text)) => {
+                    notes.push(text);
+                    *self.device.lock().await = Some(device.id);
+                    *self.session.lock().await = None;
+                }
+                Err(e) => return Ok(error_result(&e)),
+            }
+        }
         if let Some(device) = p.device {
+            match mdh_control::use_device(&device, default_file).await {
+                Ok(text) => notes.push(text),
+                Err(e) => return Ok(error_result(&e)),
+            }
             *self.device.lock().await = Some(device);
             *self.session.lock().await = None;
         }
@@ -332,6 +365,9 @@ impl MdhServer {
                 let mut text = s.summary().text();
                 if let Some(on) = animations {
                     text = format!("{}\n{text}", s.animations(on).await?);
+                }
+                if !notes.is_empty() {
+                    text = format!("{}\n{text}", notes.join("\n"));
                 }
                 Ok(text)
             })

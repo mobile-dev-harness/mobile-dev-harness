@@ -5,6 +5,7 @@
 //! settle after actions, diffs against what the agent last saw, and a recording of every step.
 
 mod action;
+mod devices;
 mod run;
 mod session;
 mod settle;
@@ -12,6 +13,10 @@ mod target;
 mod text;
 
 pub use action::{ActOutcome, Action, Direction};
+pub use devices::{
+    Ask, ConnectOptions, Connected, DEFAULT_DEVICE_FILE, DefaultDevice, Inventory, Resolution,
+    resolve, start_emulator, stop_emulator, use_device,
+};
 pub use run::{InstallReport, RunOptions, RunReport, new_run_dir};
 pub use session::{LogsReport, Observation, RecordedStep, Session, SessionSummary};
 pub use target::{Selector, Target, TextMatch, find_all, find_matches, find_one, selector_for};
@@ -25,7 +30,6 @@ use mdh_core::output::Timings;
 use mdh_core::ui::{ScreenInfo, TreeSource, WindowInfo};
 use mdh_core::{Device, Input, LaunchInfo, LogEntry, Result};
 use mdh_driver::Driver;
-use mdh_driver::android::{AndroidDriver, AndroidSdk};
 use mdh_observe::{Jpeg, UiTree, compress, screenshot_jpeg};
 use serde::Serialize;
 
@@ -67,13 +71,6 @@ pub struct Screenshot {
 }
 
 impl Control {
-    /// Connects to the requested device, or the only online one. Android is the only platform so far.
-    pub async fn connect(requested_device: Option<&str>) -> Result<Self> {
-        let driver = AndroidDriver::new(&AndroidSdk::locate()?);
-        let device = mdh_driver::select_device(driver.devices().await?, requested_device)?;
-        Ok(Self::new(Arc::new(driver), device))
-    }
-
     pub fn new(driver: Arc<dyn Driver>, device: Device) -> Self {
         Self { driver, device }
     }

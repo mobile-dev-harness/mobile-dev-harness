@@ -53,16 +53,16 @@ impl Driver for StaticDriver {
         Ok(())
     }
     async fn screenshot(&self, _: &Device) -> Result<Vec<u8>> {
-        Err(Error::NoDevice)
+        Err(Error::NoDevice { avds: Vec::new() })
     }
     async fn install(&self, _: &Device, _: &Path, _: bool) -> Result<()> {
-        Err(Error::NoDevice)
+        Err(Error::NoDevice { avds: Vec::new() })
     }
     async fn launch(&self, _: &Device, _: &str) -> Result<LaunchInfo> {
-        Err(Error::NoDevice)
+        Err(Error::NoDevice { avds: Vec::new() })
     }
     async fn stop(&self, _: &Device, _: &str) -> Result<()> {
-        Err(Error::NoDevice)
+        Err(Error::NoDevice { avds: Vec::new() })
     }
 }
 
@@ -73,6 +73,8 @@ fn device() -> Device {
         state: DeviceState::Online,
         model: None,
         is_emulator: true,
+        avd: None,
+        api: None,
     }
 }
 

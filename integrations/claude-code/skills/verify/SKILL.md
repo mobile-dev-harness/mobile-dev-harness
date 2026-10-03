@@ -12,8 +12,12 @@ work; the same steps exist as `mdh` CLI commands.
    to get to each one (deep link, or the taps from the launcher), call sites that no longer fit a
    changed signature, what else to check (UI, performance, compatibility), the tests that use the
    code, and the saved flows that pass those screens. Fix broken call sites first.
-2. **Build and run.** Call `mdh_run`. Build errors come back as `file:line` with the offending
-   line; fix them and run again.
+2. **Build and run.** Call `mdh_run`; build errors come back as `file:line`, fix them and run
+   again. If no device is online, the error lists the emulators that can be started: ask the user
+   before starting one (it takes a while and uses memory), then call `mdh_status` with
+   `start_emulator`. If several are online, ask which to use and pass it to `mdh_status` as
+   `device` (remembered for the project). With a phone and an emulator connected, the emulator is
+   used.
 3. **Drive each affected screen,** not only the one you edited. Open it with `mdh_app`
    (`command: open` with the deep link) or follow the taps impact showed. `mdh_observe` shows the
    screen as a compact tree with refs (`e12`); `mdh_act` taps, types, scrolls and presses keys, and
