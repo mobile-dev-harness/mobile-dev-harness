@@ -282,11 +282,13 @@ claude mcp add mdh -- mdh mcp
 | `mdh_app` | 启动、停止或安装 App；打开 deep link；清除数据；授予或撤销权限 |
 | `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow（指定名字，或由未提交的改动自动挑选）；返回结论、实际观测值，证据保存在磁盘上 |
 | `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |
-| `mdh_visual` | 检查当前界面的 UI 一致性：规则检查和结构基线；接受基线变化 |
-| `mdh_compat` | 改动的兼容性风险（系统版本、设备类型、厂商、屏幕尺寸）、验证计划，以及每条风险的结论 |
-| `mdh_perf` | 测量冷启动，或某个 flow 运行时的帧、内存和 CPU，与基线和预算对比，出现退化时用 Perfetto trace 解释原因；接受新数值作为基线；在你同意后安装 trace processor |
+| `mdh_visual` ¹ | 检查当前界面的 UI 一致性：规则检查和结构基线；接受基线变化 |
+| `mdh_compat` ¹ | 改动的兼容性风险（系统版本、设备类型、厂商、屏幕尺寸）、验证计划，以及每条风险的结论 |
+| `mdh_perf` ¹ | 测量冷启动，或某个 flow 运行时的帧、内存和 CPU，与基线和预算对比，出现退化时用 Perfetto trace 解释原因；接受新数值作为基线；在你同意后安装 trace processor |
 | `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
 | `mdh_status` | 设备和会话状态；切换设备、重置会话、关闭或恢复系统动画 |
+
+¹ 只在 `mdh mcp --tools all` 时提供。每个工具的定义都会随每次请求发给模型，所以默认只提供 agent 经常要用的工具；能用命令行的 agent 用 `mdh visual|perf|compat` 做这几类检查（Claude Code 插件里的技能有说明）。不能用命令行的客户端请加 `--tools all`。
 
 然后就可以对 agent 说：*"打开示例 App，用 alice@example.com 登录，检查消息列表能不能正常显示。"* 返回结果和
 CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并附上崩溃报告。

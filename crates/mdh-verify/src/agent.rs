@@ -34,8 +34,9 @@ compiles.
    configurations that show it (a tablet or landscape on the same emulator first); unverified
    risks say what's missing. Ask the user before `--yes` lets it start emulators.
 
-Over MCP the same steps are `mdh_impact`, `mdh_run`, `mdh_observe`, `mdh_act`, `mdh_verify`,
-`mdh_flow`, `mdh_perf` and `mdh_compat`.
+Over MCP the same steps are `mdh_impact`, `mdh_run`, `mdh_observe`, `mdh_act`, `mdh_verify` and
+`mdh_flow`; `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and `mdh_compat` for clients
+without a shell.
 "#;
 
 /// Sets a project up: `.mdh/.gitignore` (keeps flows, ignores session, runs and cache),

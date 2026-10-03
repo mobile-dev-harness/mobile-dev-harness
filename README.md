@@ -294,11 +294,15 @@ claude mcp add mdh -- mdh mcp
 | `mdh_app` | Launch, stop or install an app; open a deep link; clear its data; grant or revoke a permission |
 | `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows — named, or the ones the uncommitted change needs; a verdict with what was observed and evidence on disk |
 | `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
-| `mdh_visual` | UI consistency of the current screen: rule checks and structural baselines; approve deviations |
-| `mdh_compat` | The change's compatibility risks (OS versions, device types, vendors, screen sizes), the plan to verify them, and a verdict per risk |
-| `mdh_perf` | Cold start or a flow's frames, memory and CPU against the baseline and budgets, a Perfetto trace explaining any regression; approve new numbers; set up the trace processor once you agree |
+| `mdh_visual` ¹ | UI consistency of the current screen: rule checks and structural baselines; approve deviations |
+| `mdh_compat` ¹ | The change's compatibility risks (OS versions, device types, vendors, screen sizes), the plan to verify them, and a verdict per risk |
+| `mdh_perf` ¹ | Cold start or a flow's frames, memory and CPU against the baseline and budgets, a Perfetto trace explaining any regression; approve new numbers; set up the trace processor once you agree |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
 | `mdh_status` | Device and session status; switch device, reset, turn animations off or back on |
+
+¹ Only with `mdh mcp --tools all`. Every tool definition is sent with every request, so by default the server offers
+the tools an agent uses all the time; agents with a shell run these checks as `mdh visual|perf|compat` (the Claude
+Code plugin's skills describe them). Use `--tools all` for clients without a shell.
 
 Then ask your agent something like *"Open the sample app, log in with alice@example.com, and check that the
 messages list shows up."* Results are the same compact text the CLI prints; a crash of the app is returned as an

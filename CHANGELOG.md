@@ -5,6 +5,10 @@ change); JSON output changes are listed here and carry the `schema` version of t
 
 ## Unreleased
 
+- MCP: the default tool set is the core one (10 tools); `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and
+  `mdh_compat`. Tool definitions and the server instructions are 61% and 38% smaller (compact schemas, one-line
+  descriptions): fewer tokens on every request. The Claude Code plugin gains `visual`, `perf` and `compat` skills,
+  loaded only when needed.
 - The compatibility knowledge base moved to its own repository,
   [compat-kb](https://github.com/mobile-dev-harness/compat-kb); mdh ships a pinned release
   (`scripts/update-kb.sh` updates it) and reads another copy from `MDH_COMPAT_KB`.

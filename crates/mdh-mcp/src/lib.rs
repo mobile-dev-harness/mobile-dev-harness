@@ -4,6 +4,8 @@
 //! the same compact text the CLI prints. `structuredContent` is not sent: clients commonly forward
 //! it to the model next to the text, which would double the tokens of every observation.
 
+mod schema;
+
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,16 +31,12 @@ use serde::Deserialize;
 use tokio::sync::Mutex;
 
 const INSTRUCTIONS: &str = "\
-mobile-dev-harness drives an Android app for you. Start with mdh_observe: it shows the screen as a \
-compact tree where every element has a ref like e12 that stays the same for the whole session. \
-Targets are a ref, coordinates (\"100,200\"), a selector (\"id=login\", \"text=Sign in\", \
-\"text~=sign\", \"role=switch\", combined with ';') or a plain label. Every action waits for the UI \
-to settle and returns only what changed (+ added, ~ changed, - removed), or the whole tree when the \
-screen changed; don't observe again after an action. Lines starting with !! are crashes of the app: \
-fix them before anything else. Prefer refs and labels over coordinates. After changing code, call \
-mdh_impact to learn which screens the change reaches, then verify each of them with mdh_verify, not \
-only the one you edited; a change is done when the verdict passes. Save what you did as a flow \
-(mdh_flow) so the check can be repeated.";
+mdh drives an Android app. mdh_observe shows the screen as a compact tree; refs like e12 stay the \
+same for the session. Targets: a ref, a label, a selector (id=…, text=…, text~=…, role=…, joined \
+with ;) or x,y. Actions wait for the UI to settle and return only what changed: don't observe again \
+after one. Lines starting with !! are crashes of the app: fix them first. After changing code: \
+mdh_impact, then mdh_verify on every affected screen; a change is done when its verdict passes. UI, \
+performance and compatibility checks are the `mdh visual|perf|compat` commands (see their --help).";
 
 const SCREENSHOT_EDGE: u32 = 1024;
 /// Saved flows, relative to the server's working directory.
@@ -49,15 +47,31 @@ const FLOWS_DIR: &str = ".mdh/flows";
 pub struct MdhServer {
     session: Arc<Mutex<Option<Session>>>,
     device: Arc<Mutex<Option<String>>>,
-    #[expect(dead_code, reason = "read by the tool_handler macro")]
+    /// The tools, with compacted schemas (`schema.rs`).
     tool_router: ToolRouter<Self>,
 }
+
+/// Which tools a server offers. Every definition is sent with every request, so the check kinds
+/// an agent needs now and then (UI consistency, performance, compatibility) stay out unless asked
+/// for: agents with a shell reach them through the CLI, as the mdh skills describe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Tools {
+    /// Driving the app, building, verifying, flows, impact.
+    #[default]
+    Core,
+    /// Core plus `mdh_visual`, `mdh_perf` and `mdh_compat`, for clients without a shell.
+    All,
+}
+
+/// The tools only `Tools::All` offers.
+const CHECK_TOOLS: &[&str] = &["mdh_visual", "mdh_perf", "mdh_compat"];
 
 /// Serves MCP on stdin/stdout until the client disconnects.
 pub async fn serve_stdio(
     device: Option<String>,
+    tools: Tools,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let server = MdhServer::new(device);
+    let server = MdhServer::new(device).with_tools(tools);
     let service = server.clone().serve(stdio()).await?;
     service.waiting().await?;
     // Leave the device as it was found.
@@ -71,11 +85,25 @@ pub async fn serve_stdio(
 
 impl MdhServer {
     pub fn new(device: Option<String>) -> Self {
+        let mut tool_router = Self::tool_router();
+        for route in tool_router.map.values_mut() {
+            route.attr.input_schema = Arc::new(schema::compact(&route.attr.input_schema));
+        }
         Self {
             session: Arc::default(),
             device: Arc::new(Mutex::new(device)),
-            tool_router: Self::tool_router(),
+            tool_router,
         }
+    }
+
+    /// Offers `tools` (core by default).
+    pub fn with_tools(mut self, tools: Tools) -> Self {
+        if tools == Tools::Core {
+            for name in CHECK_TOOLS {
+                self.tool_router.remove_route(name);
+            }
+        }
+        self
     }
 
     /// A server whose session already uses `control`; for tests with scripted drivers.
@@ -111,36 +139,31 @@ impl MdhServer {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct StatusParams {
-    /// Switch to this device (adb serial, or a running emulator's AVD name) and make it the
-    /// project's default. Starts a new session.
+    /// Switch to this device (serial or running AVD); remembered for the project.
     pub device: Option<String>,
-    /// Start this emulator (AVD name; empty for the project's or the newest one) and switch to it.
-    /// Only after the user agreed: it takes up to a few minutes and uses memory.
+    /// Start this AVD (empty: the default one) and switch to it. Only after the user agreed.
     pub start_emulator: Option<String>,
-    /// Forget refs and recorded steps and stop the on-device helper (frees UiAutomation for other tools).
+    /// Forget refs and steps; stop the on-device helper.
     pub reset: Option<bool>,
-    /// false turns system animations off (screens settle sooner); true restores them. Restored
-    /// when the session resets or the connection closes.
+    /// false: animations off (restored later); true: back on.
     pub animations: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ObserveParams {
-    /// Only what changed since the last observation or action.
+    /// Only what changed since the last look.
     pub diff: Option<bool>,
-    /// Also return a screenshot (JPEG, long edge 1024 px). Use when the tree reports opaque regions
-    /// or visual details matter.
+    /// Add a screenshot: for opaque regions, images, visual details.
     pub screenshot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ActParams {
-    /// Actions to run in order. Stops at the first failure; each reports what changed.
+    /// In order; stops at the first failure.
     pub actions: Vec<ActSpec>,
 }
 
-/// One action. Targets: a ref (`e12`), coordinates (`100,200`), a selector (`id=…`, `text=…`,
-/// `text~=…`, `role=…`, `index=…`, combined with `;`) or a label.
+/// One action on a target (ref, label, selector or x,y).
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum ActSpec {
@@ -149,31 +172,28 @@ pub enum ActSpec {
     },
     LongPress {
         target: String,
-        /// Default 800.
         duration_ms: Option<u32>,
     },
-    /// Sets the focused field's text (any Unicode), after tapping `into` if given.
+    /// Sets the field's text (any language), tapping `into` first if given.
     Type {
         text: String,
         into: Option<String>,
-        /// Append to the current text instead of replacing it.
         append: Option<bool>,
-        /// Press ENTER afterwards.
+        /// Press ENTER after.
         enter: Option<bool>,
     },
     Swipe {
         from: [i32; 2],
         to: [i32; 2],
-        /// Default 300.
         duration_ms: Option<u32>,
     },
-    /// Reveals content in `direction` (`down` shows what is below), optionally until `until` is on screen.
+    /// `down` shows what is below; stops once `until` is on screen.
     Scroll {
         direction: ScrollDirection,
         within: Option<String>,
         until: Option<String>,
     },
-    /// Android key name without `KEYCODE_`, e.g. BACK, HOME, ENTER.
+    /// BACK, HOME, ENTER, …
     Key {
         name: String,
     },
@@ -190,33 +210,30 @@ pub enum ScrollDirection {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct RunParams {
-    /// A directory inside the Gradle project; default: the server's working directory.
+    /// Default: the working directory.
     pub project: Option<String>,
-    /// Application module such as `app`, when the build has several.
+    /// When the build has several application modules.
     pub module: Option<String>,
-    /// Build variant such as `debug` or `freeDebug`; default: the debug variant.
+    /// Default: the debug variant.
     pub variant: Option<String>,
-    /// Build first (default true); false reuses the last built APK.
+    /// false: reuse the last built APK.
     pub build: Option<bool>,
-    /// Grant all runtime permissions on install.
+    /// Grant all runtime permissions.
     pub grant: Option<bool>,
-    /// Uninstall first: replaces an app signed with another key or a newer version; clears its data.
+    /// Uninstall first (another signing key); clears data.
     pub reinstall: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct VerifyParams {
-    /// Checks on the app as it is now: `visible "Sign in"`, `not visible id=error`,
-    /// `enabled|disabled|checked|unchecked|focused TARGET`, `text TARGET == "value"`,
-    /// `text TARGET ~= "part"`, `screen .LoginActivity`, `log ~= "text"`, `no log ~= "text"`.
-    /// `no crash` is always checked.
+    /// `visible T`, `not visible T`, `enabled|disabled|checked|unchecked|focused T`,
+    /// `text T == "v"`, `text T ~= "v"`, `screen .Activity`, `[no] log ~= "x"`; `no crash` always.
     pub checks: Option<Vec<String>>,
-    /// Saved flows to replay instead (names in .mdh/flows); each gets its own verdict.
+    /// Saved flows to replay instead.
     pub flows: Option<Vec<String>>,
-    /// Replay the saved flows that pass the screens the uncommitted change reaches (as found by
-    /// mdh_impact).
+    /// Replay the flows through the screens the uncommitted change reaches.
     pub changed: Option<bool>,
-    /// Seconds checks may take to start holding, default 3.
+    /// Seconds a check may take to hold, default 3.
     pub timeout_s: Option<u64>,
 }
 
@@ -282,13 +299,13 @@ pub enum PerfCommand {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FlowParams {
     pub command: FlowCommand,
-    /// `save`, `show`: the flow's name (letters, digits, `-`, `_`).
+    /// `save`, `show`.
     pub name: Option<String>,
-    /// `save`: only the last N recorded steps (default: all of the session's steps).
+    /// `save`: only the last N steps.
     pub last: Option<usize>,
-    /// `save`: checks to run after the last step, same syntax as mdh_verify.
+    /// `save`: checks after the last step (mdh_verify syntax).
     pub checks: Option<Vec<String>>,
-    /// `save`: overwrite an existing flow.
+    /// `save`: overwrite.
     pub force: Option<bool>,
 }
 
@@ -302,10 +319,9 @@ pub enum FlowCommand {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ImpactParams {
-    /// A directory inside the project; default: the server's working directory.
+    /// Default: the working directory.
     pub project: Option<String>,
-    /// Revision to compare the working tree with, such as `main` or `HEAD~1`; default `HEAD`
-    /// (the uncommitted change).
+    /// Compare with this revision (`main`, `HEAD~1`); default the uncommitted change.
     pub base: Option<String>,
 }
 
@@ -335,7 +351,7 @@ pub enum CompatCommand {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct WaitParams {
     pub target: String,
-    /// Wait for the target to disappear instead.
+    /// Wait for it to disappear.
     pub gone: Option<bool>,
     /// Seconds, default 10.
     pub timeout_s: Option<u64>,
@@ -364,14 +380,12 @@ pub enum Level {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AppParams {
     pub command: AppCommand,
-    /// `launch`: a package (its launcher activity) or `package/activity`; it becomes the session's
-    /// app, whose logs and crashes are always watched. `stop`, `clear_data`, `grant`, `revoke`: a
-    /// package (default: the session's app). `install`: an APK path on the host. `open`: a deep
-    /// link such as `myapp://settings`.
+    /// A package or package/activity; `install`: an APK path; `open`: a deep link. Default: the
+    /// session's app.
     pub app: Option<String>,
-    /// `install` only: grant all runtime permissions.
+    /// `install`: grant all runtime permissions.
     pub grant: Option<bool>,
-    /// `grant`, `revoke`: the permission, e.g. `CAMERA` or `android.permission.POST_NOTIFICATIONS`.
+    /// `grant`, `revoke`: e.g. `CAMERA`.
     pub permission: Option<String>,
 }
 
@@ -390,7 +404,7 @@ pub enum AppCommand {
 #[tool_router]
 impl MdhServer {
     #[tool(
-        description = "Device and session status: which device, the last screen, recorded steps. Switches devices (remembered for the project), starts an emulator once the user agreed, resets the session, turns animations off. When no device or several are online, other tools fail with the options; ask the user, then call this."
+        description = "Device and session: show them, switch device, start an emulator (only after the user agreed), reset, turn animations off or on."
     )]
     async fn mdh_status(
         &self,
@@ -438,7 +452,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Observe the current screen: activity, compact UI tree with refs, new log warnings/errors and crashes. Optionally only the diff since the last look, or a screenshot."
+        description = "The current screen as a compact tree with refs; only what changed, or a screenshot, on request."
     )]
     async fn mdh_observe(
         &self,
@@ -477,7 +491,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Perform one or more actions (tap, long_press, type, swipe, scroll, key). Each waits for the UI to settle and reports what changed since you last looked, plus new log errors and crashes."
+        description = "Run actions in order (tap, long_press, type, swipe, scroll, key); each reports what changed."
     )]
     async fn mdh_act(
         &self,
@@ -523,7 +537,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Build the app with Gradle, install it if it changed, restart it and report its first settled screen. Build failures come back as file:line diagnostics with the source line. Reports progress while building."
+        description = "Build with Gradle, install if changed, restart the app and show its first screen; build errors come back as file:line."
     )]
     async fn mdh_run(
         &self,
@@ -584,9 +598,7 @@ impl MdhServer {
         })
     }
 
-    #[tool(
-        description = "Wait until a target is on screen (or gone), then report the screen. Fails after the timeout."
-    )]
+    #[tool(description = "Wait until a target appears, or with `gone` disappears.")]
     async fn mdh_wait(
         &self,
         Parameters(p): Parameters<WaitParams>,
@@ -609,9 +621,7 @@ impl MdhServer {
         })
     }
 
-    #[tool(
-        description = "Recent log lines (default warn and above) and crash reports of the session's app and the app in front, over the last 10 minutes."
-    )]
+    #[tool(description = "Recent log lines and crash reports of the app.")]
     async fn mdh_logs(
         &self,
         Parameters(p): Parameters<LogsParams>,
@@ -631,7 +641,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "What a code change reaches, from static analysis (no device, no build): changed declarations, what they call before vs. after, the screens affected and how to reach them, call sites of changed signatures, and what to verify (functional, UI, performance, compatibility, tests). Run it after editing and before verifying, so every affected screen gets checked."
+        description = "What the uncommitted change reaches, without a device: affected screens and how to reach them, broken call sites, what to verify."
     )]
     async fn mdh_impact(
         &self,
@@ -654,7 +664,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Compatibility of the uncommitted change, risk by risk. `risks` (no device): what the change puts at risk on other Android versions (API-level branches, behavior changes of the targetSdk), device types (tablets, foldables, rotation and saved state, cars, TVs), vendor ROMs (background restrictions, autostart, missing Google Play services) and screen sizes, each with evidence and where it would show. `plan`: the fewest devices and configurations covering them (display overrides on the current emulator first, other devices next). `run`: builds once, runs the flows passing each risk's screens on its cells and compares with the device as it is: a verdict per risk — failed, passed, or unverified with what's missing. Starting an emulator needs the user's consent (`consent: true` after asking). Takes a minute or more."
+        description = "Compatibility risks of the change (OS versions, device types, vendors, screen sizes), the plan to verify them, and a verdict per risk. Starting emulators needs `consent` after asking the user."
     )]
     async fn mdh_compat(
         &self,
@@ -695,7 +705,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Verify the app and get a verdict: checks on the current screen and logs, or saved flows replayed from a fresh start. Each check shows what was observed when it fails; evidence (screenshot, tree, logs) is saved to .mdh/runs. A change is done when its verdict passes."
+        description = "Verify the app: checks on the current screen and logs, or saved flows replayed from a fresh start; a verdict with evidence."
     )]
     async fn mdh_verify(
         &self,
@@ -765,7 +775,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "UI consistency of the current screen: rule checks (touch targets ≥ 48 dp, labels, overlapping controls, controls under the system bars, duplicate labels) and, with `baseline`, a structural comparison with the stored baseline that reports elements added, missing, moved, resized or with changed text. `approve` accepts the deviations as the new baseline. Flows run these checks too (configured by the flow's `visual:` section)."
+        description = "UI consistency of the current screen: rules, structural and pixel baselines, other configurations; approve baselines."
     )]
     async fn mdh_visual(
         &self,
@@ -801,7 +811,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Performance against baselines and budgets, over repeated runs (median, noise and run count reported; a change must exceed the noise to count). `startup`: cold (and hot) start time of the app. `flow`: frames (janky share, p90, p99), memory and CPU while a saved flow runs; budgets come from the flow's `perf:` section. The first measurement records the baseline; later ones fail on a regression, and a Perfetto trace then says what the main thread did (what's slow, by name). `approve` accepts new measurements as baselines. Analyzing traces needs Perfetto's trace processor: if a verdict says it's missing, ask the user, and only if they agree call `setup` with `consent: true` (a 14 MB download); `explain` then summarizes a kept trace. Takes 10–60 s."
+        description = "Performance against baselines: cold start, or a flow's frames, memory and CPU; a Perfetto trace explains regressions. `setup` downloads the trace processor: only after the user agreed."
     )]
     async fn mdh_perf(
         &self,
@@ -861,7 +871,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Flows are replayable tests made from what you did in this session: save the recorded steps (with checks to run at the end), list saved flows, or show one's YAML (in .mdh/flows; edit the file to change it). Replay them with mdh_verify."
+        description = "Save the session's steps as a replayable flow (with checks at the end), list flows, show one."
     )]
     async fn mdh_flow(
         &self,
@@ -894,7 +904,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "App lifecycle and state: launch, stop, install, open a deep link, clear its data, grant or revoke a permission."
+        description = "Launch, stop or install an app, open a deep link, clear its data, grant or revoke a permission."
     )]
     async fn mdh_app(
         &self,
@@ -942,7 +952,7 @@ impl MdhServer {
     }
 }
 
-#[tool_handler]
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for MdhServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())

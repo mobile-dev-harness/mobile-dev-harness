@@ -207,7 +207,12 @@ enum Command {
         grant: bool,
     },
     /// Serve the tools over MCP on stdin/stdout (for agents)
-    Mcp,
+    Mcp {
+        /// core: driving, building, verifying, flows, impact; all: also mdh_visual, mdh_perf and
+        /// mdh_compat (for clients without a shell; others use `mdh visual|perf|compat`)
+        #[arg(long, value_enum, default_value_t = McpTools::Core)]
+        tools: McpTools,
+    },
     /// Inspect or reset the session (refs, history, recorded steps)
     Session {
         #[command(subcommand)]
@@ -386,6 +391,12 @@ enum StateCommand {
     },
     /// Clear the app's data (a first launch again)
     ClearData { package: Option<String> },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum McpTools {
+    Core,
+    All,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -606,7 +617,15 @@ async fn main() -> ExitCode {
                 .load(&name)
                 .map(|f| Done::new(f.to_yaml().trim_end()))
         ),
-        Command::Mcp => match mdh_mcp::serve_stdio(cli.device).await {
+        Command::Mcp { tools } => match mdh_mcp::serve_stdio(
+            cli.device,
+            match tools {
+                McpTools::Core => mdh_mcp::Tools::Core,
+                McpTools::All => mdh_mcp::Tools::All,
+            },
+        )
+        .await
+        {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("error: MCP server stopped: {e}");
@@ -685,7 +704,7 @@ async fn run(
         | Command::Compat {
             command: CompatCommand::Risks { .. },
         }
-        | Command::Mcp => {
+        | Command::Mcp { .. } => {
             unreachable!("handled before connecting")
         }
         Command::Observe { diff } => report_crash!(session.observe(diff, timings).await),

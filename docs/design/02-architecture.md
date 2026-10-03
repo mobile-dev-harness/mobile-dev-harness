@@ -649,10 +649,12 @@ position, size, spacing, color and font size reported with a side-by-side diff.
   schemas are generated from Rust types with `schemars`, so docs and implementation can't drift.
 - **One session per connection**, in memory; the device is connected on first use (`mdh_status` can switch
   devices or reset). Same session engine as the CLI, so behavior is identical.
-- **Tools (M1):** `mdh_status`, `mdh_observe` (optional diff and screenshot), `mdh_act` (a list of actions, stopping
-  at the first failure; each reports what changed), `mdh_wait`, `mdh_logs`, `mdh_app` (launch, stop, install).
-  Later milestones add `mdh_run`, `mdh_navigate`, `mdh_state`, `mdh_verify`, `mdh_flow` and the perf, compat and
-  visual tools. Targets are strings in the same grammar as the CLI, so agents learn one syntax.
+- **Tools.** The default set (`--tools core`): `mdh_status`, `mdh_observe` (optional diff and screenshot), `mdh_act`
+  (a list of actions, stopping at the first failure; each reports what changed), `mdh_wait`, `mdh_logs`, `mdh_app`,
+  `mdh_run`, `mdh_verify`, `mdh_flow`, `mdh_impact`. `--tools all` adds the check kinds `mdh_visual`, `mdh_perf`,
+  `mdh_compat`; agents with a shell use their CLI commands instead, which cost no context until used (the plugin's
+  `visual`, `perf` and `compat` skills describe them). Targets are strings in the same grammar as the CLI, so agents
+  learn one syntax.
 - **Results are the compact text the CLI prints**; screenshots are image content (JPEG, long edge 1024).
   `structuredContent` is not sent for now: clients commonly forward it to the model next to the text, which would
   double the tokens of every observation; machine-readable output is available through the CLI's `--json`.
@@ -660,7 +662,11 @@ position, size, spacing, color and font size reported with a side-by-side diff.
   stable code. A crash of the app sets `isError` while still returning the observation (the CLI's exit code 5).
 - **Every input schema must have an object at its root** (the MCP spec; rmcp panics at startup otherwise), so
   parameters are structs — a tagged enum at the root would generate `oneOf`. A test asserts this for all tools.
-- **Measured:** tool definitions ~1,400 tokens; server instructions 645 characters.
+- **Every definition is paid on every request.** Descriptions are one sentence (guidance lives in skills, loaded
+  when needed), and the generated schemas are compacted when the server starts (`schema.rs`): integer formats and
+  bounds, `null` alongside optional types and `$defs` references go. The benchmark showed what this costs: the
+  previous 13 tools added ~7k tokens to every request, more than a setup with only adb. Now the core tools are
+  6.4k characters (a test keeps them under 7k) and the instructions 0.6k.
 
 ## 15. Claude Code plugin
 

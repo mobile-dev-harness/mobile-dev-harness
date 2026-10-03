@@ -269,6 +269,10 @@ since the agent last looked; CLI invocations share a session through `.mdh/sessi
 
 Few, coarse tools: every tool definition costs agent context, so actions are distinguished by parameters rather
 than split into many small tools.
+The default set (`mdh mcp`, `--tools core`) is what an agent uses every turn: driving the app, building, verifying,
+flows, impact; their definitions take about 6.4k characters (a test keeps them under 7k). The check kinds
+(`mdh_visual`, `mdh_perf`, `mdh_compat`) come with `--tools all`; agents with a shell use the CLI instead, guided
+by skills loaded only when needed.
 
 | Tool | Purpose | CLI equivalent | Since |
 |---|---|---|---|
@@ -283,9 +287,9 @@ than split into many small tools.
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches and what to verify | impact | M4 |
 | `mdh_verify` | Run checks or replay flows (named, or those the uncommitted change needs), return a verdict | verify / flow run | M4 ✅ |
 | `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
-| `mdh_visual` | Rule checks, structural and pixel baselines, other configurations of the current screen; approve candidates | visual | M5 ✅ |
-| `mdh_perf` | Measure startup or a flow against baselines and budgets, explain regressions with a Perfetto trace; approve; set up the trace processor (with the user's consent) | perf | M6 ✅ |
-| `mdh_compat` | Compatibility risks of the change, the plan to verify them, and the run: a verdict per risk | compat | M7 |
+| `mdh_visual` | Rule checks, structural and pixel baselines, other configurations of the current screen; approve candidates | visual | M5 ✅ (`--tools all`) |
+| `mdh_perf` | Measure startup or a flow against baselines and budgets, explain regressions with a Perfetto trace; approve; set up the trace processor (with the user's consent) | perf | M6 ✅ (`--tools all`) |
+| `mdh_compat` | Compatibility risks of the change, the plan to verify them, and the run: a verdict per risk | compat | M7 ✅ (`--tools all`) |
 
 Screenshots are returned as MCP image content; long builds report via progress notifications.
 

@@ -8,7 +8,7 @@ use mdh_control::Control;
 use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
 use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, Platform, Result};
 use mdh_driver::Driver;
-use mdh_mcp::MdhServer;
+use mdh_mcp::{MdhServer, Tools};
 use rmcp::model::{CallToolRequestParams, ContentBlock};
 use rmcp::{ClientHandler, ServiceExt};
 
@@ -84,7 +84,12 @@ struct TestClient;
 impl ClientHandler for TestClient {}
 
 async fn connect() -> rmcp::service::RunningService<rmcp::RoleClient, TestClient> {
-    let server = MdhServer::with_control(Control::new(Arc::new(StaticDriver), device()));
+    connect_with(Tools::All).await
+}
+
+async fn connect_with(tools: Tools) -> rmcp::service::RunningService<rmcp::RoleClient, TestClient> {
+    let server =
+        MdhServer::with_control(Control::new(Arc::new(StaticDriver), device())).with_tools(tools);
     let (server_io, client_io) = tokio::io::duplex(1 << 16);
     tokio::spawn(async move {
         let service = server.serve(server_io).await.expect("server starts");
@@ -131,6 +136,33 @@ async fn lists_the_tools_with_object_schemas() {
             Some("object"),
             "{} needs an object schema",
             tool.name
+        );
+    }
+}
+
+/// Every definition is sent with every request: the core tools stay small.
+#[tokio::test]
+async fn core_tools_leave_out_the_check_kinds_and_stay_small() {
+    let client = connect_with(Tools::Core).await;
+    let tools = client.list_all_tools().await.unwrap();
+    let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
+    assert_eq!(names.len(), 10, "{names:?}");
+    assert!(
+        !names
+            .iter()
+            .any(|n| ["mdh_visual", "mdh_perf", "mdh_compat"].contains(n))
+    );
+    let size: usize = tools
+        .iter()
+        .map(|t| serde_json::to_string(t).unwrap().len())
+        .sum();
+    assert!(size < 7_000, "core tool definitions take {size} characters");
+    for t in &tools {
+        let schema = serde_json::to_string(&t.input_schema).unwrap();
+        assert!(
+            !schema.contains("$defs") && !schema.contains("\"null\""),
+            "{}: {schema}",
+            t.name
         );
     }
 }
