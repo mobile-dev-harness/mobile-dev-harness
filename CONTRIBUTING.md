@@ -24,3 +24,8 @@ and at least one AVD. Run `cargo run -- doctor` to check your setup.
   `--json` shape change is a breaking change.
 - Crate layout and dependency direction are described in [docs/DESIGN.md](docs/DESIGN.md).
 - Coding agents should also read [AGENTS.md](AGENTS.md).
+
+## Reporting
+
+Bugs and feature requests: [issues](https://github.com/mobile-dev-harness/mobile-dev-harness/issues/new/choose).
+Security vulnerabilities: privately, see [SECURITY.md](SECURITY.md).

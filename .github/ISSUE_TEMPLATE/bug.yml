@@ -1,0 +1,45 @@
+name: Bug report
+description: mdh did something wrong, or said something wrong about your app
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command or MCP tool call, what it printed (with `--json` if you can), and what you expected.
+      placeholder: |
+        $ mdh tap "Sign in"
+        error[ELEMENT_NOT_FOUND]: …
+        Expected: the button is on screen and gets tapped.
+    validations:
+      required: true
+  - type: textarea
+    id: screen
+    attributes:
+      label: The screen
+      description: For wrong or missing elements, the output of `mdh observe` and a screenshot (`mdh screenshot -o screen.jpg`) help most.
+  - type: input
+    id: version
+    attributes:
+      label: mdh version
+      placeholder: mdh --version
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Emulator or phone, model, Android version (API level).
+      placeholder: Pixel 9 emulator, API 36
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      placeholder: macOS 26 (arm64)
+  - type: input
+    id: agent
+    attributes:
+      label: Agent, if one was involved
+      placeholder: Claude Code 2.1 over MCP

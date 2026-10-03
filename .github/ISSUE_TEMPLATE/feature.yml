@@ -1,0 +1,16 @@
+name: Feature request
+description: Something an agent (or you) needs to verify mobile apps better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to verify, and where mdh fell short (a false pass, a false fail, too many tokens, a missing check, …).
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: A command, a check, an output change. Design discussion is welcome before a PR.
