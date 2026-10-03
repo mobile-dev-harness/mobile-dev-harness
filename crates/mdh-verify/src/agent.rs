@@ -30,9 +30,12 @@ compiles.
 6. When impact lists `performance` items (startup, list binding), `mdh perf startup` or
    `mdh perf flow NAME` compares with this device's baseline in `.mdh/baselines/perf/` and says
    what got slow. Ask the user before `mdh perf setup --yes` downloads the trace processor.
+7. When impact lists `compatibility` items, `mdh compat run` verifies each risk on the fewest
+   configurations that show it (a tablet or landscape on the same emulator first); unverified
+   risks say what's missing. Ask the user before `--yes` lets it start emulators.
 
 Over MCP the same steps are `mdh_impact`, `mdh_run`, `mdh_observe`, `mdh_act`, `mdh_verify`,
-`mdh_flow` and `mdh_perf`.
+`mdh_flow`, `mdh_perf` and `mdh_compat`.
 "#;
 
 /// Sets a project up: `.mdh/.gitignore` (keeps flows, ignores session, runs and cache),

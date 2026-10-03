@@ -98,6 +98,7 @@ fn device() -> Device {
         is_emulator: true,
         avd: None,
         api: None,
+        manufacturer: None,
     }
 }
 

@@ -224,6 +224,12 @@ enum Command {
         #[command(subcommand)]
         command: PerfCommand,
     },
+    /// Compatibility: what the change puts at risk on other OS versions, device types, vendors and
+    /// screen sizes, and a verdict per risk from the fewest devices and configurations that show it
+    Compat {
+        #[command(subcommand)]
+        command: CompatCommand,
+    },
     /// Save the session's recorded steps as a flow, list flows, replay them
     Flow {
         #[command(subcommand)]
@@ -317,6 +323,47 @@ enum PerfCommand {
         /// The user agreed to the download
         #[arg(long)]
         yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum CompatCommand {
+    /// The change's compatibility risks, with evidence and where each would show (no device)
+    Risks {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Revision to compare the working tree with
+        #[arg(long, default_value = "HEAD")]
+        base: String,
+    },
+    /// The cells that would verify the risks on what is connected, and what they cost
+    Plan {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long, default_value = "HEAD")]
+        base: String,
+        /// New emulators a run may start
+        #[arg(long, default_value_t = 2)]
+        max_emulators: usize,
+    },
+    /// Verify the risks: build once, run each cell's flows, a verdict per risk (exit 1 if one
+    /// fails)
+    Run {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long, default_value = "HEAD")]
+        base: String,
+        /// The user agreed to start the emulators the plan needs
+        #[arg(long)]
+        yes: bool,
+        /// Leave out cells that need an emulator started
+        #[arg(long, conflicts_with = "yes")]
+        no_start: bool,
+        #[arg(long, default_value_t = 2)]
+        max_emulators: usize,
+        /// Seconds each step waits for its target
+        #[arg(long, default_value_t = 10)]
+        step_timeout: u64,
     },
 }
 
@@ -497,10 +544,14 @@ async fn main() -> ExitCode {
                 mdh_impact::analyze(&mdh_impact::Options { project, base }).and_then(|mut r| {
                     r.verify.flows =
                         mdh_verify::flows_for(&r, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
+                    r.verify.compatibility = mdh_compat::summaries(&r);
                     Ok(r)
                 })
             )
         }
+        Command::Compat {
+            command: CompatCommand::Risks { project, base },
+        } => report!(mdh_compat::analyze(&project, &base)),
         Command::Visual {
             command: VisualCommand::Approve { scope },
         } => report!(mdh_visual::approve(scope.as_deref()).map(Done::new)),
@@ -629,6 +680,9 @@ async fn run(
         | Command::Init { .. }
         | Command::Hook { .. }
         | Command::Impact { .. }
+        | Command::Compat {
+            command: CompatCommand::Risks { .. },
+        }
         | Command::Mcp => {
             unreachable!("handled before connecting")
         }
@@ -818,6 +872,65 @@ async fn run(
                 finish(json, started, std::mem::take(timings), data, error)
             }
             VisualCommand::Approve { .. } => unreachable!("handled before connecting"),
+        },
+        Command::Compat { command } => match command {
+            CompatCommand::Plan {
+                project,
+                base,
+                max_emulators,
+            } => {
+                let options = mdh_compat::CompatOptions {
+                    project,
+                    base,
+                    plan: mdh_compat::PlanOptions {
+                        max_starts: max_emulators,
+                    },
+                    ..mdh_compat::CompatOptions::default()
+                };
+                report!(mdh_compat::plan_for(session, &options).await)
+            }
+            CompatCommand::Run {
+                project,
+                base,
+                yes,
+                no_start,
+                max_emulators,
+                step_timeout,
+            } => {
+                let options = mdh_compat::CompatOptions {
+                    project,
+                    base,
+                    consent: yes,
+                    no_start,
+                    plan: mdh_compat::PlanOptions {
+                        max_starts: max_emulators,
+                    },
+                    step_timeout: Duration::from_secs(step_timeout),
+                    ..mdh_compat::CompatOptions::default()
+                };
+                let mut result = mdh_compat::run(session, &options, timings).await;
+                if let Err(Error::NeedsConsent { action, .. }) = &result
+                    && std::io::stdin().is_terminal()
+                    && std::io::stderr().is_terminal()
+                {
+                    eprint!("{}? [y/N] ", capitalized(action));
+                    let mut line = String::new();
+                    if std::io::stdin().read_line(&mut line).is_ok()
+                        && matches!(line.trim().to_lowercase().as_str(), "y" | "yes")
+                    {
+                        let options = mdh_compat::CompatOptions {
+                            consent: true,
+                            ..options.clone()
+                        };
+                        result = mdh_compat::run(session, &options, timings).await;
+                    }
+                }
+                let (data, error) = split(result);
+                let error =
+                    error.or_else(|| data.as_ref().and_then(mdh_compat::CompatReport::failure));
+                finish(json, started, std::mem::take(timings), data, error)
+            }
+            CompatCommand::Risks { .. } => unreachable!("handled before connecting"),
         },
         Command::Perf { command } => {
             let verdict = match command {

@@ -1,0 +1,307 @@
+# Android behavior changes a code change can run into, by API level.
+#
+# api:     the first Android version (API level) with the change.
+# by:      `device` when it applies on devices running `api` or newer whatever the app targets;
+#          `target` when it applies once the app's targetSdk is `api` or newer.
+# uses:    names that make a changed declaration run into it: calls, types, constants, overridden
+#          methods (`Type.name` matches a call on a known receiver, `name` any use).
+# manifest: manifest elements (`<service>`) or attributes (`foregroundServiceType`) that do.
+# both_sides: verify below `api` too, where the old behavior (or a fallback) runs.
+# Every entry links the Android documentation it comes from.
+
+behavior:
+  - id: notification-permission
+    api: 33
+    by: target
+    uses: [notify, NotificationManagerCompat, NotificationCompat.Builder, Notification.Builder, createNotificationChannel, POST_NOTIFICATIONS]
+    summary: posting notifications needs the POST_NOTIFICATIONS runtime permission
+    verify: on API 33+, deny the permission prompt; the app keeps working and doesn't re-ask on every launch
+    source: https://developer.android.com/develop/ui/views/notifications/notification-permission
+
+  - id: media-permissions
+    api: 33
+    by: target
+    uses: [READ_EXTERNAL_STORAGE, READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO, MediaStore]
+    summary: READ_EXTERNAL_STORAGE is replaced by READ_MEDIA_IMAGES, READ_MEDIA_VIDEO and READ_MEDIA_AUDIO
+    verify: on API 33+, the media the app reads is still listed after granting the new permissions
+    source: https://developer.android.com/about/versions/13/behavior-changes-13#granular-media-permissions
+
+  - id: partial-media-access
+    api: 34
+    by: device
+    uses: [READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_VISUAL_USER_SELECTED, MediaStore, PickVisualMedia]
+    summary: users can grant access to selected photos and videos only
+    verify: on API 34+, choose "Select photos"; the app works with the partial selection
+    source: https://developer.android.com/about/versions/14/changes/partial-photo-video-access
+
+  - id: pending-intent-mutability
+    api: 31
+    by: target
+    uses: [PendingIntent.getActivity, PendingIntent.getActivities, PendingIntent.getBroadcast, PendingIntent.getService, PendingIntent.getForegroundService, PendingIntentCompat]
+    summary: every PendingIntent must say FLAG_IMMUTABLE or FLAG_MUTABLE, or creating it throws
+    verify: on API 31+, the code path creating the PendingIntent runs without IllegalArgumentException
+    source: https://developer.android.com/about/versions/12/behavior-changes-12#pending-intent-mutability
+
+  - id: exported-components
+    api: 31
+    by: target
+    manifest: ["<activity>", "<activity-alias>", "<service>", "<receiver>"]
+    summary: components with an intent filter must declare android:exported, or the APK doesn't install
+    verify: the app installs on API 31+; components meant for other apps are still reachable
+    source: https://developer.android.com/about/versions/12/behavior-changes-12#exported
+
+  - id: exact-alarms
+    api: 31
+    by: target
+    uses: [setExact, setExactAndAllowWhileIdle, setAlarmClock, canScheduleExactAlarms, SCHEDULE_EXACT_ALARM, USE_EXACT_ALARM]
+    summary: exact alarms need SCHEDULE_EXACT_ALARM, which on API 34+ is denied by default for new installs
+    verify: on API 34+, with the permission not granted, the app falls back (canScheduleExactAlarms) instead of crashing
+    source: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
+
+  - id: foreground-service-from-background
+    api: 31
+    by: target
+    uses: [startForegroundService, ContextCompat.startForegroundService, startForeground]
+    summary: foreground services can't be started while the app is in the background
+    verify: on API 31+, start the work with the app in the background; no ForegroundServiceStartNotAllowedException
+    source: https://developer.android.com/about/versions/12/behavior-changes-12#foreground-service-launch-restrictions
+
+  - id: foreground-service-types
+    api: 34
+    by: target
+    uses: [startForeground, ServiceCompat.startForeground, FOREGROUND_SERVICE]
+    manifest: ["<service>", foregroundServiceType]
+    summary: every foreground service needs a foregroundServiceType and its matching permission
+    verify: on API 34+, the service starts (no MissingForegroundServiceTypeException or SecurityException)
+    source: https://developer.android.com/about/versions/14/changes/fgs-types-required
+
+  - id: runtime-receivers-export
+    api: 34
+    by: target
+    uses: [registerReceiver, ContextCompat.registerReceiver]
+    summary: receivers registered at run time must pass RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED
+    verify: on API 34+, the code path registering the receiver runs without SecurityException
+    source: https://developer.android.com/about/versions/14/behavior-changes-14#runtime-receivers-exported
+
+  - id: bluetooth-permissions
+    api: 31
+    by: target
+    uses: [BluetoothAdapter, BluetoothManager, BluetoothLeScanner, startScan, startDiscovery, BLUETOOTH_SCAN, BLUETOOTH_CONNECT]
+    summary: Bluetooth needs the BLUETOOTH_SCAN and BLUETOOTH_CONNECT runtime permissions
+    verify: on API 31+, the Bluetooth feature asks for and works with the new permissions
+    source: https://developer.android.com/about/versions/12/features/bluetooth-permissions
+
+  - id: package-visibility
+    api: 30
+    by: target
+    uses: [queryIntentActivities, queryIntentServices, resolveActivity, getPackageInfo, getInstalledPackages, getInstalledApplications, getLaunchIntentForPackage]
+    summary: other apps are invisible unless declared in <queries>
+    verify: on API 30+, the lookup still finds the apps it needs
+    source: https://developer.android.com/training/package-visibility
+
+  - id: scoped-storage
+    api: 30
+    by: target
+    uses: [getExternalStorageDirectory, getExternalStoragePublicDirectory, WRITE_EXTERNAL_STORAGE, requestLegacyExternalStorage]
+    summary: direct access to shared storage paths is replaced by scoped storage
+    verify: on API 30+, files are written and read where the app expects
+    source: https://developer.android.com/about/versions/11/privacy/storage
+
+  - id: background-location
+    api: 30
+    by: target
+    uses: [ACCESS_BACKGROUND_LOCATION]
+    summary: background location must be requested separately, after foreground location
+    verify: on API 30+, the request sequence leads to background access in settings
+    source: https://developer.android.com/about/versions/11/privacy/location
+
+  - id: approximate-location
+    api: 31
+    by: target
+    uses: [ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FusedLocationProviderClient, LocationManager, requestLocationUpdates]
+    summary: users can grant only approximate location
+    verify: on API 31+, choose "Approximate"; the feature still works or explains what it needs
+    source: https://developer.android.com/about/versions/12/approximate-location
+
+  - id: one-time-permissions
+    api: 30
+    by: device
+    uses: [requestPermissions, RequestPermission, RequestMultiplePermissions, CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION]
+    summary: permissions can be granted "only this time" and are revoked when the app is left
+    verify: on API 30+, grant once, leave the app, come back; it asks again instead of failing
+    source: https://developer.android.com/about/versions/11/privacy/permissions#one-time
+
+  - id: background-start-service
+    api: 26
+    by: target
+    uses: [startService]
+    summary: background apps can't start services; startService throws IllegalStateException
+    verify: on API 26+, the service starts when the app isn't in the foreground (or uses WorkManager)
+    source: https://developer.android.com/about/versions/oreo/background
+
+  - id: notification-channels
+    api: 26
+    by: target
+    uses: [NotificationCompat.Builder, Notification.Builder, notify]
+    summary: notifications without a channel aren't shown
+    verify: on API 26+, the notification appears
+    source: https://developer.android.com/develop/ui/views/notifications/channels
+
+  - id: per-app-language
+    api: 33
+    by: device
+    uses: [setApplicationLocales, AppCompatDelegate.setApplicationLocales, LocaleManager, getApplicationLocales]
+    both_sides: true
+    summary: per-app languages are a system setting on API 33+ and emulated by AppCompat below
+    verify: switch the app language on API 32 and on API 33+; the change survives a restart on both
+    source: https://developer.android.com/guide/topics/resources/app-languages
+
+  - id: edge-to-edge
+    api: 35
+    by: target
+    uses: [setContentView, enableEdgeToEdge, WindowInsets, WindowInsetsCompat, setOnApplyWindowInsetsListener, fitsSystemWindows, setDecorFitsSystemWindows, statusBarColor, navigationBarColor, setStatusBarColor, setNavigationBarColor, systemBars]
+    summary: apps are drawn edge to edge; content not padded for the system bars slides under them
+    verify: on API 35+, nothing tappable or readable sits under the status or navigation bar
+    source: https://developer.android.com/about/versions/15/behavior-changes-15#edge-to-edge
+
+  - id: edge-to-edge-no-opt-out
+    api: 36
+    by: target
+    uses: [windowOptOutEdgeToEdgeEnforcement]
+    summary: the opt-out from edge-to-edge is ignored
+    verify: on API 36, nothing sits under the system bars
+    source: https://developer.android.com/about/versions/16/behavior-changes-16#edge-to-edge
+
+  - id: predictive-back
+    api: 36
+    by: target
+    uses: [onBackPressed, KEYCODE_BACK, OnBackPressedCallback, OnBackPressedDispatcher, BackHandler, onBackInvoked, enableOnBackInvokedCallback]
+    summary: predictive back is on by default; onBackPressed isn't called and KEYCODE_BACK isn't dispatched
+    verify: on API 36, back from each changed screen does what it did (closes dialogs, saves drafts, navigates)
+    source: https://developer.android.com/about/versions/16/behavior-changes-16#predictive-back
+
+# What makes a change risky on other kinds of devices.
+#
+# uses / qualifiers / manifest / features: triggers, as above; qualifiers match resource directory
+# qualifiers (`sw600dp` matches `layout-sw600dp-land`).
+# cells: where to verify it: `compact` (a small phone), `tablet`, `foldable` (a foldable's inner
+#        screen), `landscape`; `state: true` adds the state check across rotation.
+# needs: instead of cells, what a device would need (cars, TVs): reported, not run.
+form_factors:
+  - id: large-screen-resources
+    qualifiers: [sw600dp, sw720dp, w600dp, w840dp, large, xlarge]
+    cells: [tablet]
+    summary: resources for large screens
+    verify: the large-screen layout on a tablet-sized screen
+    source: https://developer.android.com/guide/topics/large-screens/support-different-screen-sizes
+
+  - id: orientation-resources
+    qualifiers: [land, port]
+    cells: [landscape]
+    summary: resources for one orientation
+    verify: the screen in landscape and portrait
+    source: https://developer.android.com/guide/topics/resources/providing-resources#OrientationQualifier
+
+  - id: window-size-classes
+    uses: [WindowSizeClass, calculateWindowSizeClass, currentWindowAdaptiveInfo, windowSizeClass, WindowWidthSizeClass, WindowHeightSizeClass, WindowMetricsCalculator, computeCurrentWindowMetrics, BoxWithConstraints]
+    cells: [compact, tablet]
+    summary: layout chosen by window size
+    verify: the screen at compact and expanded widths
+    source: https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
+
+  - id: folding-features
+    uses: [WindowInfoTracker, FoldingFeature, windowLayoutInfo, DisplayFeature, WindowLayoutInfo]
+    cells: [foldable, tablet]
+    summary: layout reacting to a fold or hinge
+    verify: the screen on a foldable's inner screen (the hinge itself needs a foldable device)
+    source: https://developer.android.com/develop/ui/views/layout/foldables/make-your-app-fold-aware
+
+  - id: configuration-changes
+    uses: [onSaveInstanceState, onRestoreInstanceState, SavedStateHandle, rememberSaveable, onConfigurationChanged, isChangingConfigurations]
+    manifest: [configChanges]
+    cells: [landscape]
+    state: true
+    summary: state across configuration changes (rotation, folding, resizing)
+    verify: what the user entered or chose survives a rotation
+    source: https://developer.android.com/guide/topics/resources/runtime-changes
+
+  - id: orientation-and-resizability
+    manifest: [screenOrientation, resizeableActivity, minAspectRatio, maxAspectRatio]
+    uses: [setRequestedOrientation, requestedOrientation]
+    cells: [tablet, landscape]
+    state: true
+    summary: fixed orientation or resizability, which large screens ignore from API 36 (targetSdk 36)
+    verify: the screen on a tablet-sized screen in landscape
+    source: https://developer.android.com/about/versions/16/behavior-changes-16#adaptive-layouts
+
+  - id: multi-window
+    uses: [isInMultiWindowMode, onMultiWindowModeChanged, isInPictureInPictureMode, enterPictureInPictureMode, onPictureInPictureModeChanged]
+    manifest: [supportsPictureInPicture]
+    cells: [compact]
+    state: true
+    summary: split screen and picture-in-picture
+    verify: the screen at a small window size; split screen itself isn't automated yet
+    source: https://developer.android.com/develop/ui/views/layout/support-multi-window-mode
+
+  - id: automotive
+    features: [android.hardware.type.automotive]
+    qualifiers: [car]
+    uses: [CarAppService, CarContext, Session.onCreateScreen]
+    needs: an Android Automotive OS emulator or head unit
+    summary: Android Automotive
+    verify: driving restrictions and car UI on an AAOS emulator
+    source: https://developer.android.com/training/cars
+
+  - id: television
+    features: [android.software.leanback]
+    qualifiers: [television]
+    uses: [BrowseSupportFragment, Leanback]
+    needs: an Android TV emulator or device
+    summary: Android TV
+    verify: D-pad navigation and focus on a TV emulator
+    source: https://developer.android.com/training/tv
+
+# Vendor ROMs: what they change and what runs into it. Only physical devices (or cloud farms) of
+# the vendor show it.
+vendors:
+  - id: background-restrictions
+    vendors: [xiaomi, huawei, honor, oppo, vivo, oneplus, realme, samsung, meizu]
+    uses: [WorkManager, enqueueUniqueWork, enqueueUniquePeriodicWork, PeriodicWorkRequest, OneTimeWorkRequest, JobScheduler, AlarmManager, startForegroundService, startForeground]
+    summary: battery managers kill background work and delay alarms unless the app is allowed to run in the background
+    verify: on the vendor's device, the background work runs with the screen off and after the app is swiped away
+    source: https://dontkillmyapp.com/
+
+  - id: autostart
+    vendors: [xiaomi, huawei, honor, oppo, vivo, oneplus, realme, meizu]
+    uses: [BOOT_COMPLETED, RECEIVE_BOOT_COMPLETED, ACTION_BOOT_COMPLETED, LOCKED_BOOT_COMPLETED]
+    summary: apps don't start at boot until the user enables autostart
+    verify: on the vendor's device, reboot; the boot-time work runs (or the app guides the user to the setting)
+    source: https://dontkillmyapp.com/
+
+  - id: google-play-services
+    vendors: [huawei, honor]
+    uses: [GoogleApiAvailability, FirebaseMessaging, FirebaseMessagingService, onMessageReceived, FusedLocationProviderClient, LocationServices, GoogleSignIn, GoogleSignInClient, IntegrityManager, SafetyNet, MapView, GoogleMap]
+    summary: devices without Google Play services (Huawei and Honor since 2019, most China-market ROMs) don't deliver FCM, fused location, Google sign-in or maps
+    verify: on a device or emulator image without Google Play services, the feature degrades instead of failing
+    source: https://developers.google.com/android/guides/setup#ensure_devices_have_the_google_play_services_apk
+
+  - id: background-popups
+    vendors: [xiaomi, vivo, oppo]
+    uses: [SYSTEM_ALERT_WINDOW, canDrawOverlays, ACTION_MANAGE_OVERLAY_PERMISSION, TYPE_APPLICATION_OVERLAY, setFullScreenIntent, USE_FULL_SCREEN_INTENT]
+    summary: an extra vendor permission ("display pop-up windows while running in the background") blocks overlays and activity starts from the background
+    verify: on the vendor's device, trigger the overlay or full-screen notification with the app in the background
+    source: https://dontkillmyapp.com/xiaomi
+
+  - id: settings-intents
+    vendors: [xiaomi, huawei, honor, oppo, vivo, samsung]
+    uses: [ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS, ACTION_APPLICATION_DETAILS_SETTINGS, ACTION_APP_NOTIFICATION_SETTINGS, ACTION_MANAGE_OVERLAY_PERMISSION, ACTION_REQUEST_SCHEDULE_EXACT_ALARM, ACTION_MANAGE_UNKNOWN_APP_SOURCES]
+    summary: system settings screens are missing, moved or redirected on some ROMs
+    verify: on the vendor's device, the settings link opens the right screen; check resolveActivity before starting it
+    source: https://developer.android.com/reference/android/provider/Settings
+
+  - id: webview
+    vendors: [huawei, honor, xiaomi, samsung]
+    uses: [WebView, loadUrl, WebViewClient, WebChromeClient, evaluateJavascript, addJavascriptInterface]
+    summary: the WebView implementation and its version differ by vendor and update channel
+    verify: on the vendor's device, the page renders and its JavaScript bridge works
+    source: https://developer.android.com/develop/ui/views/layout/webapps/webview

@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use mdh_core::ui::RawTree;
 use mdh_core::{
     Appearance, AppearanceKind, Avd, Device, Error, FrameStats, Input, LaunchInfo, LogEntry,
-    MemoryStats, Platform, Result,
+    MemoryStats, PhysicalDisplay, Platform, Result,
 };
 
 /// A platform backend: low-level device capabilities only. Element targeting, waiting and
@@ -141,6 +141,11 @@ pub trait Driver: Send + Sync {
         Err(unsupported("reading appearance settings"))
     }
 
+    /// The panel's own size and density, whatever is overridden.
+    async fn physical_display(&self, _device: &Device) -> Result<PhysicalDisplay> {
+        Err(unsupported("reading the display size"))
+    }
+
     /// Changes an appearance setting; running apps get a configuration change.
     async fn set_appearance(&self, _device: &Device, _value: &Appearance) -> Result<()> {
         Err(unsupported("changing appearance settings"))
@@ -201,7 +206,6 @@ pub trait Driver: Send + Sync {
     }
 }
 
-/// Picks the device to work on: the requested one, or the only online device.
 fn unsupported(operation: &str) -> Error {
     Error::Unsupported {
         operation: operation.to_owned(),

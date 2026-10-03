@@ -477,6 +477,7 @@ mod tests {
             is_emulator: avd.is_some(),
             avd: avd.map(str::to_owned),
             api: Some(36),
+            manufacturer: None,
         }
     }
 

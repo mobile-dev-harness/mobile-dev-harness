@@ -197,3 +197,35 @@ fn string_literals_name_assets() {
     let r = refs("fun f() { load(\"file:///android_asset/page.html\") }");
     assert!(r.contains(&"f: Literal page.html".to_string()), "{r:#?}");
 }
+
+#[test]
+fn api_levels_from_version_checks_and_annotations() {
+    let f = extract(
+        "a/B.kt",
+        r#"
+class B {
+    fun notify() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { ask() }
+    }
+    fun legacy() { if (SDK_INT < 26) old() else if (SDK_INT > 30) new() }
+    @RequiresApi(Build.VERSION_CODES.S)
+    fun exact() {}
+    @RequiresApi(api = 34)
+    fun types() {}
+    fun plain() { if (count >= 33) {} }
+}
+"#,
+    );
+    let levels = |name: &str| {
+        f.decls
+            .iter()
+            .find(|d| d.name == name)
+            .map(|d| d.api_levels.clone())
+            .unwrap()
+    };
+    assert_eq!(levels("notify"), [33]);
+    assert_eq!(levels("legacy"), [26, 31]);
+    assert_eq!(levels("exact"), [31]);
+    assert_eq!(levels("types"), [34]);
+    assert!(levels("plain").is_empty());
+}

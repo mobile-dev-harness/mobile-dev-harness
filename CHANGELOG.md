@@ -3,6 +3,20 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
+## Unreleased
+
+### Compatibility (in progress)
+- `mdh compat risks`: compatibility risks of the change, from impact analysis and a knowledge base with sources —
+  API-level branches (both sides), behavior changes of the app's target SDK and of newer Android versions,
+  `minSdk` and `targetSdk` changes, large-screen and orientation resources, window size classes, folding, saved
+  state, cars and TVs, vendor ROMs (background restrictions, autostart, Google Play services, overlays), screen
+  sizes. No device.
+- `mdh compat plan` / `mdh compat run`: the fewest cells covering the risks — display overrides for a small phone,
+  a foldable and a tablet, landscape, on the current emulator; other devices and AVDs by API level and vendor —
+  then a verdict per risk: new rule violations compared with the device as it is, state lost across a rotation,
+  flows failing only there; unverified risks say what's missing. MCP: `mdh_compat`.
+- `mdh impact` lists the compatibility risks; manifest entries show their attributes before and after.
+
 ## 0.2.0
 
 Performance and UI consistency checks join functional checks in the verification engine.

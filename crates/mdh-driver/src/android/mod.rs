@@ -2,6 +2,7 @@
 
 mod adb;
 mod am;
+mod display;
 mod emulator;
 mod helper;
 mod install;
@@ -26,7 +27,7 @@ use async_trait::async_trait;
 use mdh_core::ui::{RawTree, TreeSource};
 use mdh_core::{
     Appearance, AppearanceKind, Avd, Device, Error, FrameStats, Input, LaunchInfo, LogEntry,
-    MemoryStats, Platform, Result,
+    MemoryStats, PhysicalDisplay, Platform, Result,
 };
 
 use crate::Driver;
@@ -154,9 +155,10 @@ impl Driver for AndroidDriver {
             .iter_mut()
             .filter(|d| d.state == mdh_core::DeviceState::Online)
         {
-            let (avd, api) = emulator::identity(&self.adb, &d.id).await;
-            d.avd = avd.filter(|_| d.is_emulator);
-            d.api = api;
+            let id = emulator::identity(&self.adb, &d.id).await;
+            d.avd = id.avd.filter(|_| d.is_emulator);
+            d.api = id.api;
+            d.manufacturer = id.manufacturer;
         }
         Ok(devices)
     }
@@ -547,6 +549,33 @@ impl Driver for AndroidDriver {
                     locales,
                 }
             }
+            AppearanceKind::Rotation => {
+                let out = shell(
+                    "settings get system accelerometer_rotation; settings get system user_rotation"
+                        .into(),
+                )
+                .await?;
+                let mut lines = out.lines().map(str::trim);
+                let auto = lines.next() != Some("0");
+                let user = lines.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                Appearance::Rotation((!auto).then_some(user))
+            }
+            AppearanceKind::Display => {
+                let out = shell("wm size; wm density".into()).await?;
+                let d = display::parse(&out);
+                Appearance::Display {
+                    size: d.override_size,
+                    density: d.override_density,
+                }
+            }
+        })
+    }
+
+    async fn physical_display(&self, device: &Device) -> Result<PhysicalDisplay> {
+        let out = self.adb.shell(&device.id, "wm size; wm density").await?;
+        display::parse(&out).physical.ok_or_else(|| Error::Parse {
+            tool: "wm size".into(),
+            detail: out.trim().to_owned(),
         })
     }
 
@@ -564,6 +593,16 @@ impl Driver for AndroidDriver {
                 "cmd locale set-app-locales {} --locales {}",
                 shell_quote(package),
                 shell_quote(locales)
+            ),
+            Appearance::Rotation(None) => "settings put system accelerometer_rotation 1".into(),
+            Appearance::Rotation(Some(n)) => format!(
+                "settings put system accelerometer_rotation 0; settings put system user_rotation {}",
+                n % 4
+            ),
+            Appearance::Display { size, density } => format!(
+                "wm size {}; wm density {}",
+                size.map_or("reset".into(), |(w, h)| format!("{w}x{h}")),
+                density.map_or("reset".into(), |d| d.to_string())
             ),
         };
         self.adb.shell(&device.id, &command).await.map(drop)

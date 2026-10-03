@@ -65,6 +65,7 @@ fn device() -> Device {
         is_emulator: true,
         avd: Some("Pixel 9".into()),
         api: Some(36),
+        manufacturer: None,
     }
 }
 

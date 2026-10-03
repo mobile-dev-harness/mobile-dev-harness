@@ -74,6 +74,24 @@ impl Human for mdh_impact::ImpactReport {
     }
 }
 
+impl Human for mdh_compat::RiskReport {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}
+
+impl Human for mdh_compat::PlanReport {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}
+
+impl Human for mdh_compat::CompatReport {
+    fn human(&self) -> String {
+        self.text.clone()
+    }
+}
+
 impl Human for mdh_verify::Verdict {
     fn human(&self) -> String {
         self.text.clone()

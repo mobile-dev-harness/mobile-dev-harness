@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 base64 = "0.22"
+mdh-compat.workspace = true
 mdh-control.workspace = true
 mdh-core.workspace = true
 mdh-impact.workspace = true

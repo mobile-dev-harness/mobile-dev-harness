@@ -310,6 +310,29 @@ pub struct ImpactParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CompatParams {
+    pub command: CompatCommand,
+    /// A directory inside the project; default: the server's working directory.
+    pub project: Option<String>,
+    /// Revision to compare the working tree with; default `HEAD` (the uncommitted change).
+    pub base: Option<String>,
+    /// `run`: the user agreed to start the emulators the plan needs. Never set it without asking.
+    pub consent: Option<bool>,
+    /// `run`: leave out the cells that need an emulator started.
+    pub no_start: Option<bool>,
+    /// `plan`, `run`: new emulators a run may start, default 2.
+    pub max_emulators: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CompatCommand {
+    Risks,
+    Plan,
+    Run,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct WaitParams {
     pub target: String,
     /// Wait for the target to disappear instead.
@@ -622,11 +645,53 @@ impl MdhServer {
             let mut report = mdh_impact::analyze(&options)?;
             report.verify.flows =
                 mdh_verify::flows_for(&report, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
+            report.verify.compatibility = mdh_compat::summaries(&report);
             Ok(report)
         })
         .await
         .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(text_result(result.map(|r| mdh_impact::render(&r))))
+    }
+
+    #[tool(
+        description = "Compatibility of the uncommitted change, risk by risk. `risks` (no device): what the change puts at risk on other Android versions (API-level branches, behavior changes of the targetSdk), device types (tablets, foldables, rotation and saved state, cars, TVs), vendor ROMs (background restrictions, autostart, missing Google Play services) and screen sizes, each with evidence and where it would show. `plan`: the fewest devices and configurations covering them (display overrides on the current emulator first, other devices next). `run`: builds once, runs the flows passing each risk's screens on its cells and compares with the device as it is: a verdict per risk — failed, passed, or unverified with what's missing. Starting an emulator needs the user's consent (`consent: true` after asking). Takes a minute or more."
+    )]
+    async fn mdh_compat(
+        &self,
+        Parameters(p): Parameters<CompatParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let options = mdh_compat::CompatOptions {
+            project: p.project.map_or_else(|| ".".into(), Into::into),
+            base: p.base.unwrap_or_else(|| "HEAD".into()),
+            consent: p.consent.unwrap_or(false),
+            no_start: p.no_start.unwrap_or(false),
+            plan: mdh_compat::PlanOptions {
+                max_starts: p.max_emulators.unwrap_or(2),
+            },
+            ..mdh_compat::CompatOptions::default()
+        };
+        let result = match p.command {
+            CompatCommand::Risks => {
+                let (project, base) = (options.project.clone(), options.base.clone());
+                tokio::task::spawn_blocking(move || {
+                    mdh_compat::analyze(&project, &base).map(|r| r.text)
+                })
+                .await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+            }
+            CompatCommand::Plan => {
+                self.with_session(async |s| Ok(mdh_compat::plan_for(s, &options).await?.text))
+                    .await
+            }
+            CompatCommand::Run => {
+                self.with_session(async |s| {
+                    let mut timings = Timings::default();
+                    Ok(mdh_compat::run(s, &options, &mut timings).await?.text)
+                })
+                .await
+            }
+        };
+        Ok(text_result(result))
     }
 
     #[tool(

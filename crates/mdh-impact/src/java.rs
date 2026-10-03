@@ -103,6 +103,18 @@ impl<'s> Extractor<'s> {
         self.out.refs.len() - 1
     }
 
+    /// Records the API level an `SDK_INT` comparison branches on, for the enclosing declaration.
+    fn api_check(&mut self, node: Node) {
+        let expr = self.text(node);
+        if expr.contains("SDK_INT")
+            && let Some(level) = syntax::api_level(expr)
+            && let Some(i) = self.from()
+            && !self.out.decls[i].api_levels.contains(&level)
+        {
+            self.out.decls[i].api_levels.push(level);
+        }
+    }
+
     fn visit(&mut self, node: Node) {
         match node.kind() {
             "package_declaration" => {
@@ -205,6 +217,9 @@ impl<'s> Extractor<'s> {
             }
             "line_comment" | "block_comment" | "this" | "super" => {}
             _ => {
+                if node.kind() == "binary_expression" {
+                    self.api_check(node);
+                }
                 for c in named_children(node) {
                     self.visit(c);
                 }
@@ -232,6 +247,11 @@ impl<'s> Extractor<'s> {
                     .to_owned();
                 if name == "Override" {
                     decl.overrides = true;
+                }
+                if crate::kotlin::API_ANNOTATIONS.contains(&name.as_str())
+                    && let Some(level) = syntax::api_level(self.text(c))
+                {
+                    decl.api_levels.push(level);
                 }
                 decl.annotations.push(name);
             }

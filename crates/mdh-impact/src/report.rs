@@ -29,6 +29,57 @@ pub struct ImpactReport {
     /// What this analysis can't see, and files it couldn't fully parse.
     pub limits: Vec<String>,
     pub stats: Stats,
+    /// What compatibility analysis reads (ADR-0011); `mdh-compat` turns it into risks.
+    #[serde(skip)]
+    pub compat: CompatFacts,
+}
+
+/// Facts about the change and the project for compatibility analysis, from syntax alone.
+#[derive(Debug, Clone, Default)]
+pub struct CompatFacts {
+    /// Every changed (or added) declaration outside tests.
+    pub decls: Vec<DeclFacts>,
+    pub sdk: SdkLevels,
+    /// Resource directories with qualifiers in the project: `layout-sw600dp`, `values-night`.
+    pub qualified_dirs: Vec<String>,
+    /// `<uses-feature>` names in the manifests: `android.hardware.type.automotive`.
+    pub features: Vec<String>,
+    /// Every name the app's (non-test) sources use, to tell whether a behavior change brought by
+    /// a new `targetSdk` touches the app at all.
+    pub uses: std::collections::BTreeSet<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeclFacts {
+    pub decl: String,
+    pub file: String,
+    pub line: usize,
+    pub kind: DeclKind,
+    pub change: ChangeKind,
+    /// Resource type, or the manifest element.
+    pub rtype: Option<String>,
+    /// Resource qualifiers of the file (`sw600dp-land`); empty for the default configuration.
+    pub qualifiers: String,
+    /// Manifest entries: the attributes before and after (`screenOrientation=portrait …`).
+    pub before: Option<String>,
+    pub after: Option<String>,
+    pub annotations: Vec<String>,
+    /// Its own and its enclosing type's supertypes.
+    pub supertypes: Vec<String>,
+    /// Names it uses (calls, types, constants), and `Receiver.name` where the receiver is known.
+    pub uses: Vec<String>,
+    /// API levels it branches on or requires.
+    pub api_levels: Vec<u32>,
+    /// Screens it reaches.
+    pub screens: Vec<String>,
+}
+
+/// The app module's SDK levels in the base and now; `None` when not found or not a literal.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SdkLevels {
+    pub min: (Option<u32>, Option<u32>),
+    pub target: (Option<u32>, Option<u32>),
+    pub compile: (Option<u32>, Option<u32>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

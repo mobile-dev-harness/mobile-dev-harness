@@ -32,6 +32,9 @@ pub struct Device {
     /// OS API level, e.g. 36.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api: Option<u32>,
+    /// `ro.product.manufacturer`, lowercase: `google`, `xiaomi`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manufacturer: Option<String>,
 }
 
 impl Device {
@@ -78,6 +81,13 @@ pub enum Appearance {
     NightMode(String),
     /// The app's own languages, comma-separated tags; empty follows the system.
     AppLocales { package: String, locales: String },
+    /// A fixed rotation (0–3, quarter turns), or `None` for auto-rotate.
+    Rotation(Option<u32>),
+    /// Display size (px) and density overrides; `None` is the panel's own.
+    Display {
+        size: Option<(u32, u32)>,
+        density: Option<u32>,
+    },
 }
 
 /// Which appearance setting to read.
@@ -86,4 +96,14 @@ pub enum AppearanceKind {
     FontScale,
     NightMode,
     AppLocales { package: String },
+    Rotation,
+    Display,
+}
+
+/// The panel itself, whatever is overridden: size in px and density in dpi.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct PhysicalDisplay {
+    pub width: u32,
+    pub height: u32,
+    pub density: u32,
 }

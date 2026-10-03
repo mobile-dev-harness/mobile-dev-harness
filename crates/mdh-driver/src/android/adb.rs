@@ -98,6 +98,7 @@ fn parse_devices(out: &str) -> Vec<Device> {
                 is_emulator: id.starts_with("emulator-"),
                 avd: None,
                 api: None,
+                manufacturer: None,
             })
         })
         .collect()

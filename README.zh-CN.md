@@ -23,6 +23,10 @@ agent 改完一个 Web 应用，可以打开浏览器、点一点、看看控制
 - **性能看数字，不靠感觉**：`mdh perf` 多次运行，测量冷启动、卡顿帧、内存和 CPU，与同一台设备上的基线对比，
   只有变化超出噪声时才判为失败，并用 Perfetto trace 指出到底慢在哪里（`performCreate:MainActivity 509 ms →
   slowInit 451 ms`）。
+- **从改动出发做兼容性，而不是把设备农场跑一遍**：`mdh compat` 读取改动涉及的内容（`SDK_INT` 分支、提高了的
+  `targetSdk`、`layout-sw600dp`、保存的状态、后台任务），指出在其他 Android 版本、设备类型、厂商 ROM 和屏幕尺寸上的
+  风险，并在最少的配置上逐条验证（优先在同一台模拟器上模拟平板或横屏）。这里验证不了的（比如小米 ROM），会明确说明，
+  而不是当作通过。
 - **agent 能直接动手修的构建错误**：`mdh run` 用 Gradle 构建，只安装有变化的部分，并重启 App；编译、资源、Manifest
   和依赖方面的错误都会以 `文件:行号` 加出错源码行的形式返回。
 - **一套引擎，两种接口**：给人、脚本和只有命令行的 agent 用的 CLI，以及给 Claude Code 等 agent 用的
@@ -145,12 +149,12 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（均已完成）；兼容性矩阵在不同设备和配置上重复这些检查（计划中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
+  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（均已完成）；兼容性在改动涉及风险的设备和配置上重复这些检查（进行中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
 </picture>
 
 - **两个入口，一套引擎**：agent 通过 MCP 接入，人、CI 和脚本使用 CLI，拿到的是同样的紧凑文本。
 - **先控制，再校验**：控制（已完成）负责驱动 App。在它之上，校验引擎运行 flow 和可插拔的检查类型（功能、UI 一致性、性能），
-  汇总成一份验证结论；兼容性矩阵则在不同设备和配置上重复这一切（见[状态与路线图](#状态与路线图)）。
+  汇总成一份验证结论；兼容性则在改动涉及风险的设备和配置上重复这一切（见[状态与路线图](#状态与路线图)）。
 - **设备上的常驻 helper**：`dev.mdh.helper` 保持一个无障碍连接，所以读取屏幕和注入输入都只要几毫秒；logcat 则把
   崩溃和错误信息反馈到每一次的结果里。
 
@@ -178,7 +182,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 | 执行一个动作并等到界面稳定 | 0.8 到 1.4 秒，主要是 App 自身的动画 |
 
 公平地说：最大的提速来自架构设计，比如用常驻的 helper 代替 `uiautomator`，用 diff 代替整屏内容。Rust 的作用是保证
-harness 本身不再额外增加开销，并且在性能和视觉检查、以及计划中的兼容性矩阵让每次调用承担更多工作时，依然保持这一点。
+harness 本身不再额外增加开销，并且在性能、视觉和兼容性检查让每次调用承担更多工作时，依然保持这一点。
 
 ## 环境要求
 
@@ -277,6 +281,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow（指定名字，或由未提交的改动自动挑选）；返回结论、实际观测值，证据保存在磁盘上 |
 | `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |
 | `mdh_visual` | 检查当前界面的 UI 一致性：规则检查和结构基线；接受基线变化 |
+| `mdh_compat` | 改动的兼容性风险（系统版本、设备类型、厂商、屏幕尺寸）、验证计划，以及每条风险的结论 |
 | `mdh_perf` | 测量冷启动，或某个 flow 运行时的帧、内存和 CPU，与基线和预算对比，出现退化时用 Perfetto trace 解释原因；接受新数值作为基线；在你同意后安装 trace processor |
 | `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
 | `mdh_status` | 设备和会话状态；切换设备、重置会话、关闭或恢复系统动画 |
@@ -311,6 +316,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
 | `mdh flow run --changed [--base REF]` | 重放经过未提交改动所影响界面的 flow |
 | `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET] [--configs font_scale,dark,rtl]` · `mdh visual approve [NAME]` | 检查当前界面的 UI 一致性：触控区域、标签、重叠、被系统栏遮住的控件、重复标签、文字对比度；带 `--baseline` 时，对比基线报告哪些元素移动、改变大小、新增、消失或文字变了，以及哪些区域的像素变了；带 `--configs` 时，检查大字号、深色模式、从右到左布局下哪里坏了；`approve` 接受这些变化作为新基线 |
+| `mdh compat risks [--base REF]` · `mdh compat plan` · `mdh compat run [--yes\|--no-start] [--max-emulators 2]` | 改动的兼容性：带证据的风险列表（不需要设备）、能验证它们的最少设备和配置，以及实际运行，每条风险一个结论（失败、通过，或无法验证并说明缺什么；有失败时退出码 1）；需要启动模拟器时会先询问 |
 | `mdh perf startup [APP] [--hot] [--runs 5] [--trace]` · `mdh perf flow NAME [--runs N] [--trace]` · `mdh perf approve [SCOPE]` | 多次运行，测量冷启动（以及热启动），或某个 flow 运行时的帧、内存和 CPU，与这台设备上的基线以及 flow 中 `perf:` 的预算对比（退化时退出码 1）；出现退化时附上一份 Perfetto trace 的摘要，指出慢在哪里；`approve` 接受新数值作为基线 |
 | `mdh perf setup [--yes]` · `mdh perf explain TRACE --app PKG [--startup]` | 安装 Perfetto 的 trace processor（下载 14 MB 之前会先询问）；为保存下来的 trace 生成摘要 |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
@@ -390,7 +396,7 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、带证据的验证结论、flow 的保存与重放（JUnit）、UI 一致性检查和性能检查、CLI 以及 MCP server。后续计划：用矩阵在不同设备上重复执行这些检查、支持更多平台，以及 benchmark：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、带证据的验证结论、flow 的保存与重放（JUnit）、UI 一致性检查和性能检查、兼容性风险分析及屏幕尺寸/旋转/状态检查、CLI 以及 MCP server。后续计划：在更多设备上做兼容性验证、支持更多平台，以及 benchmark：
 
 | | 层次 | 计划内容 |
 |---|---|---|
@@ -401,7 +407,7 @@ mdh launch dev.mdh.sample
 | ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
 | ✅ | ↳ **UI 一致性检查** | 无障碍和布局规则（含对比度）、结构基线和像素基线、大字号/深色模式/从右到左布局下的检查（已完成）；与设计稿对比放在以后 |
 | ✅ | ↳ **性能检查** | 多次运行，对照每台设备各自的基线和预算检查启动耗时、卡顿、内存和 CPU，用 Perfetto trace 解释退化原因（已完成） |
-| ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |
+| 🚧 | **兼容性** | 从改动推出风险（系统版本、设备类型、厂商、屏幕尺寸），在最少的配置上验证；屏幕尺寸、旋转和状态保留已经可以在一台模拟器上完成，其他 API 级别和厂商真机还在进行中 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |
 | ⏳ | **Benchmark** | 用预先埋好 bug 的任务，衡量误判通过率、误判失败率、任务成功率和 token：只有 agent、agent + adb 和截图、agent + mobile-mcp、agent + mdh 四种配置对比 |
 

@@ -66,6 +66,21 @@ struct Xml<'s> {
     src: &'s str,
 }
 
+/// A manifest element's attributes other than its name, `screenOrientation=portrait
+/// configChanges=orientation|screenSize`: what changed shows before and after, and compatibility
+/// rules read them.
+fn attributes(e: &Element) -> Option<String> {
+    let parts: Vec<String> = e
+        .attrs
+        .iter()
+        .filter(|(k, _)| {
+            *k != "android:name" && !k.starts_with("xmlns") && !k.starts_with("tools:")
+        })
+        .map(|(k, v)| format!("{}={v}", k.trim_start_matches("android:")))
+        .collect();
+    (!parts.is_empty()).then(|| parts.join(" "))
+}
+
 struct Element<'t, 's> {
     node: Node<'t>,
     /// `STag` or `EmptyElemTag`.
@@ -346,6 +361,7 @@ impl<'s> Xml<'s> {
                     d.rtype = Some("application".into());
                     d.key = "<application>".into();
                     d.body = self.hash(e.tag);
+                    d.value = attributes(&e);
                     out.decls.push(d);
                     let from = Some(out.decls.len() - 1);
                     for (k, v) in &e.attrs {
@@ -373,6 +389,7 @@ impl<'s> Xml<'s> {
         d.rtype = Some(e.name.to_owned());
         d.key = format!("<{}> {name}", e.name);
         d.body = self.hash(e.node);
+        d.value = attributes(e);
         out.decls.push(d);
     }
 
@@ -385,6 +402,7 @@ impl<'s> Xml<'s> {
         d.rtype = Some(e.name.to_owned());
         d.key = format!("<{}> {simple}", e.name);
         d.body = self.hash(e.node);
+        d.value = attributes(e);
         out.decls.push(d);
         let from = Some(out.decls.len() - 1);
         let target = e.attr("android:targetActivity").unwrap_or(class);

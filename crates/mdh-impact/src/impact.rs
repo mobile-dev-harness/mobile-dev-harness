@@ -6,8 +6,8 @@ use crate::git::{FileChange, Status};
 use crate::index::{Confidence, DeclId, Project};
 use crate::model::{Decl, DeclKind, FileIndex, FileKind, Receiver, Ref, RefKind};
 use crate::report::{
-    Callers, Change, ChangeKind, EdgeChange, ImpactReport, OtherFile, ScreenImpact, ScreenKind,
-    Site, Verify,
+    Callers, Change, ChangeKind, DeclFacts, EdgeChange, ImpactReport, OtherFile, ScreenImpact,
+    ScreenKind, Site, Verify,
 };
 use crate::source::classify;
 
@@ -160,7 +160,9 @@ pub fn analyze(
     report.screens = walk.screens(&impact);
     report.callers = callers(project, &seeds);
     report.dangling = dangling(project, &removed);
-    report.verify = verify(project, &walk, &impact, &seeds, &report);
+    let (verify, decls) = verify(project, &walk, &impact, &seeds, &report);
+    report.verify = verify;
+    report.compat.decls = decls;
     report.limits.push(
         "syntax only: reflection, dependency injection, generated code and routes built at run time \
          are not followed"
@@ -794,9 +796,10 @@ fn verify(
     impact: &Impact,
     seeds: &[(DeclId, ChangeKind)],
     report: &ImpactReport,
-) -> Verify {
+) -> (Verify, Vec<DeclFacts>) {
     let p = project;
     let mut v = Verify::default();
+    let mut facts = Vec::new();
     for s in &report.screens {
         let name = match &s.host {
             Some(h) => format!("{} (in {h})", s.screen),
@@ -838,6 +841,47 @@ fn verify(
             .collect();
         let owner = p.enclosing_type(id);
         let owner_supers = owner.map(|o| p.supertypes(o)).unwrap_or_default();
+
+        let display = d.display();
+        let change = report
+            .changes
+            .iter()
+            .find(|c| c.file == p.files[id.0].path && c.decl == display);
+        let mut uses: Vec<String> = Vec::new();
+        for r in &refs {
+            if matches!(r.kind, RefKind::Literal | RefKind::Resource(_)) {
+                continue;
+            }
+            if let Receiver::Type(t) = &r.receiver {
+                uses.push(format!("{t}.{}", r.name));
+            }
+            uses.push(r.name.clone());
+        }
+        uses.sort();
+        uses.dedup();
+        let mut supertypes = p.supertypes(id);
+        supertypes.extend(owner_supers.iter().cloned());
+        facts.push(DeclFacts {
+            decl: display,
+            file: p.files[id.0].path.clone(),
+            line: d.line,
+            kind: d.kind,
+            change: kind,
+            rtype: d.rtype.clone(),
+            qualifiers: class.qualifiers.clone(),
+            before: change.and_then(|c| c.before.clone()),
+            after: change
+                .and_then(|c| c.after.clone())
+                .or_else(|| d.value.clone()),
+            annotations: d.annotations.clone(),
+            supertypes,
+            uses,
+            api_levels: d.api_levels.clone(),
+            screens: reached
+                .get(&id)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_default(),
+        });
 
         let visual = match d.kind {
             DeclKind::Resource => {
@@ -921,7 +965,7 @@ fn verify(
         }
     }
     v.tests = impact.tests.iter().cloned().collect();
-    v
+    (v, facts)
 }
 
 fn kind_word(kind: ChangeKind) -> &'static str {

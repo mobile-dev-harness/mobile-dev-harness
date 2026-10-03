@@ -109,14 +109,15 @@ pub(crate) async fn start(adb: &Adb, emulator: &Path, avd: &str, headless: bool)
             if before.contains(&d.id) || !d.is_emulator || d.state != DeviceState::Online {
                 continue;
             }
-            let (name, api) = identity(adb, &d.id).await;
-            if name.as_deref().is_some_and(|n| n != avd) {
+            let id = identity(adb, &d.id).await;
+            if id.avd.as_deref().is_some_and(|n| n != avd) {
                 continue;
             }
             if booted(adb, &d.id).await {
                 return Ok(Device {
                     avd: Some(avd.to_owned()),
-                    api,
+                    api: id.api,
+                    manufacturer: id.manufacturer,
                     ..d
                 });
             }
@@ -139,21 +140,40 @@ async fn booted(adb: &Adb, serial: &str) -> bool {
         .is_ok_and(|out| out.trim() == "1")
 }
 
-/// The AVD an emulator runs and the API level of any device. Older emulator images lack
-/// `ro.boot.qemu.avd_name`; the emulator console still knows it.
-pub(crate) async fn identity(adb: &Adb, serial: &str) -> (Option<String>, Option<u32>) {
+/// What identifies a device beyond its serial.
+#[derive(Debug, Default)]
+pub(crate) struct Identity {
+    /// The AVD an emulator runs.
+    pub avd: Option<String>,
+    pub api: Option<u32>,
+    /// Lowercase.
+    pub manufacturer: Option<String>,
+}
+
+/// The AVD an emulator runs, and the API level and manufacturer of any device. Older emulator
+/// images lack `ro.boot.qemu.avd_name`; the emulator console still knows it.
+pub(crate) async fn identity(adb: &Adb, serial: &str) -> Identity {
     let out = adb
         .shell(
             serial,
-            "getprop ro.boot.qemu.avd_name; getprop ro.build.version.sdk",
+            "getprop ro.boot.qemu.avd_name; getprop ro.build.version.sdk; getprop ro.product.manufacturer",
         )
         .await
         .unwrap_or_default();
     let mut lines = out.lines().map(str::trim);
     let name = lines.next().filter(|n| !n.is_empty()).map(str::to_owned);
     let api = lines.next().and_then(|a| a.parse().ok());
+    let manufacturer = lines
+        .next()
+        .filter(|m| !m.is_empty())
+        .map(str::to_lowercase);
+    let known = |avd| Identity {
+        avd,
+        api,
+        manufacturer: manufacturer.clone(),
+    };
     if name.is_some() || !serial.starts_with("emulator-") {
-        return (name, api);
+        return known(name);
     }
     let console = adb
         .on(serial, &["emu", "avd", "name"])
@@ -164,7 +184,7 @@ pub(crate) async fn identity(adb: &Adb, serial: &str) -> (Option<String>, Option
         .map(str::trim)
         .find(|l| !l.is_empty() && *l != "OK")
         .map(str::to_owned);
-    (name, api)
+    known(name)
 }
 
 #[cfg(test)]

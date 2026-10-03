@@ -188,6 +188,60 @@ pub fn collapsed(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Android API levels by `Build.VERSION_CODES` name.
+const VERSION_CODES: &[(&str, u32)] = &[
+    ("KITKAT", 19),
+    ("KITKAT_WATCH", 20),
+    ("LOLLIPOP", 21),
+    ("LOLLIPOP_MR1", 22),
+    ("M", 23),
+    ("N", 24),
+    ("N_MR1", 25),
+    ("O", 26),
+    ("O_MR1", 27),
+    ("P", 28),
+    ("Q", 29),
+    ("R", 30),
+    ("S", 31),
+    ("S_V2", 32),
+    ("TIRAMISU", 33),
+    ("UPSIDE_DOWN_CAKE", 34),
+    ("VANILLA_ICE_CREAM", 35),
+    ("BAKLAVA", 36),
+];
+
+/// The API level an `SDK_INT` comparison or a `@RequiresApi` argument names, as the first level on
+/// the newer side: `SDK_INT >= TIRAMISU` and `SDK_INT < 33` → 33, `SDK_INT > 32` → 33.
+pub fn api_level(expr: &str) -> Option<u32> {
+    let level = |token: &str| -> Option<u32> {
+        let name = token.rsplit('.').next().unwrap_or(token);
+        name.parse::<u32>()
+            .ok()
+            .filter(|n| (1..=99).contains(n))
+            .or_else(|| {
+                VERSION_CODES
+                    .iter()
+                    .find(|(c, _)| *c == name)
+                    .map(|(_, n)| *n)
+            })
+    };
+    let tokens: Vec<&str> = expr
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '.'))
+        .filter(|t| !t.is_empty() && !t.ends_with("SDK_INT"))
+        .collect();
+    let n = tokens.iter().rev().find_map(|t| level(t))?;
+    // `>` and `<=` put the boundary one level up.
+    let strict_upper = expr.contains('>') && !expr.contains(">=") || expr.contains("<=");
+    let sdk_left = expr.find("SDK_INT").unwrap_or(0) < expr.find(['<', '>']).unwrap_or(usize::MAX);
+    // With SDK_INT on the right the operator reads the other way round.
+    let bump = if sdk_left {
+        strict_upper
+    } else {
+        expr.contains('<') && !expr.contains("<=") || expr.contains(">=")
+    };
+    Some(if bump { n + 1 } else { n })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +255,24 @@ mod tests {
             "OPEN(id, x)\nopen class A\nsuspend () -> T\nreopen(1)\nx.open(2)\nVALUE (3)"
         );
         assert_eq!(masked.len(), src.len());
+    }
+
+    #[test]
+    fn api_levels_name_the_newer_side() {
+        assert_eq!(
+            api_level("Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU"),
+            Some(33)
+        );
+        assert_eq!(api_level("SDK_INT < 33"), Some(33));
+        assert_eq!(api_level("SDK_INT > 32"), Some(33));
+        assert_eq!(api_level("SDK_INT <= 32"), Some(33));
+        assert_eq!(api_level("33 <= SDK_INT"), Some(33));
+        assert_eq!(api_level("32 < SDK_INT"), Some(33));
+        assert_eq!(api_level("SDK_INT == Build.VERSION_CODES.S_V2"), Some(32));
+        assert_eq!(
+            api_level("@RequiresApi(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)"),
+            Some(34)
+        );
+        assert_eq!(api_level("SDK_INT >= minimum"), None);
     }
 }

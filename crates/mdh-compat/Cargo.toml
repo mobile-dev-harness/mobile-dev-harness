@@ -1,6 +1,6 @@
 [package]
 name = "mdh-compat"
-description = "Compatibility checks for mobile-dev-harness: device and configuration matrices"
+description = "Compatibility checks for mobile-dev-harness: risks from the change, verified on the devices and configurations they need"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,20 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+mdh-control.workspace = true
+mdh-driver.workspace = true
+mdh-core.workspace = true
+mdh-impact.workspace = true
+mdh-observe.workspace = true
+mdh-verify.workspace = true
+mdh-visual.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_norway = "0.9.42"
+tokio.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
 
 [lints]
 workspace = true

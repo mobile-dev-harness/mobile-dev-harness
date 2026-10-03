@@ -27,8 +27,9 @@ Claude Code plugin (`integrations/claude-code`, hooks via `mdh hook`), `mdh init
 section), and the emulator e2e job replaying the sample's flows. M5 done: `mdh-visual` rule checks with contrast, structural and pixel baselines,
 cross-config layout checks (`mdh visual`, `mdh_visual`, flows' `visual:` section). M6 done:
 `mdh-perf` (startup, frames, memory, CPU against per-device baselines and budgets; regressions
-explained by a Perfetto trace; `mdh perf`, `mdh_perf`, flows' `perf:` section). Next: M7
-(compatibility matrix).
+explained by a Perfetto trace; `mdh perf`, `mdh_perf`, flows' `perf:` section). M7 in progress:
+`mdh-compat` (ADR-0011: risks from the change with a knowledge base, the fewest cells, a verdict per
+risk; `mdh compat`, `mdh_compat`).
 State and config is a track that grows with each milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -197,6 +198,18 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   only with the user's consent (`NEEDS_CONSENT` otherwise); never download it in tests or CI.
 - Trace SQL is checked against a real trace from the emulator after every change; the summary
   logic (`trace::explain`) is unit-tested on slices.
+
+## Compatibility
+
+- Risk-driven (ADR-0011): never add a mode that runs every flow on every device by default.
+- The knowledge base (`crates/mdh-compat/kb/android.yaml`) is data: every entry needs a source link
+  and triggers (the test checks both). Prefer reporting a risk to missing one, but keep triggers
+  specific: a common name (`enqueue`, `File`) matches unrelated code.
+- An unverified risk is never a pass: cells that couldn't run, risks without a flow or deep link,
+  vendors without a device are reported unverified with what's missing.
+- Display, rotation and other device settings are restored on every path; check the emulator
+  after a run (`wm size`, `settings get system accelerometer_rotation`).
+- Starting emulators needs consent (`NEEDS_CONSENT` otherwise); at most `--max-emulators` new ones.
 
 ## Impact analysis
 

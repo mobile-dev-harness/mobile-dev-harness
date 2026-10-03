@@ -75,6 +75,7 @@ fn device() -> Device {
         is_emulator: true,
         avd: None,
         api: None,
+        manufacturer: None,
     }
 }
 
@@ -111,6 +112,7 @@ async fn lists_the_tools_with_object_schemas() {
         [
             "mdh_act",
             "mdh_app",
+            "mdh_compat",
             "mdh_flow",
             "mdh_impact",
             "mdh_logs",

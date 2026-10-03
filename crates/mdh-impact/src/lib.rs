@@ -13,6 +13,7 @@ mod kotlin;
 mod model;
 mod render;
 mod report;
+mod sdk;
 mod source;
 mod syntax;
 mod xml;
@@ -29,8 +30,8 @@ pub use index::Confidence;
 pub use model::DeclKind;
 pub use render::render;
 pub use report::{
-    Callers, Change, ChangeKind, EdgeChange, ImpactReport, OtherFile, ScreenImpact, ScreenKind,
-    Site, Stats, Verify,
+    Callers, Change, ChangeKind, CompatFacts, DeclFacts, EdgeChange, ImpactReport, OtherFile,
+    ScreenImpact, ScreenKind, SdkLevels, Site, Stats, Verify,
 };
 
 use crate::model::{Decl, FileIndex, FileKind};
@@ -76,6 +77,30 @@ pub fn analyze(options: &Options) -> Result<ImpactReport> {
         .collect();
     let old = repo.read_at(&options.base, &old_paths)?;
     let mut report = impact::analyze(&project, &changes, &old);
+    report.compat.sdk = sdk_levels(&root, &repo, &options.base, &files)?;
+    report.compat.qualified_dirs = qualified_dirs(&files);
+    for (fi, f) in project.files.iter().enumerate() {
+        if project.classes[fi].test {
+            continue;
+        }
+        report
+            .compat
+            .uses
+            .extend(f.refs.iter().map(|r| r.name.clone()));
+        report.compat.uses.extend(
+            f.decls
+                .iter()
+                .filter(|d| d.kind == DeclKind::Manifest)
+                .map(|d| d.name.clone()),
+        );
+    }
+    report.compat.features = project
+        .files
+        .iter()
+        .flat_map(|f| &f.decls)
+        .filter(|d| d.kind == DeclKind::Manifest && d.rtype.as_deref() == Some("uses-feature"))
+        .map(|d| d.name.clone())
+        .collect();
     report.base = options.base.clone();
     report.base_commit = commit;
     report.stats.files_indexed = project.files.len();
@@ -84,6 +109,46 @@ pub fn analyze(options: &Options) -> Result<ImpactReport> {
     report.stats.index_ms = index_ms;
     report.stats.analysis_ms = millis(analysis);
     Ok(report)
+}
+
+/// SDK levels of the app module in the base and now, from the build scripts and the catalog.
+fn sdk_levels(
+    root: &Path,
+    repo: &git::Repo,
+    base: &str,
+    files: &[String],
+) -> Result<report::SdkLevels> {
+    let paths: Vec<&str> = files
+        .iter()
+        .map(String::as_str)
+        .filter(|p| p.ends_with(".gradle.kts") || p.ends_with(".gradle") || *p == sdk::CATALOG)
+        .filter(|p| !p.starts_with("settings."))
+        .collect();
+    let now: std::collections::HashMap<String, Vec<u8>> = paths
+        .iter()
+        .filter_map(|p| {
+            std::fs::read(root.join(p))
+                .ok()
+                .map(|b| ((*p).to_owned(), b))
+        })
+        .collect();
+    let before = repo.read_at(base, &paths)?;
+    Ok(sdk::levels(&before, &now))
+}
+
+/// `layout-sw600dp`, `values-night`: qualified resource directories, each once.
+fn qualified_dirs(files: &[String]) -> Vec<String> {
+    let mut dirs: Vec<String> = files
+        .iter()
+        .filter_map(|f| {
+            let c = classify(f);
+            let dir = c.res_dir?;
+            (!c.qualifiers.is_empty() && !c.test).then(|| format!("{dir}-{}", c.qualifiers))
+        })
+        .collect();
+    dirs.sort();
+    dirs.dedup();
+    dirs
 }
 
 /// The Gradle root containing `dir` and the app files (sources, resources, manifests, build

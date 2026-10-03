@@ -605,6 +605,20 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 [[package]]
 name = "mdh-compat"
 version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "mdh-control",
+ "mdh-core",
+ "mdh-driver",
+ "mdh-impact",
+ "mdh-observe",
+ "mdh-verify",
+ "mdh-visual",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "tokio",
+]
 
 [[package]]
 name = "mdh-control"
@@ -661,6 +675,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
+ "mdh-compat",
  "mdh-control",
  "mdh-core",
  "mdh-driver",
@@ -785,6 +800,7 @@ name = "mobile-dev-harness"
 version = "0.2.0"
 dependencies = [
  "clap",
+ "mdh-compat",
  "mdh-control",
  "mdh-core",
  "mdh-driver",

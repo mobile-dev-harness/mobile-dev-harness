@@ -52,6 +52,11 @@ impl Driver for FakeDriver {
                 package: package.clone(),
                 locales: String::new(),
             },
+            AppearanceKind::Rotation => Appearance::Rotation(None),
+            AppearanceKind::Display => Appearance::Display {
+                size: None,
+                density: None,
+            },
         })
     }
     async fn set_appearance(&self, _: &Device, value: &Appearance) -> Result<()> {
@@ -103,6 +108,7 @@ fn device() -> Device {
         is_emulator: true,
         avd: None,
         api: None,
+        manufacturer: None,
     }
 }
 

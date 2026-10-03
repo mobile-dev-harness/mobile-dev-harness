@@ -36,6 +36,11 @@ work; the same steps exist as `mdh` CLI commands.
    of what got slow. If it says the trace processor is missing, ask the user before calling
    `command: setup` with `consent: true`. When a slower number is intended, `command: approve`.
 
+7. **Compatibility.** When impact lists `compatibility` items, call `mdh_compat` with
+   `command: run`. Each risk comes back failed (with the device or configuration and what broke),
+   passed, or unverified with what's missing. If it needs an emulator started, ask the user before
+   calling it again with `consent: true` (or pass `no_start: true`). Report unverified risks as such.
+
 Report the verdicts in your answer. If something can't be verified here (no device, needs real
 accounts or hardware), say exactly what wasn't verified instead of implying it works.
 

@@ -8,6 +8,9 @@ use crate::model::{Decl, DeclKind, FileIndex, Receiver, Ref, RefKind};
 use crate::source::{RESOURCE_TYPES, binding_layout, literal_file_name, snake_case};
 use crate::syntax::{self, child_of_kind, children, line, named_children, text};
 
+/// Annotations whose argument is the API level a declaration needs.
+pub(crate) const API_ANNOTATIONS: &[&str] = &["RequiresApi", "TargetApi", "ChecksSdkIntAtLeast"];
+
 /// Members of a type body; a type's own body hash leaves them out because they are diffed on their own.
 const MEMBERS: &[&str] = &[
     "function_declaration",
@@ -182,7 +185,23 @@ impl<'s> Extractor<'s> {
             }
             "label" | "this_expression" | "super_expression" | "line_comment" | "block_comment" => {
             }
+            "binary_expression" => {
+                self.api_check(node);
+                self.visit_children(node);
+            }
             _ => self.visit_children(node),
+        }
+    }
+
+    /// Records the API level an `SDK_INT` comparison branches on, for the enclosing declaration.
+    fn api_check(&mut self, node: Node) {
+        let expr = self.text(node);
+        if expr.contains("SDK_INT")
+            && let Some(level) = syntax::api_level(expr)
+            && let Some(i) = self.from()
+            && !self.out.decls[i].api_levels.contains(&level)
+        {
+            self.out.decls[i].api_levels.push(level);
         }
     }
 
@@ -224,7 +243,13 @@ impl<'s> Extractor<'s> {
                     if let Some(t) = first_descendant(c, "user_type") {
                         let ids = named_children(t);
                         if let Some(id) = ids.iter().rev().find(|i| i.kind() == "identifier") {
-                            decl.annotations.push(self.text(*id).to_owned());
+                            let name = self.text(*id);
+                            if API_ANNOTATIONS.contains(&name)
+                                && let Some(level) = syntax::api_level(self.text(c))
+                            {
+                                decl.api_levels.push(level);
+                            }
+                            decl.annotations.push(name.to_owned());
                         }
                     }
                 }

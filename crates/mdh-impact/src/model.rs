@@ -63,6 +63,9 @@ pub struct Decl {
     pub rtype: Option<String>,
     /// Short value of string resources, shown when it changes.
     pub value: Option<String>,
+    /// API levels the declaration branches on (`SDK_INT >= 33`) or requires (`@RequiresApi(33)`),
+    /// each as the first level on the newer side of the boundary.
+    pub api_levels: Vec<u32>,
 }
 
 impl Decl {
@@ -95,6 +98,7 @@ impl Decl {
             overrides: false,
             rtype: None,
             value: None,
+            api_levels: Vec::new(),
         }
     }
 

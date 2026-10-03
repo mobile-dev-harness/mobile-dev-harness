@@ -110,7 +110,7 @@ function diagram(t) {
   parts.push(card(t, 40, 300, 250, 170, t.done, "Control ✓", ["session · stable refs", "act → wait → diff", "logs · crashes · run"]));
   parts.push(arrow(t, 334, 385, 296, 385));
   parts.push(box(t, 340, 290, 790, 190, "none", { dashed: true, weight: 1.4 }));
-  parts.push(text(t, 360, 310, "compatibility matrix — the same flows and checks on every device & config", { size: 16, anchor: "start", color: t.muted }));
+  parts.push(text(t, 360, 310, "compatibility — the same flows and checks where the change is at risk", { size: 16, anchor: "start", color: t.muted }));
   parts.push(box(t, 360, 326, 750, 140, t.planned, { weight: 1.4 }));
   parts.push(text(t, 378, 346, "verification engine — flows · verdicts · evidence · baselines ✓", { size: 17, anchor: "start" }));
   const checks = [["Functional", ["assertions on", "screens & logs"]],
