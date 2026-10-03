@@ -1,0 +1,11 @@
+name: remember-me
+app: dev.mdh.sample
+setup:
+  reset: data
+  open: mdhsample://login
+screens:
+- LoginActivity
+steps:
+- tap: Remember me
+assert:
+- checked id=remember

@@ -1,0 +1,16 @@
+kind: verify
+truth: fail
+summary: done in the shared insets helper, which now also drops the top inset; every screen's top slides under the status bar
+change:
+- path: src/main/kotlin/dev/mdh/sample/Insets.kt
+  find: |2-
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+  replace: |2-
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, 0, bars.right, bars.bottom)
+prompt: |
+  A teammate changed how the login screen reacts to the on-screen keyboard: the form stays where it
+  is and the keyboard covers the empty space below it, instead of the layout being pushed up. The
+  change is uncommitted in this project. Verify on the emulator that it works and that it doesn't
+  break anything else in the app.

@@ -1,0 +1,10 @@
+name: main-top
+app: dev.mdh.sample
+visual:
+  rules: [obscured]
+screens:
+- MainActivity
+steps: []
+assert:
+- visible id=open_login
+- enabled id=open_login

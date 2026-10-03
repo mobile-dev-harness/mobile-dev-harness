@@ -1,0 +1,21 @@
+kind: fix
+summary: a click listener on the checkbox unchecks it again
+bug:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: '        email.doAfterTextChanged { update() }'
+  replace: |2-
+            email.doAfterTextChanged { update() }
+            findViewById<CheckBox>(R.id.remember).setOnClickListener { (it as CheckBox).isChecked = false }
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: 'import android.widget.Button'
+  replace: |-
+    import android.widget.Button
+    import android.widget.CheckBox
+fix:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: |2-
+            findViewById<CheckBox>(R.id.remember).setOnClickListener { (it as CheckBox).isChecked = false }
+  replace: ''
+prompt: |
+  Users report that they can't tick "Remember me" on the login screen. Fix it, and make sure the
+  fix works on the emulator.

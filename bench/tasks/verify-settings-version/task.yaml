@@ -1,0 +1,14 @@
+kind: verify
+truth: pass
+summary: an "App version" row in Settings; correct
+change:
+- path: src/main/kotlin/dev/mdh/sample/SettingsActivity.kt
+  find: '        row(rows, "Developer options", initial = false) { "Unavailable" }.setEnabled(false, reason = "Unavailable")'
+  replace: |2-
+            row(rows, "Developer options", initial = false) { "Unavailable" }.setEnabled(false, reason = "Unavailable")
+            val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
+            row(rows, "App version", initial = false) { version }.setEnabled(false, reason = version)
+prompt: |
+  A teammate added an "App version" row at the bottom of the Settings screen, showing the app's
+  version name. The change is uncommitted in this project. Verify on the emulator that it works
+  and that the Settings screen still works otherwise.

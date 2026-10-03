@@ -1,0 +1,24 @@
+kind: verify
+truth: pass
+summary: the keyboard no longer pushes the login form up; done in LoginActivity only; correct
+change:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: '        padForSystemBars()'
+  replace: |2-
+            // The form is at the top: let the keyboard cover the empty space below it.
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { view, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                WindowInsetsCompat.CONSUMED
+            }
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: 'import androidx.core.widget.doAfterTextChanged'
+  replace: |-
+    import androidx.core.view.ViewCompat
+    import androidx.core.view.WindowInsetsCompat
+    import androidx.core.widget.doAfterTextChanged
+prompt: |
+  A teammate changed how the login screen reacts to the on-screen keyboard: the form stays where it
+  is and the keyboard covers the empty space below it, instead of the layout being pushed up. The
+  change is uncommitted in this project. Verify on the emulator that it works and that it doesn't
+  break anything else in the app.

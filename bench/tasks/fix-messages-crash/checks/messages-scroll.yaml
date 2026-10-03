@@ -1,0 +1,13 @@
+name: messages-scroll
+app: dev.mdh.sample
+setup:
+  open: mdhsample://messages
+screens:
+- MessagesActivity
+steps:
+- scroll:
+    direction: down
+    until: Message 95
+- tap: Message 95
+assert:
+- text id=selected == "Opened Message 95"

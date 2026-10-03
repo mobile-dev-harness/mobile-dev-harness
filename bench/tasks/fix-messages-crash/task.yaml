@@ -1,0 +1,19 @@
+kind: fix
+summary: titles come from a list of 60 for 100 rows; scrolling past row 60 crashes
+bug:
+- path: src/main/kotlin/dev/mdh/sample/MessagesActivity.kt
+  find: '        holder.title.text = "Message $n"'
+  replace: '        holder.title.text = subjects[position]'
+- path: src/main/kotlin/dev/mdh/sample/MessagesActivity.kt
+  find: '    override fun getItemCount() = 100'
+  replace: |2-
+        private val subjects = List(60) { "Message ${it + 1}" }
+
+        override fun getItemCount() = 100
+fix:
+- path: src/main/kotlin/dev/mdh/sample/MessagesActivity.kt
+  find: '    private val subjects = List(60) { "Message ${it + 1}" }'
+  replace: '    private val subjects = List(100) { "Message ${it + 1}" }'
+prompt: |
+  The app crashes when users scroll far down the Messages list. Fix it; the list should still show
+  100 messages. Make sure the fix works on the emulator.

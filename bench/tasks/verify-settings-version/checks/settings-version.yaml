@@ -1,0 +1,12 @@
+name: settings-version
+app: dev.mdh.sample
+setup:
+  open: mdhsample://settings
+screens:
+- SettingsActivity
+steps:
+- assert:
+  - visible "App version"
+assert:
+- visible "1.0"
+- enabled role=switch;text=Bluetooth

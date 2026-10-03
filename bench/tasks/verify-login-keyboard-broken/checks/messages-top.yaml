@@ -1,0 +1,12 @@
+name: messages-top
+app: dev.mdh.sample
+setup:
+  open: mdhsample://messages
+visual:
+  rules: [obscured]
+screens:
+- MessagesActivity
+steps:
+- tap: Message 1
+assert:
+- text id=selected == "Opened Message 1"

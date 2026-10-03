@@ -1,0 +1,13 @@
+kind: fix
+summary: the Bluetooth row enables Nearby share only when Bluetooth is turned off
+bug:
+- path: src/main/kotlin/dev/mdh/sample/SettingsActivity.kt
+  find: '            if (::nearby.isInitialized) nearby.setEnabled(on, reason = "Needs Bluetooth")'
+  replace: '            if (::nearby.isInitialized) nearby.setEnabled(!on, reason = "Needs Bluetooth")'
+fix:
+- path: src/main/kotlin/dev/mdh/sample/SettingsActivity.kt
+  find: '            if (::nearby.isInitialized) nearby.setEnabled(!on, reason = "Needs Bluetooth")'
+  replace: '            if (::nearby.isInitialized) nearby.setEnabled(on, reason = "Needs Bluetooth")'
+prompt: |
+  In Settings, "Nearby share" stays greyed out after turning Bluetooth on, so users can't turn it
+  on. Fix it, and make sure the fix works on the emulator.

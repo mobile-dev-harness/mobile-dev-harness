@@ -1,0 +1,12 @@
+kind: verify
+truth: pass
+summary: email accepted in any letter case; correct
+change:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: 'if (email.text.toString() == EMAIL && password.text.toString() == PASSWORD) {'
+  replace: 'if (email.text.toString().trim().equals(EMAIL, ignoreCase = true) && password.text.toString() == PASSWORD) {'
+prompt: |
+  A teammate changed sign-in so that the email address is accepted in any letter case and with
+  surrounding spaces (for example "Alice@Example.com "). The change is uncommitted in this project.
+  The test account is alice@example.com with the password correct-horse.
+  Verify on the emulator that the change works and that sign-in still behaves correctly otherwise.

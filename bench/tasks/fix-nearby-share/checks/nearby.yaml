@@ -1,0 +1,12 @@
+name: nearby
+app: dev.mdh.sample
+setup:
+  open: mdhsample://settings
+screens:
+- SettingsActivity
+steps:
+- tap: role=switch;text=Bluetooth
+- tap: role=switch;text=Nearby share
+assert:
+- checked role=switch;text=Nearby share
+- visible "Visible to contacts"

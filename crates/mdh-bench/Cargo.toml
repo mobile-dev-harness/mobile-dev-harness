@@ -1,0 +1,19 @@
+[package]
+name = "mdh-bench"
+description = "The mobile-dev-harness benchmark: seeded-bug tasks run by a coding agent with and without mdh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_norway = "0.9.42"
+
+[lints]
+workspace = true

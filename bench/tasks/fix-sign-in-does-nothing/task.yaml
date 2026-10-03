@@ -1,0 +1,14 @@
+kind: fix
+summary: the click listener is set on the progress bar instead of the button
+bug:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: '        signIn.setOnClickListener {'
+  replace: '        progress.setOnClickListener {'
+fix:
+- path: src/main/kotlin/dev/mdh/sample/LoginActivity.kt
+  find: '        progress.setOnClickListener {'
+  replace: '        signIn.setOnClickListener {'
+prompt: |
+  Users report that on the login screen, tapping "Sign in" after entering their email and password
+  does nothing. The test account is alice@example.com with the password correct-horse. Fix it, and
+  make sure the fix works on the emulator.
