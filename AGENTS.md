@@ -64,7 +64,8 @@ integrations/claude-code/  Claude Code plugin (MCP config, skills, hooks calling
 android-helper/  on-device helper APK (Java, no dependencies); see docs/design/02-architecture.md §10
 examples/android-sample/  test app exercising every feature (Kotlin, Views + Compose); its flows in
                  .mdh/flows/ are replayed on an emulator by .github/workflows/e2e.yml
-scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/
+scripts/         build-helper.sh rebuilds the helper into crates/mdh-driver/assets/; update-kb.sh
+                 replaces the vendored compatibility knowledge base with a release
                  diagram/ generates docs/assets/architecture-{light,dark}.svg (Rough.js; `npm install && npm run build`)
 fixtures/        real tool output used by tests (e.g. android/uiautomator/<screen>_api<level>.xml)
 docs/DESIGN.md   design overview + roadmap; details in docs/design/, decisions in docs/adr/
@@ -202,8 +203,11 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 ## Compatibility
 
 - Risk-driven (ADR-0011): never add a mode that runs every flow on every device by default.
-- The knowledge base (`crates/mdh-compat/kb/android.yaml`) is data: every entry needs a source link
-  and triggers (the test checks both). Prefer reporting a risk to missing one, but keep triggers
+- The knowledge base lives in [android-compat-kb](https://github.com/mobile-dev-harness/android-compat-kb)
+  (ADR-0012). `crates/mdh-compat/kb/android.yaml` is a pinned snapshot: never edit it here (a test
+  checks it against `kb/SOURCE`); change the KB repository, release it, then run
+  `scripts/update-kb.sh <version>`. Try unreleased entries with `MDH_COMPAT_KB=<file>`. Every entry
+  needs a source link and triggers. Prefer reporting a risk to missing one, but keep triggers
   specific: a common name (`enqueue`, `File`) matches unrelated code.
 - An unverified risk is never a pass: cells that couldn't run, risks without a flow or deep link,
   vendors without a device are reported unverified with what's missing.

@@ -17,3 +17,4 @@ Superseded.
 | [0009](0009-verification-engine.md) | Verification is an engine; checks plug into it; compatibility is a matrix | Superseded in part by 0011 |
 | [0010](0010-impact-analysis.md) | Change impact analysis is static, syntax-level and fast | Accepted |
 | [0011](0011-risk-driven-compatibility.md) | Compatibility is verified risk by risk, not cell by cell | Accepted |
+| [0012](0012-repositories.md) | One engine repository; data, the benchmark and reusable parts in their own | Accepted |

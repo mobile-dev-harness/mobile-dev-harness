@@ -1,5 +1,7 @@
 //! The knowledge base (ADR-0011): Android behavior changes, form-factor triggers and vendor quirks,
-//! as data compiled into the binary (`kb/android.yaml`), each entry with its source.
+//! each entry with its source. It lives in its own repository (`android-compat-kb`, ADR-0012); a
+//! pinned release is compiled into the binary (`kb/android.yaml`, version and checksum in
+//! `kb/SOURCE`), and `MDH_COMPAT_KB` points a binary at another copy.
 
 use std::sync::OnceLock;
 
@@ -134,18 +136,48 @@ pub struct VendorQuirk {
     pub source: String,
 }
 
-/// The knowledge base shipped with this build.
+const BUILT_IN: &str = include_str!("../kb/android.yaml");
+
+/// The knowledge base: the file `MDH_COMPAT_KB` names, else the one shipped with this build. A file
+/// that can't be read or parsed falls back to the built-in one, with a warning on stderr.
 pub fn kb() -> &'static Kb {
     static KB: OnceLock<Kb> = OnceLock::new();
     KB.get_or_init(|| {
-        serde_norway::from_str(include_str!("../kb/android.yaml"))
-            .expect("kb/android.yaml is valid (checked by tests)")
+        if let Some(path) = std::env::var_os("MDH_COMPAT_KB") {
+            let parsed = std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|text| serde_norway::from_str(&text).map_err(|e| e.to_string()));
+            match parsed {
+                Ok(kb) => return kb,
+                Err(e) => eprintln!(
+                    "warning: MDH_COMPAT_KB={}: {e}; using the built-in knowledge base",
+                    std::path::Path::new(&path).display()
+                ),
+            }
+        }
+        serde_norway::from_str(BUILT_IN).expect("kb/android.yaml is valid (checked by tests)")
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_snapshot_is_the_release_it_says_it_is() {
+        use sha2::{Digest, Sha256};
+        let source = include_str!("../kb/SOURCE");
+        let pinned = source
+            .lines()
+            .find_map(|l| l.strip_prefix("sha256 = "))
+            .expect("kb/SOURCE names a checksum");
+        let actual = format!("{:x}", Sha256::digest(BUILT_IN.as_bytes()));
+        assert_eq!(
+            actual, pinned,
+            "kb/android.yaml was edited in place: change android-compat-kb, release it, then run \
+             scripts/update-kb.sh <version>"
+        );
+    }
 
     #[test]
     fn the_knowledge_base_parses_and_every_entry_is_sourced() {

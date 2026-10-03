@@ -532,7 +532,10 @@ reaches. Per project: `minSdk`, `targetSdk` and `compileSdk` in the base and now
 the version catalog as text; a value computed at configuration time is reported unknown), the resource qualifier
 directories, the manifest's `uses-feature` entries.
 
-**Knowledge base.** YAML compiled into the binary (`crates/mdh-compat/kb/`), each entry with a source link:
+**Knowledge base.** Its own repository, [android-compat-kb](https://github.com/mobile-dev-harness/android-compat-kb)
+(ADR-0012); a pinned release is compiled into the binary (`crates/mdh-compat/kb/android.yaml`, version and
+SHA-256 in `kb/SOURCE`, replaced by `scripts/update-kb.sh <version>`, checked by a test), and `MDH_COMPAT_KB`
+points a binary at another copy. Each entry has a source link:
 
 - behavior changes by API level and target SDK: the version, whether it applies by the device's version or the
   app's `targetSdk`, the names that trigger it, what to verify;

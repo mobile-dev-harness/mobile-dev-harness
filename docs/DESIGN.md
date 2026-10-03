@@ -9,6 +9,7 @@
 | Document | Contents |
 |---|---|
 | [design/01-functional.md](design/01-functional.md) | Functional design: users and scenarios, core concepts, feature modules (F1–F14), CLI/MCP/config/flow/output interfaces, non-functional requirements |
+| [adr/0012-repositories.md](adr/0012-repositories.md) | Which parts live in their own repositories, and why |
 | [design/02-architecture.md](design/02-architecture.md) | Technical architecture: crates, core abstractions, key flows, UI tree compression, stability, logs, Gradle probing, helper, the perf/compat/visual domains, impact analysis, MCP, plugin, error model, testing, release, security |
 | [adr/](adr/) | Architecture decision records |
 
@@ -77,6 +78,28 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 - **Verification is where agents have nothing today**: evidence-backed verdicts covering behavior, UI and
   performance, repeatable as flows and across a device matrix. That is where the project's value is.
 - The core is agent-agnostic (CLI + MCP); the Claude Code plugin is the first and best-supported integration.
+
+## Repositories (ADR-0012)
+
+The `mobile-dev-harness` GitHub organization holds the project. The engine stays in one repository: its crates
+are modules already, and features cut across them. A part gets its own repository when it has users without mdh,
+a different toolchain, its own release rhythm, or needs to be neutral.
+
+| Repository | What | Why on its own | When |
+|---|---|---|---|
+| `mobile-dev-harness` | CLI, MCP server, engine crates, Claude Code plugin, sample app, e2e | — | ✅ |
+| `android-compat-kb` | The compatibility knowledge base: behavior changes by API level, device-type triggers, vendor quirks, each with its source | Data, updated with Android releases and ROM changes; open to contributions; usable by other tools | Phase 1 |
+| `mobile-agent-bench` | The benchmark: tasks, runner, graders, results | Neutral ground: any tool can enter, results don't ship with mdh | Phase 1 |
+| `android-helper` | The on-device helper APK and its protocol | Gradle and Java; reusable by other tools | Phase 2 |
+| `android-impact` | Change impact analysis as its own CLI and crate | Useful without a device or mdh: CI and code review | Phase 2 |
+| `setup-mdh` | A GitHub Action: emulator, `mdh flow run --changed`, `mdh compat`, the verdict as a PR comment | Distribution | Phase 2 |
+| `skills` | Skills and rules for agents beyond Claude Code (Codex, Cursor, …) | Distribution | Phase 3 |
+| `ios-helper` | The on-device agent for iOS (or reuse an existing one) | Swift; M9 | Phase 3 |
+| `homebrew-tap` | `brew install mobile-dev-harness/tap/mdh` | Distribution | Any time |
+
+What stays: the check kinds and the verification engine share one `Check` interface and one verdict; split, every
+feature would need changes in several repositories at once. Data a binary needs (the knowledge base) is vendored
+at a pinned version with its checksum and updated by a script, never fetched at build time.
 
 ## Roadmap
 
