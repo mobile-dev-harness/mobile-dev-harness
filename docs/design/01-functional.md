@@ -180,19 +180,20 @@ A check kind of the verification engine (F6.4): its measurements and budget resu
 > Emulators are not representative in absolute terms. Reports name the device, compare against a baseline on the
 > same device, and show variance; absolute budgets are meant for physical devices.
 
-### F12 Compatibility matrix (`mdh-compat`)
+### F12 Compatibility (`mdh-compat`)
 
-Not a check kind: it runs flows and their functional, UI and performance checks on every cell of a device and
-configuration matrix, and aggregates the cells' verdicts.
+Not a check kind, and not a matrix run for its own sake (ADR-0011): the change says what is at risk, and only
+that is verified. Impact (F14) → risk analysis → verification plan → verdict per risk.
 
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F12.1 | Matrix | Axes in `mdh.yaml`: Android version, form factor (phone, tablet, foldable), screen size and density, orientation, locale (including RTL), font scale, dark mode, display size, vendor; with includes/excludes to keep it small |
-| F12.2 | Device pool | Local emulators (created from system images on demand and reused), physical devices over USB or Wi-Fi, later cloud providers (F12.5); parallel runs bounded by host resources |
-| F12.3 | Cheap axes first | Configuration axes are applied to an existing device where possible (`cmd locale`, `settings put system font_scale`, `cmd uimode night`, `wm density`, `wm size`, rotation) and restored afterwards; only version and form factor need different AVDs |
-| F12.4 | Run and report | Runs flows plus selected perf and visual checks on each cell; the report is a matrix of verdicts with evidence, identical failures deduplicated across cells |
-| F12.5 | Vendors and cloud (later) | Physical vendor devices (Xiaomi, Huawei, OPPO, Samsung, …) and cloud farms; documents known vendor quirks (background restrictions, autostart, permission dialogs) |
+| F12.1 | Risk analysis | `compat risks`: from the change's facts and a knowledge base shipped as data, the compatibility risks in four dimensions — **OS version** (API-level branches and `@RequiresApi` → both sides of the boundary; APIs whose behavior changed in a version; `targetSdk` raised → that version's behavior changes; `minSdk` changed → the lowest version), **device type** (qualified resources such as `sw600dp`, window size classes, folding features, `configChanges`, orientation and resizability, saved state; cars and TVs), **vendor** (background work, notifications, exact alarms, overlays, system settings intents, WebView, autostart and battery restrictions of Xiaomi, OPPO, vivo, Huawei, Honor, Samsung ROMs) and **screen size** (changed layouts and composables on the screens they reach). Each risk has its reason, evidence (`file:line`, the matched name), the screens, a likelihood and how to verify it. No device, milliseconds; `mdh impact` shows the risks too |
+| F12.2 | Verification plan | `compat plan`: the fewest cells covering the risks, cheapest first: configuration on the current device (screen size and density overrides for a small phone, a tablet, a foldable's inner screen; landscape; font scale; dark mode; locale), then other local AVDs by API level, then connected physical devices by vendor. States what each cell costs and what would need consent (starting an emulator, downloading a system image); risks that can't be covered here are listed as unverifiable with what's missing |
+| F12.3 | Run | `compat run [--changed]`: builds once, installs on each cell's device, applies the configuration (restored afterwards), runs the flows that pass the risks' screens with their checks (functional, UI rules), or opens the screens by deep link; device-type risks add a state check across rotation (and folding on a foldable AVD). Starts at most two new emulators, only with consent |
+| F12.4 | Report | One line per risk: verified (on which cells), failed (cell, check, evidence), unverified (why, what would verify it); failures deduplicated across cells; simulated cells (display overrides) say so |
+| F12.5 | Explicit matrix (later) | `compat run --cells …` for release testing: the same execution over cells given by hand |
+| F12.6 | Device providers (later) | Creating AVDs from system images on demand, cloud device farms for vendors and form factors not at hand, car (AAOS) and TV emulators |
 
 ### F13 UI consistency checks (`mdh-visual`)
 
@@ -251,7 +252,7 @@ mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name
 mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10] [--timeout 3]
 mdh perf startup [app] [--hot] [--runs 5] [--trace] | flow <name> [--runs N] [--trace] | approve [SCOPE]
 mdh perf setup [--yes] | explain <trace> --app <pkg> [--startup]   # Perfetto's trace processor; asks before downloading
-mdh compat run [--matrix <name>] [flows...] | devices
+mdh compat risks [--base REF] | plan [--base REF] | run [--changed] [--yes]
 mdh visual check [--baseline NAME] [--rules all|none|r1,r2] [--ignore TARGET]... [--configs font_scale,dark,rtl] | approve [NAME|FLOW]
 mdh session show | reset
 mdh mcp
@@ -284,7 +285,7 @@ than split into many small tools.
 | `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
 | `mdh_visual` | Rule checks, structural and pixel baselines, other configurations of the current screen; approve candidates | visual | M5 ✅ |
 | `mdh_perf` | Measure startup or a flow against baselines and budgets, explain regressions with a Perfetto trace; approve; set up the trace processor (with the user's consent) | perf | M6 ✅ |
-| `mdh_compat` | Run flows across a matrix; matrix report | compat | M7 |
+| `mdh_compat` | Compatibility risks of the change, the plan to verify them, and the run: a verdict per risk | compat | M7 |
 
 Screenshots are returned as MCP image content; long builds report via progress notifications.
 

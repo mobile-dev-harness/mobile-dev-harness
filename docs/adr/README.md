@@ -14,5 +14,6 @@ Superseded.
 | [0006](0006-flow-format.md) | Own YAML flow format, Maestro import later | Accepted |
 | [0007](0007-helper-in-m1.md) | Ship the on-device helper in M1 | Accepted |
 | [0008](0008-quality-domains.md) | Organize around five quality domains on a shared foundation | Superseded in part by 0009 |
-| [0009](0009-verification-engine.md) | Verification is an engine; checks plug into it; compatibility is a matrix | Accepted |
+| [0009](0009-verification-engine.md) | Verification is an engine; checks plug into it; compatibility is a matrix | Superseded in part by 0011 |
 | [0010](0010-impact-analysis.md) | Change impact analysis is static, syntax-level and fast | Accepted |
+| [0011](0011-risk-driven-compatibility.md) | Compatibility is verified risk by risk, not cell by cell | Accepted |

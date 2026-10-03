@@ -1,6 +1,6 @@
 # ADR-0009: Verification is an engine; checks plug into it; compatibility is a matrix
 
-- Status: Accepted (2026-10-03)
+- Status: Accepted (2026-10-03); compatibility as a matrix superseded by [ADR-0011](0011-risk-driven-compatibility.md)
 - Supersedes: the domain structure of ADR-0008 (the shared foundation and the rationale for leaving device
   control behind stay)
 

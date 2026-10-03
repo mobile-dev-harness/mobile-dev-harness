@@ -49,11 +49,11 @@ Every feature is judged against these:
 5. **Every token earns its place.** Each output has a budget, and tests measure it.
 6. **Failures say what to do next.** Candidates and fixes, so the agent doesn't explore.
 
-## Model (ADR-0009)
+## Model (ADR-0009, ADR-0011)
 
 What an agent gets, on top of a shared foundation: **control** to drive the app, **verification** to judge it —
-an engine with pluggable check kinds — and the **compatibility matrix** to repeat all of it across devices and
-configurations.
+an engine with pluggable check kinds — and **compatibility** to repeat it on the devices and configurations the
+change puts at risk, found from the change rather than run as a full matrix.
 
 | Layer | Crate | Question it answers | Features |
 |---|---|---|---|
@@ -63,7 +63,7 @@ configurations.
 | ↳ Functional checks | `mdh-verify` | Does it do what it should? | F6.1 |
 | ↳ UI consistency checks | `mdh-visual` | Does it match its baseline, its design and accessibility rules? | F13 |
 | ↳ Performance checks | `mdh-perf` | Is it fast and lean, and did that regress? | F11 |
-| **Compatibility matrix** | `mdh-compat` | Does all of that hold on every version, form factor, configuration and vendor? | F12 |
+| **Compatibility** | `mdh-compat` | Does all of that hold on the versions, device types, vendors and screen sizes the change puts at risk? Impact → risks → the fewest cells → a verdict per risk | F12 |
 
 The shared foundation: `mdh-core` (types, errors, config, output contract), `mdh-driver` (device backends and the
 on-device helper), `mdh-observe` (UI trees, logs, crashes, screenshots; F4, F8) and `mdh-project` (build adapters;
@@ -88,7 +88,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | **M4 Verification engine + functional checks** ✅ | F14 change impact ✅ (ADR-0010), F6.1–F6.4 ✅ (the `Check` interface UI and performance checks will implement), F7.1–F7.4 ✅, F9.2 Claude Code plugin ✅, F9.3 ✅; from the state track: data reset ✅, permissions ✅, deep links ✅, animations ✅ (what flow `setup` needs) | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
 | **M5 UI consistency checks v1** ✅ | F13.1 baselines (structural ✅ + pixel ✅), F13.3 cross-config layout checks on one device ✅, F13.4 rule checks (tree ✅, contrast ✅) | A layout regression and a missing label in the sample app show up in a flow's verdict with evidence |
 | **M6 Performance checks v1** ✅ | F11.1–F11.5 ✅, F11.6 Perfetto traces ✅ | A startup and a jank regression in the sample app show up in a verdict against a baseline → **release 0.2.0** |
-| **M7 Compatibility matrix v1** | F12.1–F12.4 (local emulators and physical devices) | One command runs the sample's flows and their checks across a 3×3 matrix and reports per-cell verdicts |
+| **M7 Compatibility v1** | F12.1–F12.4, risk-driven (ADR-0011): local emulators and physical devices | Seeded compatibility bugs in the sample app (an API-level branch, a tablet layout, lost state on rotation) are found from the change alone: risks named, the fewest cells run, a verdict per risk; vendor risks without a device are reported unverified |
 | **M8 Ecosystem** | F10.1 RN/Expo, F10.2 Flutter, F13.2 design-mock comparison, F12.5 cloud and vendor devices, F7.5 Maestro import | — |
 | **M9 iOS** | F10.3 | Control and functional checks pass S1–S4 on the iOS simulator |
 | **M10 Benchmark** | Seeded-bug tasks on the sample app, each with ground truth (a button that does nothing, a crash on submit, wrong text, overlapping layout, fixing screen A breaks screen B, …), run with four setups: agent alone, agent + raw adb and screenshots, agent + mobile-mcp, agent + mdh | Published numbers for false-pass rate, false-fail rate, task success, tokens per task, tool calls and wall time |

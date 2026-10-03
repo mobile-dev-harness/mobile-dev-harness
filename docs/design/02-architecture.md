@@ -8,8 +8,8 @@
             agent ──▶ mdh-mcp            mdh-cli ◀── humans / CI / agents (shell)
                          └───────┬───────────┘
           ┌──────────────────────▼──────────────────────────────────────┐
-          │ mdh-compat   compatibility matrix: the same flows and checks │   where it is checked
-          │              across versions, sizes, configs, vendors        │
+          │ mdh-compat   compatibility: the same flows and checks on the │   where it is checked
+          │              versions, devices, vendors, sizes at risk       │
           │  ┌──────────────────────────────────────────────────────┐   │
           │  │ mdh-verify   verification engine                      │   │
           │  │   flows · check interface · verdicts · evidence ·     │   │
@@ -64,7 +64,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
 | `mdh-visual` | check kind | UI consistency: rule checks, structural and pixel baselines, contrast, cross-config layout checks ✅; design mocks next (§13) | M5 ✅, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets and baselines; Perfetto traces explain regressions | M6 ✅ |
-| `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
+| `mdh-compat` | orchestrator | Compatibility (ADR-0011): risk analysis with a knowledge base, verification plans, device pool and providers, config application, verdicts per risk | M7, M8 |
 | `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
 | `mobile-dev-harness` (`crates/mdh-cli`) | entry | CLI `mdh`, the only published binary | ✅ |
 
@@ -513,42 +513,53 @@ afterwards.
 drops counted from FrameTimeline on every run, Java/native heap and graphics memory as metrics, perf findings in
 the compatibility matrix.
 
-## 12. Compatibility matrix (`mdh-compat`)
+## 12. Compatibility (`mdh-compat`)
 
-Not a check kind (ADR-0009): it schedules (cell, flow) jobs whose checks — functional, UI, performance — are run by
-the verification engine, and aggregates the cells' verdicts.
+Not a check kind (ADR-0009) and not a matrix by default (ADR-0011): a pipeline from the change to a verdict per
+risk. The first two stages need no device.
 
-
-**Matrix model.** Axes from `mdh.yaml` expand into cells; a cell is a *device spec* (API level, form factor, vendor)
-plus a *configuration* (locale, font scale, night mode, density, size, orientation). Includes and excludes keep the
-matrix small; pairwise reduction can come later.
-
-**Device pool.**
-
-```rust
-#[async_trait]
-pub trait DeviceProvider: Send + Sync {
-    async fn candidates(&self, spec: &DeviceSpec) -> Result<Vec<DeviceOffer>>;
-    async fn acquire(&self, offer: &DeviceOffer) -> Result<DeviceLease>;   // booted, ready, exclusive
-}
+```
+mdh-impact                 mdh-compat::risk             mdh-compat::plan            mdh-compat::run
+changed declarations  ──▶  rules × knowledge base  ──▶  fewest cells, cheapest ──▶  cells on devices,
++ compat facts             → risks (dimension,          first; cost and consent    flows + checks per risk
+(syntax, ms)               reason, evidence, screens)                              → verdict per risk
 ```
 
-Providers: local emulators (install the system image with `sdkmanager`, create an AVD from a hardware profile such
-as a phone, tablet or foldable with `avdmanager`, boot headless, keep a clean snapshot, reuse across runs), physical
-devices (matched by `getprop`: manufacturer, model, API level), and later cloud farms. Parallelism is bounded by host
-RAM and CPU.
+**Facts from impact.** Per changed declaration (kept out of the serialized report): what it uses by name (calls,
+types, constants, with their receivers), the API levels it compares `SDK_INT` with or requires
+(`@RequiresApi`, `@TargetApi`), its resource qualifiers, the manifest element and attributes, the screens it
+reaches. Per project: `minSdk`, `targetSdk` and `compileSdk` in the base and now (read from the Gradle scripts and
+the version catalog as text; a value computed at configuration time is reported unknown), the resource qualifier
+directories, the manifest's `uses-feature` entries.
 
-**Configuration without new AVDs.** A per-cell guard applies configuration on an existing device and restores it on
-drop: `settings put system font_scale`, `cmd uimode night yes|no`, `wm density` / `wm size` (and `reset`), rotation
-via `user_rotation`, and locale (per-app locales via `cmd locale` on API 33+; how to switch the system locale without
-root on older images is to be verified in M7).
+**Knowledge base.** YAML compiled into the binary (`crates/mdh-compat/kb/`), each entry with a source link:
 
-**Execution and report.** A scheduler runs (cell, flow) jobs on leased devices, each with its own control session,
-and collects verdicts plus the selected perf and visual results per cell. The report is a matrix with evidence;
-failures are clustered by signature (step, assertion, error code) so one bug isn't reported nine times.
+- behavior changes by API level and target SDK: the version, whether it applies by the device's version or the
+  app's `targetSdk`, the names that trigger it, what to verify;
+- form-factor triggers: qualifiers, APIs (window size classes, folding features, multi-window), manifest
+  attributes;
+- vendor quirks: the vendors, the names that trigger them, what goes wrong and how it shows.
 
-**Vendors.** Vendor ROM differences (background restrictions, autostart, permission dialogs) only show on physical
-devices. Leases record manufacturer and ROM version, and a small knowledge base of known quirks turns them into hints.
+**Risks.** `Risk { dimension, id, reason, evidence, screens, likelihood, verify }` where `verify` is a set of cell
+requirements or `Unverifiable { needs }`. Risks with the same id and requirement merge across declarations.
+
+**Cells.** A device requirement (API level, form factor, vendor) plus a configuration. Configurations are applied
+to a running device and restored on every path (like visual variants): `wm size` / `wm density` computed from the
+target size in dp and the panel (a tablet at 800×1280 dp on a 1344×2992 panel at 480 dpi becomes 1340×2144 at 268
+dpi, so `sw600dp` resources and window size classes apply), `user_rotation` with auto-rotate off, font scale, night
+mode, app locale. The planner covers every risk with the fewest cells, cheapest first; the current device in its
+default configuration is always a cell, as the reference.
+
+**Devices.** The current device; other local AVDs matched by API level (started with consent, at most two new
+ones per run, stopped afterwards if mdh started them); physical devices matched by `ro.product.manufacturer`.
+Missing ones make their risks unverifiable with the command that would add them. The `DeviceProvider` interface
+(`candidates(spec)`, `acquire(offer)`) leaves room for AVD creation and cloud farms.
+
+**Execution.** The APK is built once and installed per device (install-if-changed). Per cell: apply the
+configuration, run the flows that pass the risk's screens with the functional and UI-rule checks, or open each
+screen by its deep link and check it; device-type risks add a state check — the values of inputs and toggles
+before and after a rotation (or a fold) must match. The report is per risk: verified, failed (cell, check,
+evidence), unverified (needs); identical failures across cells are reported once.
 
 ## 13. UI consistency checks (`mdh-visual`)
 
