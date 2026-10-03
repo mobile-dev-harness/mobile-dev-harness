@@ -3,7 +3,9 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
-## Unreleased
+## 0.3.0
+
+Compatibility, verified risk by risk from the change (ADR-0011).
 
 ### Compatibility
 - `mdh compat risks`: compatibility risks of the change, from impact analysis and a knowledge base with sources —
