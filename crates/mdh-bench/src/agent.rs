@@ -162,7 +162,9 @@ pub fn run(
             let why = std::fs::read_to_string(log).unwrap_or_default();
             usage.error = Some(format!(
                 "no result from the agent: {}",
-                why.lines().find(|l| !l.trim().is_empty()).unwrap_or("see agent.log")
+                why.lines()
+                    .find(|l| !l.trim().is_empty())
+                    .unwrap_or("see agent.log")
             ));
         }
     }
