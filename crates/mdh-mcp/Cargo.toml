@@ -14,6 +14,7 @@ mdh-control.workspace = true
 mdh-core.workspace = true
 mdh-impact.workspace = true
 mdh-observe.workspace = true
+mdh-perf.workspace = true
 mdh-verify.workspace = true
 mdh-visual.workspace = true
 rmcp = { version = "2.2.0", features = ["server", "transport-io", "macros", "schemars"] }

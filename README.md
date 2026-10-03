@@ -20,6 +20,9 @@ works. When it changes a mobile app, it usually can't: it edits code and hopes. 
 - **Verdicts, not impressions.** `mdh verify` checks the app (`enabled id=sign_in`, `screen .MessagesActivity`,
   always `no crash`) and answers pass or fail with what it observed and a screenshot on disk; what the agent did
   can be saved as a flow and replayed from a clean start, with JUnit for CI.
+- **Performance with numbers, not hunches.** `mdh perf` measures cold start, janky frames, memory and CPU over
+  repeated runs against a baseline from the same device, fails only on changes larger than the noise, and says
+  what got slow from a Perfetto trace (`performCreate:MainActivity 509 ms → slowInit 451 ms`).
 - **Build errors an agent can act on.** `mdh run` builds with Gradle, installs only what changed and restarts the
   app; compiler, resource, manifest and dependency failures come back as `file:line` with the offending line.
 - **One engine, two interfaces.** A CLI for humans, scripts and shell-based agents, and an MCP server for agents
@@ -146,7 +149,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional (done), UI consistency, performance (planned) — and the compatibility matrix repeats them across devices and configurations (planned); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
+  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional, UI consistency and performance (done) — and the compatibility matrix repeats them across devices and configurations (planned); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
 </picture>
 
 - **Two entry points, one engine.** Agents connect over MCP, people, CI and scripts use the CLI; both get the same
@@ -185,7 +188,7 @@ three ways:
 
 To be fair to other languages: the largest wins come from the design — a warm helper instead of `uiautomator`,
 diffs instead of full screens. Rust is what keeps the harness itself from adding anything on top, and keeps it that
-way as the planned performance, compatibility and visual checks do far more work per call than today.
+way as the performance and visual checks, and the planned compatibility matrix, do far more work per call.
 
 ## Requirements
 
@@ -285,6 +288,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows — named, or the ones the uncommitted change needs; a verdict with what was observed and evidence on disk |
 | `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
 | `mdh_visual` | UI consistency of the current screen: rule checks and structural baselines; approve deviations |
+| `mdh_perf` | Cold start or a flow's frames, memory and CPU against the baseline and budgets, a Perfetto trace explaining any regression; approve new numbers; set up the trace processor once you agree |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
 | `mdh_status` | Device and session status; switch device, reset, turn animations off or back on |
 
@@ -319,6 +323,8 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
 | `mdh flow run --changed [--base REF]` | Replay the flows that pass the screens the uncommitted change reaches |
 | `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET] [--configs font_scale,dark,rtl]` · `mdh visual approve [NAME]` | UI consistency of the current screen: touch targets, labels, overlap, controls under the system bars, duplicate labels, text contrast; with `--baseline`, what moved, resized, appeared, disappeared or changed text, and which regions' pixels changed, since the baseline; with `--configs`, what breaks at a larger font, in dark mode or right to left; `approve` accepts the deviations |
+| `mdh perf startup [APP] [--hot] [--runs 5] [--trace]` · `mdh perf flow NAME [--runs N] [--trace]` · `mdh perf approve [SCOPE]` | Cold (and hot) start, or frames, memory and CPU while a flow runs, over repeated runs against this device's baseline and the flow's `perf:` budgets (exit 1 on a regression); a regression comes with a Perfetto trace summarized to what's slow; `approve` accepts the new numbers |
+| `mdh perf setup [--yes]` · `mdh perf explain TRACE --app PKG [--startup]` | Get Perfetto's trace processor (asks before downloading 14 MB); summarize a kept trace |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
 | `mdh open URI [--package P]` | Open a deep link |
@@ -404,19 +410,19 @@ Test account: `alice@example.com` / `correct-horse`.
 ## Status and roadmap
 
 Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
-crash reports, change impact analysis, verdicts with evidence, flows saved and replayed (JUnit), the CLI and the
-MCP server. Planned: verification as an engine with pluggable check kinds, and a
-matrix that repeats it across devices:
+crash reports, change impact analysis, verdicts with evidence, flows saved and replayed (JUnit), UI consistency and
+performance checks, the CLI and the MCP server. Planned: a matrix that repeats the checks across devices, more
+platforms and a benchmark:
 
 | | Layer | What's planned |
 |---|---|---|
 | ✅ | **Control** | Drive the app reliably (done) |
 | ✅ | **Build** | Build from source with readable compiler errors; one command to build, install and launch (done) |
 | ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
-| ✅ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests (in CI too), the flows a change needs picked from its impact, JUnit reports, a Claude Code plugin (done); baselines arrive with UI checks — with pluggable check kinds: |
+| ✅ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests (in CI too), the flows a change needs picked from its impact, JUnit reports, a Claude Code plugin, baselines (done) — with pluggable check kinds: |
 | ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
 | ✅ | ↳ **UI consistency checks** | Accessibility and layout rules with contrast, structural and pixel baselines, layout checks at a larger font, in dark mode and right to left (done); design-mock comparison later |
-| ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
+| ✅ | ↳ **Performance checks** | Startup time, jank, memory and CPU over repeated runs against per-device baselines and budgets, regressions explained by a Perfetto trace (done) |
 | ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
 | ⏳ | **Benchmark** | Seeded-bug tasks measuring false passes, false fails, success and tokens: agent alone vs. adb and screenshots vs. mobile-mcp vs. mdh |

@@ -218,6 +218,12 @@ enum Command {
         #[command(subcommand)]
         command: VisualCommand,
     },
+    /// Performance: startup time, frames, memory and CPU over repeated runs, against baselines
+    /// and budgets; a Perfetto trace explains what's slow
+    Perf {
+        #[command(subcommand)]
+        command: PerfCommand,
+    },
     /// Save the session's recorded steps as a flow, list flows, replay them
     Flow {
         #[command(subcommand)]
@@ -266,6 +272,52 @@ enum VisualCommand {
     /// Make the candidates left by failed baseline comparisons the new baselines (all, or one
     /// flow's or name's)
     Approve { scope: Option<String> },
+}
+
+#[derive(Subcommand)]
+enum PerfCommand {
+    /// Cold start time of an app (with --hot, hot start too) over repeated runs (exit 1 on a
+    /// regression)
+    Startup {
+        /// Package or package/activity (default: the session's app)
+        app: Option<String>,
+        #[arg(long)]
+        hot: bool,
+        /// Measured runs (one more runs first and is discarded)
+        #[arg(long, default_value_t = 5)]
+        runs: usize,
+        /// Capture and explain a Perfetto trace even if nothing regressed
+        #[arg(long)]
+        trace: bool,
+    },
+    /// Frames, jank, memory and CPU while a saved flow runs, over repeated runs (exit 1 on a
+    /// regression or a budget exceeded)
+    Flow {
+        name: String,
+        /// Measured runs (default: the flow's `perf: runs`, else 5)
+        #[arg(long)]
+        runs: Option<usize>,
+        #[arg(long)]
+        trace: bool,
+    },
+    /// Summarize a trace `mdh perf` kept: what the main thread did, which frames were late
+    Explain {
+        trace: PathBuf,
+        /// The app's package
+        #[arg(long)]
+        app: String,
+        /// The trace is of a cold start (default: of a flow)
+        #[arg(long)]
+        startup: bool,
+    },
+    /// Make the latest measurements the baselines (all, or one scope's: a flow, `startup-<package>`)
+    Approve { scope: Option<String> },
+    /// Get Perfetto's trace processor, which explains traces (asks before downloading ~14 MB)
+    Setup {
+        /// The user agreed to the download
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -452,6 +504,45 @@ async fn main() -> ExitCode {
         Command::Visual {
             command: VisualCommand::Approve { scope },
         } => report!(mdh_visual::approve(scope.as_deref()).map(Done::new)),
+        Command::Perf {
+            command: PerfCommand::Approve { scope },
+        } => report!(mdh_perf::approve(scope.as_deref()).map(Done::new)),
+        Command::Perf {
+            command:
+                PerfCommand::Explain {
+                    trace,
+                    app,
+                    startup,
+                },
+        } => {
+            let scenario = if startup {
+                mdh_perf::Scenario::Startup
+            } else {
+                mdh_perf::Scenario::Flow
+            };
+            report!(
+                mdh_perf::explain(&trace, &app, scenario).map(|lines| Done::new(lines.join("\n")))
+            )
+        }
+        Command::Perf {
+            command: PerfCommand::Setup { yes },
+        } => {
+            let mut result = mdh_perf::setup(yes);
+            if let Err(Error::NeedsConsent { action, .. }) = &result
+                && std::io::stdin().is_terminal()
+                && std::io::stderr().is_terminal()
+            {
+                eprint!("{}? [y/N] ", capitalized(action));
+                let mut line = String::new();
+                let agreed = std::io::stdin().read_line(&mut line).is_ok()
+                    && matches!(line.trim().to_lowercase().as_str(), "y" | "yes");
+                if agreed {
+                    eprintln!("downloading…");
+                    result = mdh_perf::setup(true);
+                }
+            }
+            report!(result.map(Done::new))
+        }
         Command::Flow {
             command: FlowCommand::List,
         } => report!(mdh_verify::FlowStore::new(FLOWS_DIR).list().map(Done::new)),
@@ -728,6 +819,53 @@ async fn run(
             }
             VisualCommand::Approve { .. } => unreachable!("handled before connecting"),
         },
+        Command::Perf { command } => {
+            let verdict = match command {
+                PerfCommand::Startup {
+                    app,
+                    hot,
+                    runs,
+                    trace,
+                } => {
+                    let options = mdh_perf::PerfOptions {
+                        runs: runs.max(1),
+                        trace,
+                        ..mdh_perf::PerfOptions::default()
+                    };
+                    match session.package_or_app(app.as_deref()) {
+                        Ok(app) => mdh_perf::startup(session, &app, hot, &options).await,
+                        Err(e) => Err(e),
+                    }
+                }
+                PerfCommand::Flow { name, runs, trace } => {
+                    let options = mdh_perf::PerfOptions {
+                        runs: runs.unwrap_or(5).max(1),
+                        trace,
+                        ..mdh_perf::PerfOptions::default()
+                    };
+                    match mdh_verify::FlowStore::new(FLOWS_DIR).load(&name) {
+                        Ok(mut flow) => {
+                            if let Some(runs) = runs
+                                && let Some(perf) =
+                                    flow.perf.as_mut().and_then(|p| p.as_object_mut())
+                            {
+                                perf.insert("runs".into(), runs.into());
+                            }
+                            mdh_perf::flow(session, &flow, &options, timings).await
+                        }
+                        Err(e) => Err(e),
+                    }
+                }
+                PerfCommand::Approve { .. }
+                | PerfCommand::Setup { .. }
+                | PerfCommand::Explain { .. } => {
+                    unreachable!("handled before connecting")
+                }
+            };
+            let (data, error) = split(verdict);
+            let error = error.or_else(|| data.as_ref().and_then(mdh_verify::Verdict::failure));
+            finish(json, started, std::mem::take(timings), data, error)
+        }
         Command::Flow { command } => match command {
             FlowCommand::Save {
                 name,
@@ -995,6 +1133,14 @@ async fn hook(event: HookEvent) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+fn capitalized(s: &str) -> String {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// Check kinds that run next to the functional checks in every verification.

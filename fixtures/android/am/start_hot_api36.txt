@@ -1,0 +1,8 @@
+Starting: Intent { cmp=dev.mdh.sample/.MainActivity }
+Warning: Activity not started, its current task has been brought to the front
+Status: ok
+LaunchState: HOT
+Activity: dev.mdh.sample/.MessagesActivity
+TotalTime: 59
+WaitTime: 61
+Complete

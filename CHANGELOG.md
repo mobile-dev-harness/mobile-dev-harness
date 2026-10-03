@@ -3,6 +3,32 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
+## Unreleased
+
+### Performance checks
+- `mdh perf startup [APP] [--hot]`: cold (and hot) start over repeated runs; `mdh perf flow NAME`: janky frames,
+  p90 and p99 frame time, memory (PSS) and CPU while a saved flow runs. Median, p90 and noise (MAD) per metric; a
+  first run is discarded and animations stay on.
+- Baselines per device profile (AVD or model, API level, debug or release) in `.mdh/baselines/perf/`, recorded by
+  the first measurement and promoted by `mdh perf approve`; a regression must exceed three times the noise and a
+  per-metric minimum. Budgets in a flow's `perf:` section. Memory that grows with every run is reported.
+- Regressions are explained by a Perfetto trace of one more run, summarized to the main-thread work behind it
+  (startup, late frames, busiest work, GC); the trace is kept for ui.perfetto.dev and `mdh perf explain`.
+  Perfetto's trace processor (pinned v58.2, hash-checked) is downloaded only after the user agreed
+  (`mdh perf setup`); the new error code `NEEDS_CONSENT` says so to agents.
+- MCP: `mdh_perf`.
+
+### UI consistency checks
+- `mdh visual check`: rules on the compact tree (touch targets, labels, overlap, controls under system bars,
+  duplicate labels) and text contrast on pixels; structural (dp) and pixel baselines per device profile, approved
+  with `mdh visual approve`; the same screen at font scale 1.3, in dark mode and right to left (`--configs`).
+- Flows run them at every checkpoint, configured by their `visual:` section. MCP: `mdh_visual`.
+
+### Devices
+- `mdh devices` lists startable emulators; `mdh devices use` sets the project's default device;
+  `mdh emulator start|stop`. With nothing online, mdh asks before starting an emulator (agents get the options in
+  the error and ask their user).
+
 ## 0.1.0
 
 The first release: precise verification for coding agents on Android.

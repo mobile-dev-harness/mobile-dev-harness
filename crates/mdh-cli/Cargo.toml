@@ -23,6 +23,7 @@ mdh-driver.workspace = true
 mdh-impact.workspace = true
 mdh-mcp.workspace = true
 mdh-observe.workspace = true
+mdh-perf.workspace = true
 mdh-verify.workspace = true
 mdh-visual.workspace = true
 serde.workspace = true

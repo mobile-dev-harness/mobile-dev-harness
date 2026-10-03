@@ -34,6 +34,9 @@ pub struct Flow {
     /// Configuration of the UI consistency checks (`mdh-visual`), passed to them as is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visual: Option<serde_json::Value>,
+    /// Configuration of the performance checks (`mdh-perf`): runs and budgets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub perf: Option<serde_json::Value>,
     /// Checked after the last step; `no crash` is always checked too.
     #[serde(default, rename = "assert", skip_serializing_if = "Vec::is_empty")]
     pub checks: Vec<FlowCheck>,
@@ -272,6 +275,15 @@ impl fmt::Display for Step {
 }
 
 impl Flow {
+    /// The section of the flow file a check kind is configured by.
+    pub fn config_for(&self, kind: CheckKind) -> Option<&serde_json::Value> {
+        match kind {
+            CheckKind::Functional => None,
+            CheckKind::Visual => self.visual.as_ref(),
+            CheckKind::Performance => self.perf.as_ref(),
+        }
+    }
+
     /// Environment variables the flow reads through `${env:NAME}`.
     pub fn secrets(&self) -> Vec<String> {
         let mut texts: Vec<&str> = self.setup.open.as_deref().into_iter().collect();
@@ -402,6 +414,7 @@ impl Flow {
             setup: Setup::default(),
             screens,
             visual: None,
+            perf: None,
             steps,
             checks: checks.into_iter().map(FlowCheck).collect(),
         };
@@ -550,6 +563,23 @@ pub async fn run_flow(
     if let Err(e) = setup {
         findings.push(step_failure(None, "setup".into(), e.to_string()));
     }
+    // Check kinds that measure the whole run start here, with the app launched.
+    if !failed {
+        let mut cx = CheckContext {
+            session,
+            run_dir: run_dir.as_deref(),
+            step: None,
+            since_ms: Some(since),
+            scope: Some(&flow.name),
+            checkpoint: "begin",
+            config: None,
+            timings,
+        };
+        for check in &options.verify.checks {
+            cx.config = flow.config_for(check.kind());
+            check.begin(&mut cx).await?;
+        }
+    }
     for (i, step) in flow.steps.iter().enumerate() {
         if failed {
             break;
@@ -592,6 +622,7 @@ pub async fn run_flow(
     // Other check kinds look at the screen the flow ends on, unless it never got there.
     if !failed {
         for check in &options.verify.checks {
+            cx.config = flow.config_for(check.kind());
             findings.extend(check.run(&mut cx).await?);
         }
     }
@@ -740,6 +771,7 @@ async fn run_step(
             };
             let mut findings = check.run(&mut cx).await?;
             for extra in &options.verify.checks {
+                cx.config = flow.config_for(extra.kind());
                 findings.extend(extra.run(&mut cx).await?);
             }
             return Ok(findings);

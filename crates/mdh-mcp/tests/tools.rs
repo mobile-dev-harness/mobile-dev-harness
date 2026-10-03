@@ -115,6 +115,7 @@ async fn lists_the_tools_with_object_schemas() {
             "mdh_impact",
             "mdh_logs",
             "mdh_observe",
+            "mdh_perf",
             "mdh_run",
             "mdh_status",
             "mdh_verify",

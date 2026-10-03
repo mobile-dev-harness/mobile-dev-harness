@@ -6,6 +6,7 @@ mod emulator;
 mod helper;
 mod install;
 mod logcat;
+mod perf;
 mod sdk;
 mod uiautomator;
 
@@ -24,13 +25,20 @@ use std::time::Duration;
 use async_trait::async_trait;
 use mdh_core::ui::{RawTree, TreeSource};
 use mdh_core::{
-    Appearance, AppearanceKind, Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result,
+    Appearance, AppearanceKind, Avd, Device, Error, FrameStats, Input, LaunchInfo, LogEntry,
+    MemoryStats, Platform, Result,
 };
 
 use crate::Driver;
 
 /// Upper bound on log lines fetched per read, so a long pause between calls can't flood memory.
 const MAX_LOG_LINES: usize = 5000;
+
+/// Where traces are written: the one directory perfetto may write to on user builds.
+const TRACE_FILE: &str = "/data/misc/perfetto-traces/mdh.pftrace";
+const TRACE_CONFIG: &str = "/data/local/tmp/mdh-perfetto.cfg";
+/// The PID of the tracing perfetto, so stopping it leaves other traces alone.
+const TRACE_PID: &str = "/data/local/tmp/mdh-perfetto.pid";
 
 /// Global settings that scale window, transition and animator animations.
 const ANIMATION_SCALES: [&str; 3] = [
@@ -384,6 +392,123 @@ impl Driver for AndroidDriver {
             tool: "wm density".into(),
             detail: out,
         })
+    }
+
+    async fn frame_stats(&self, device: &Device, package: &str, reset: bool) -> Result<FrameStats> {
+        let command = format!(
+            "dumpsys gfxinfo {}{}",
+            shell_quote(package),
+            if reset { " reset" } else { "" }
+        );
+        let out = self.adb.shell(&device.id, &command).await?;
+        // A reset prints the statistics it discards, which may be nothing for a new process.
+        Ok(perf::parse_gfxinfo(&out).unwrap_or_default())
+    }
+
+    async fn memory(&self, device: &Device, package: &str) -> Result<MemoryStats> {
+        let out = self
+            .adb
+            .shell(
+                &device.id,
+                &format!("dumpsys meminfo {}", shell_quote(package)),
+            )
+            .await?;
+        perf::parse_meminfo(&out).ok_or_else(|| Error::AppNotFound {
+            package: package.to_owned(),
+        })
+    }
+
+    async fn cpu_time_ms(&self, device: &Device, pid: u32) -> Result<u64> {
+        let out = self
+            .adb
+            .shell(&device.id, &format!("cat /proc/{pid}/stat"))
+            .await?;
+        // Android's clock tick is 10 ms (CLK_TCK 100).
+        perf::parse_proc_stat_ticks(&out)
+            .map(|t| t * 10)
+            .ok_or(Error::Parse {
+                tool: "/proc/stat".into(),
+                detail: out,
+            })
+    }
+
+    async fn debuggable(&self, device: &Device, package: &str) -> Result<bool> {
+        let out = self
+            .adb
+            .shell_stdout(
+                &device.id,
+                &format!("dumpsys package {}", shell_quote(package)),
+            )
+            .await?;
+        Ok(out
+            .lines()
+            .any(|l| l.contains("flags=[") && l.contains("DEBUGGABLE")))
+    }
+
+    async fn start_trace(&self, device: &Device, config: &str) -> Result<()> {
+        // The config goes through a file: perfetto doesn't read a heredoc on stdin when it
+        // detaches, but does read a pipe. `--background-wait` returns once every data source
+        // records (so the first events of what follows aren't lost); before Android 12 there's
+        // only `--background`, and a pause instead. Either prints the PID.
+        let command = format!(
+            "rm -f {TRACE_FILE}; cat > {TRACE_CONFIG} <<'MDH_EOF'\n{config}\nMDH_EOF\n\
+             P=$(cat {TRACE_CONFIG} | perfetto --background-wait --txt -c - -o {TRACE_FILE} 2>/dev/null) \
+             || {{ P=$(cat {TRACE_CONFIG} | perfetto --background --txt -c - -o {TRACE_FILE}) && sleep 1; }}; \
+             echo \"$P\" > {TRACE_PID}; echo \"$P\""
+        );
+        let pid = self.adb.shell_stdout(&device.id, &command).await?;
+        if pid.trim().parse::<u32>().is_err() {
+            return Err(Error::CommandFailed {
+                command: "perfetto --background".into(),
+                code: None,
+                stderr: format!("tracing didn't start: {}", pid.trim()),
+            });
+        }
+        Ok(())
+    }
+
+    async fn stop_trace(&self, device: &Device) -> Result<Vec<u8>> {
+        // SIGTERM makes perfetto flush and write the trace. The file fills in shortly after the
+        // process is gone, so wait for both: the process to exit, the file to stop growing.
+        let _ = self
+            .adb
+            .shell(
+                &device.id,
+                &format!("kill -TERM $(cat {TRACE_PID}) 2>/dev/null"),
+            )
+            .await;
+        for _ in 0..40 {
+            let running = self
+                .adb
+                .shell_stdout(
+                    &device.id,
+                    &format!("kill -0 $(cat {TRACE_PID}) 2>/dev/null && echo running"),
+                )
+                .await
+                .unwrap_or_default();
+            if running.trim().is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        let mut last = 0u64;
+        for _ in 0..40 {
+            let size = self
+                .adb
+                .shell_stdout(&device.id, &format!("stat -c %s {TRACE_FILE}"))
+                .await
+                .ok()
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .unwrap_or(0);
+            if size > 0 && size == last {
+                break;
+            }
+            last = size;
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        self.adb
+            .exec_out_bytes(&device.id, &["cat", TRACE_FILE])
+            .await
     }
 
     async fn appearance(&self, device: &Device, kind: &AppearanceKind) -> Result<Appearance> {

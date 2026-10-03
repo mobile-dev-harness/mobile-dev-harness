@@ -151,6 +151,11 @@ impl Control {
         self.driver.set_appearance(&self.device, value).await
     }
 
+    /// The driver, for check kinds that read device statistics directly.
+    pub fn driver(&self) -> &Arc<dyn Driver> {
+        &self.driver
+    }
+
     pub async fn density(&self) -> Result<u32> {
         self.driver.density(&self.device).await
     }

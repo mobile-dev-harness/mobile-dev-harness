@@ -67,5 +67,9 @@ pub struct CheckContext<'a> {
 #[async_trait]
 pub trait Check: Send + Sync {
     fn kind(&self) -> CheckKind;
+    /// Called once in a flow, after setup and before the first step: where measuring starts.
+    async fn begin(&self, _cx: &mut CheckContext<'_>) -> Result<()> {
+        Ok(())
+    }
     async fn run(&self, cx: &mut CheckContext<'_>) -> Result<Vec<Finding>>;
 }

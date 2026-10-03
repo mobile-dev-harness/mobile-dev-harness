@@ -25,8 +25,10 @@ verification engine in `mdh-verify` (`Check` interface, functional checks, verdi
 state for flows (animations, permissions, data reset, deep links: `mdh state`, `mdh open`), the
 Claude Code plugin (`integrations/claude-code`, hooks via `mdh hook`), `mdh init` (AGENTS.md
 section), and the emulator e2e job replaying the sample's flows. M5 done: `mdh-visual` rule checks with contrast, structural and pixel baselines,
-cross-config layout checks (`mdh visual`, `mdh_visual`, flows' `visual:` section). Next: M6
-(performance checks).
+cross-config layout checks (`mdh visual`, `mdh_visual`, flows' `visual:` section). M6 done:
+`mdh-perf` (startup, frames, memory, CPU against per-device baselines and budgets; regressions
+explained by a Perfetto trace; `mdh perf`, `mdh_perf`, flows' `perf:` section). Next: M7
+(compatibility matrix).
 State and config is a track that grows with each milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -184,6 +186,17 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Baselines are per device profile; never compare across sizes or densities.
 - Configuration variants must restore the setting on every path, errors included
   (`check_variant`); they run only at the `final` checkpoint.
+
+## Performance checks
+
+- Never judge on one run: medians over repeated runs, a regression must beat three times the noise
+  (MAD) and the metric's minimum change (`Metric::minimum_change`). Check a change to the protocol
+  for false fails by measuring the clean sample twice: both must pass.
+- adb output parsers are pure functions tested on captured output in `fixtures/android/`.
+- Perfetto's trace processor is pinned (`trace::VERSION`, SHA-256 per platform) and is downloaded
+  only with the user's consent (`NEEDS_CONSENT` otherwise); never download it in tests or CI.
+- Trace SQL is checked against a real trace from the emulator after every change; the summary
+  logic (`trace::explain`) is unit-tested on slices.
 
 ## Impact analysis
 

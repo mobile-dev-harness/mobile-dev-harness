@@ -170,12 +170,12 @@ A check kind of the verification engine (F6.4): its measurements and budget resu
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F11.1 | Startup | Cold, warm and hot start over N runs (`am start -W` after force-stop / back / home); time to initial and full display (`Displayed`, `reportFullyDrawn`); median, p90 and spread |
-| F11.2 | Rendering | Frame timing during a flow or scroll (`dumpsys gfxinfo` reset before, read after; `framestats` for detail): janky-frame share, p50/p90/p99 frame time, slow and frozen frames |
-| F11.3 | Memory | PSS, Java and native heap (`dumpsys meminfo`) after a flow; growth across N repetitions of the same flow as a leak signal |
-| F11.4 | CPU | CPU usage of the app process sampled during a flow |
-| F11.5 | Budgets and baselines | Budgets in `mdh.yaml` (e.g. cold start p50 < 800 ms, janky < 5%) and stored baselines per device; regressions are judged relative to the baseline with a noise-aware threshold, never on a single run |
-| F11.6 | Traces (later) | Perfetto capture around a slow step, summarized to the slices that explain it |
+| F11.1 | Startup ✅ | `perf startup [app] [--hot]`: cold start (after force-stop) and hot start (after HOME) over N runs plus a discarded first one (`am start -W`); median, p90 and spread. Warm starts and time to full display (`reportFullyDrawn`) later |
+| F11.2 | Rendering ✅ | `perf flow <name>`: frame timing while a saved flow runs, N times (`dumpsys gfxinfo` reset at the start, read at the end): janky-frame share, p90 and p99 frame time; animations kept on |
+| F11.3 | Memory ✅ | Total PSS (`dumpsys meminfo`) at the end of each run; growth with every repetition of the same flow is reported as a leak signal |
+| F11.4 | CPU ✅ | CPU time of the app process over the run's wall time (`/proc/<pid>/stat`) |
+| F11.5 | Budgets and baselines ✅ | Budgets in the flow's `perf:` section (`janky_pct: 5`, `cold_start_ms: 800`, …) judged on the median; baselines per device profile (AVD or model, API level, debug/release) in `.mdh/baselines/perf/`, recorded by the first measurement, promoted by `perf approve`; a regression must exceed both three times the noise and a per-metric minimum, never judged on a single run |
+| F11.6 | Traces ✅ | On a regression (or `--trace`) one more run under Perfetto, summarized to the main-thread work that explains it (`bindApplication 592 ms → … → slowInit 451 ms`, `RV Prefetch ×88 806 ms → … → slowBind ×33 792 ms`), late frames and GC; the trace is kept for ui.perfetto.dev. The host-side trace processor (14 MB, pinned, hash-checked) is downloaded only after the user agreed (`perf setup`) |
 
 > Emulators are not representative in absolute terms. Reports name the device, compare against a baseline on the
 > same device, and show variance; absolute budgets are meant for physical devices.
@@ -249,7 +249,8 @@ mdh impact [--base REF] [--project DIR]   # what the change reaches; no device n
 mdh verify CHECK... [--timeout 3]     # e.g. 'visible "Sign in"' 'enabled id=sign_in' 'screen .LoginActivity'
 mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name>
 mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10] [--timeout 3]
-mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
+mdh perf startup [app] [--hot] [--runs 5] [--trace] | flow <name> [--runs N] [--trace] | approve [SCOPE]
+mdh perf setup [--yes] | explain <trace> --app <pkg> [--startup]   # Perfetto's trace processor; asks before downloading
 mdh compat run [--matrix <name>] [flows...] | devices
 mdh visual check [--baseline NAME] [--rules all|none|r1,r2] [--ignore TARGET]... [--configs font_scale,dark,rtl] | approve [NAME|FLOW]
 mdh session show | reset
@@ -282,7 +283,7 @@ than split into many small tools.
 | `mdh_verify` | Run checks or replay flows (named, or those the uncommitted change needs), return a verdict | verify / flow run | M4 ✅ |
 | `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
 | `mdh_visual` | Rule checks, structural and pixel baselines, other configurations of the current screen; approve candidates | visual | M5 ✅ |
-| `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf | M6 |
+| `mdh_perf` | Measure startup or a flow against baselines and budgets, explain regressions with a Perfetto trace; approve; set up the trace processor (with the user's consent) | perf | M6 ✅ |
 | `mdh_compat` | Run flows across a matrix; matrix report | compat | M7 |
 
 Screenshots are returned as MCP image content; long builds report via progress notifications.

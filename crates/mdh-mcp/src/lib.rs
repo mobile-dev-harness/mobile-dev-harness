@@ -244,6 +244,42 @@ pub enum VisualCommand {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PerfParams {
+    pub command: PerfCommand,
+    /// `startup`: package or package/activity (default: the session's app). `explain`: the app's
+    /// package.
+    pub app: Option<String>,
+    /// `flow`: the saved flow to measure.
+    pub flow: Option<String>,
+    /// `startup`: measure the hot start too.
+    pub hot: Option<bool>,
+    /// `startup`, `flow`: measured runs, default 5 (or the flow's `perf: runs`).
+    pub runs: Option<usize>,
+    /// `startup`, `flow`: capture and explain a Perfetto trace even if nothing regressed.
+    pub trace: Option<bool>,
+    /// `approve`: the scope whose latest measurements become the baselines: a flow's name or
+    /// `startup-<package>` (default: all).
+    pub scope: Option<String>,
+    /// `setup`: the user agreed to download Perfetto's trace processor. Never set it without
+    /// asking them.
+    pub consent: Option<bool>,
+    /// `explain`: the trace file a verdict named.
+    pub path: Option<String>,
+    /// `explain`: the trace is of a cold start (default: of a flow).
+    pub startup: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum PerfCommand {
+    Startup,
+    Flow,
+    Approve,
+    Setup,
+    Explain,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FlowParams {
     pub command: FlowCommand,
     /// `save`, `show`: the flow's name (letters, digits, `-`, `_`).
@@ -696,6 +732,66 @@ impl MdhServer {
                     .text)
             })
             .await;
+        Ok(text_result(result))
+    }
+
+    #[tool(
+        description = "Performance against baselines and budgets, over repeated runs (median, noise and run count reported; a change must exceed the noise to count). `startup`: cold (and hot) start time of the app. `flow`: frames (janky share, p90, p99), memory and CPU while a saved flow runs; budgets come from the flow's `perf:` section. The first measurement records the baseline; later ones fail on a regression, and a Perfetto trace then says what the main thread did (what's slow, by name). `approve` accepts new measurements as baselines. Analyzing traces needs Perfetto's trace processor: if a verdict says it's missing, ask the user, and only if they agree call `setup` with `consent: true` (a 14 MB download); `explain` then summarizes a kept trace. Takes 10–60 s."
+    )]
+    async fn mdh_perf(
+        &self,
+        Parameters(p): Parameters<PerfParams>,
+    ) -> std::result::Result<CallToolResult, ErrorData> {
+        let missing = |what: &str| Error::InvalidFlow {
+            flow: String::new(),
+            reason: format!("pass `{what}`"),
+        };
+        let options = mdh_perf::PerfOptions {
+            runs: p.runs.unwrap_or(5).max(1),
+            trace: p.trace.unwrap_or(false),
+            ..mdh_perf::PerfOptions::default()
+        };
+        let result = match p.command {
+            PerfCommand::Approve => mdh_perf::approve(p.scope.as_deref()),
+            PerfCommand::Setup => mdh_perf::setup(p.consent.unwrap_or(false)),
+            PerfCommand::Explain => match (p.path, p.app) {
+                (Some(path), Some(app)) => {
+                    let scenario = if p.startup == Some(true) {
+                        mdh_perf::Scenario::Startup
+                    } else {
+                        mdh_perf::Scenario::Flow
+                    };
+                    mdh_perf::explain(Path::new(&path), &app, scenario).map(|l| l.join("\n"))
+                }
+                (None, _) => Err(missing("path")),
+                (_, None) => Err(missing("app")),
+            },
+            PerfCommand::Startup => {
+                let hot = p.hot.unwrap_or(false);
+                self.with_session(async |s| {
+                    let app = s.package_or_app(p.app.as_deref())?;
+                    Ok(mdh_perf::startup(s, &app, hot, &options).await?.text)
+                })
+                .await
+            }
+            PerfCommand::Flow => match p.flow {
+                Some(name) => {
+                    let runs = p.runs;
+                    self.with_session(async |s| {
+                        let mut flow = mdh_verify::FlowStore::new(FLOWS_DIR).load(&name)?;
+                        if let Some(runs) = runs
+                            && let Some(perf) = flow.perf.as_mut().and_then(|v| v.as_object_mut())
+                        {
+                            perf.insert("runs".into(), runs.into());
+                        }
+                        let mut timings = Timings::default();
+                        Ok(mdh_perf::flow(s, &flow, &options, &mut timings).await?.text)
+                    })
+                    .await
+                }
+                None => Err(missing("flow")),
+            },
+        };
         Ok(text_result(result))
     }
 

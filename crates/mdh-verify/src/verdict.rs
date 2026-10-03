@@ -37,7 +37,7 @@ pub struct Verdict {
 }
 
 impl Verdict {
-    pub(crate) fn new(
+    pub fn new(
         name: Option<String>,
         findings: Vec<Finding>,
         duration_ms: u64,
@@ -68,7 +68,7 @@ impl Verdict {
         v
     }
 
-    pub(crate) fn set_steps(&mut self, ran: usize, total: usize) {
+    pub fn set_steps(&mut self, ran: usize, total: usize) {
         self.steps = Some((ran, total));
         self.text = self.render();
     }

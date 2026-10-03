@@ -30,6 +30,11 @@ work; the same steps exist as `mdh` CLI commands.
 5. **Regressions.** Call `mdh_verify` with `changed: true` to replay the saved flows that pass the
    affected screens. When you verified something worth repeating, save it with `mdh_flow`
    (`command: save`, `name`, and the `checks` to run at the end; `last` keeps only the last N steps).
+6. **Performance.** When impact lists `performance` items (app startup, list binding, drawing),
+   call `mdh_perf`: `command: startup` for startup, `command: flow` with a saved flow that scrolls
+   the affected list. A regression fails with the numbers (median, noise, runs) and a trace summary
+   of what got slow. If it says the trace processor is missing, ask the user before calling
+   `command: setup` with `consent: true`. When a slower number is intended, `command: approve`.
 
 Report the verdicts in your answer. If something can't be verified here (no device, needs real
 accounts or hardware), say exactly what wasn't verified instead of implying it works.

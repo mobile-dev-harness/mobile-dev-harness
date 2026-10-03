@@ -63,7 +63,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
 | `mdh-visual` | check kind | UI consistency: rule checks, structural and pixel baselines, contrast, cross-config layout checks ✅; design mocks next (§13) | M5 ✅, M8 |
-| `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
+| `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets and baselines; Perfetto traces explain regressions | M6 ✅ |
 | `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
 | `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
 | `mobile-dev-harness` (`crates/mdh-cli`) | entry | CLI `mdh`, the only published binary | ✅ |
@@ -400,6 +400,10 @@ build "up to date" in 0.8 s and the install skipped; a one-line edit to the visi
   swapped; enums are written as single-key maps (`- tap: Sign in`), not YAML tags.
 - `.mdh/session.json`: CLI mode only, versioned; incompatible versions are discarded and rebuilt.
 - `.mdh/runs/`: one directory per run; the latest 20 are kept (configurable).
+- `.mdh/baselines/`: visual (`visual/<scope>/<checkpoint>/<profile>.*`) and performance
+  (`perf/<profile>/<scope>.json`) baselines, committed; candidates (`*.new.*`) wait for `approve`.
+- Host cache: Perfetto's trace processor in `~/Library/Caches/mdh` or `$XDG_CACHE_HOME/mdh` (downloaded only with
+  the user's consent).
 - Restoring global settings: original values (e.g. animation scales) are recorded at session start and restored on
   `session reset` or when the MCP connection closes.
 
@@ -443,30 +447,71 @@ can't start, mdh falls back to `uiautomator dump`.
 
 ## 11. Performance checks (`mdh-perf`)
 
-A check kind (ADR-0009): it implements `Check`, runs on flows from the verification engine and reports measurements
-and budget results as findings.
+A check kind (ADR-0009) with its own runner: a measurement needs repetitions, so `mdh perf` (`mdh_perf` over MCP)
+drives the engine instead of riding along with every verification. `perf startup` launches the app itself;
+`perf flow` replays a saved flow N times through `run_flow` with a `Performance` check (the sampler) attached:
+its `begin` hook, called after the flow's setup, resets the frame counters and notes the process's CPU time, and its
+run at the `final` checkpoint reads frames, memory and CPU. The result is an ordinary verdict whose findings are the
+metrics; a run that fails functionally stops the measurement and its verdict is returned instead.
 
-
-**Data sources** (all via adb, parsed by pure functions with fixtures):
+**Data sources** (all via adb, parsed by pure functions with fixtures in `fixtures/android/`):
 
 | Metric | Source |
 |---|---|
-| Startup | `am start -W` (`TotalTime`, `WaitTime`, `LaunchState`); `ActivityTaskManager: Displayed` and `Fully drawn` in logcat |
-| Frames | `dumpsys gfxinfo <pkg> reset` before, `dumpsys gfxinfo <pkg>` after (janky frames, percentiles, slow/frozen counts); `framestats` for per-frame detail |
-| Memory | `dumpsys meminfo <pkg>` (TOTAL PSS, Java heap, native heap, graphics) |
-| CPU | `/proc/<pid>/stat` sampled during the flow |
+| Cold, hot start | `am start -W` (`TotalTime`, `LaunchState`) after `force-stop` (cold) or HOME (hot) |
+| Frames | `dumpsys gfxinfo <pkg> reset` at the start, `dumpsys gfxinfo <pkg>` at the end: janky-frame share, p90 and p99 frame time |
+| Memory | `dumpsys meminfo <pkg>`: total PSS (Java heap, native heap and graphics are parsed too) |
+| CPU | utime + stime of `/proc/<pid>/stat` (10 ms ticks) over the flow's wall time |
 
-**Measurement protocol.** Warm-up runs are discarded; N measured runs report median, p90 and median absolute
-deviation. Perf runs restore the device's real animation scales — control disables animations for stability, but
-jank can't be measured without them. Runs are separated by a cool-down; device, API level and build fingerprint are
-recorded with every result.
+**Measurement protocol.** One extra first run is discarded (the first launch after an install pays for dex2oat and
+cold caches). N measured runs (5 by default, or the flow's `perf: runs`) report median, p90 and median absolute
+deviation (MAD). Animations stay on — jank can't be measured without them — so a session that turned them off has
+them back on for the measurement and off again after it. Runs are separated by an 800 ms cool-down.
 
-**Baselines and regressions.** Baselines live in `.mdh/baselines/perf/<device-fingerprint>/<scenario>.json`. A
-regression requires both a statistical signal (new median beyond baseline median + k·MAD) and a minimum absolute
-delta, so noise on emulators doesn't produce failures. Budgets in `mdh.yaml` are absolute and meant for physical
-devices. Perf checks are also exposed as assertion kinds for `mdh-verify`.
+**Baselines and regressions.** `.mdh/baselines/perf/<profile>/<scope>.json`, committed with the project: the
+profile is the AVD (or model), API level and build type (`Pixel_9_Pro_XL-api36-debug`; `run-as` tells debug
+builds, whose numbers only compare with other debug builds and get a warning saying so); the scope is the flow or
+`startup-<package>`. A regression needs the median to exceed the baseline's by more than three times the larger MAD
+*and* by a per-metric minimum (cold start 50 ms and 5%, hot start 20 ms and 10%, janky frames 2 points, p90 4 ms and
+10%, p99 8 ms and 25%, PSS 5 MB and 10%, CPU 5 points and 15%), so emulator jitter doesn't fail verdicts and a
+noisy run can't show a small change. The first measurement records the baseline (a warning: commit it); later ones
+write `<scope>.new.json`, which `mdh perf approve [scope]` promotes. Budgets (`perf: budgets:` in a flow, keyed
+like the metrics: `cold_start_ms`, `janky_pct`, `frame_p90_ms`, …) are upper limits on the median, meant for
+physical devices. PSS that grows with every run of the same flow by 10% (at least 5 MB) is reported as a leak
+signal.
 
-**Later:** Perfetto traces around slow steps, summarized with trace processor to the slices that explain them.
+What gfxinfo can't see: frames that are never produced. Work between frames (RecyclerView prefetch, say) delays
+or skips frames without making a counted frame slow; it shows as CPU, and the trace below names it.
+
+**Traces.** On a regression, a budget exceeded or `--trace`, one more run is traced with Perfetto (Android 9+ ships
+it): scheduling, `am wm gfx view dalvik binder_driver res input` atrace categories plus the app's own sections,
+FrameTimeline (Android 12+), process renames. The config is written to `/data/local/tmp` and piped to `perfetto
+--background-wait` (which returns once the data sources record; `--background` and a pause before Android 12);
+SIGTERM to the recorded PID stops it, and the file is pulled once it stops growing (it is written just after the
+process exits). The trace is kept in the run directory and summarized by Perfetto's `trace_processor_shell` with SQL:
+
+- startup: `android_startups` (the app's last start), then its main-thread slices in that window;
+- flows: FrameTimeline frames with `App Deadline Missed` and the main thread during them, then the busiest
+  main-thread work over the whole run;
+- both: GC count and time in the window.
+
+Slices aggregate by their path of normalized names (numbers, `key=value` details and paths dropped), so repeated
+work reads as one line, and each line follows the biggest part while it is at least half of its parent, eliding the
+framework in between: `Choreographer#doFrame ×120 1674 ms → … → View#onTouchEvent ×94 1164 ms → slowScroll ×56
+1120 ms`. The app's process is matched by name or, when the trace has it under `zygote64`, by its main thread's
+name (the package's last 15 characters).
+
+**Trace processor.** Pinned to Perfetto v58.2 (the SQL modules change between releases) with a SHA-256 per platform
+(macOS and Linux, arm64 and x86-64). Found as `MDH_TRACE_PROCESSOR`, the cache (`~/Library/Caches/mdh`,
+`$XDG_CACHE_HOME/mdh`), Perfetto's own download of the same build (`~/.local/share/perfetto/prebuilts`), or on
+PATH. Never downloaded unasked: without it the trace is still kept and the finding tells the agent to ask its user;
+`mdh perf setup` asks at a terminal, otherwise fails with `NEEDS_CONSENT` until called with `--yes` (MCP: `consent:
+true`), then downloads with curl and checks the hash. `mdh perf explain <trace> --app <pkg>` summarizes a kept trace
+afterwards.
+
+**Later:** warm starts and time to full display (`reportFullyDrawn`), per-frame detail from `framestats`, frame
+drops counted from FrameTimeline on every run, Java/native heap and graphics memory as metrics, perf findings in
+the compatibility matrix.
 
 ## 12. Compatibility matrix (`mdh-compat`)
 

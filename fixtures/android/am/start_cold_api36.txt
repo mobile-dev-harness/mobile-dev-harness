@@ -1,0 +1,7 @@
+Starting: Intent { cmp=dev.mdh.sample/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: dev.mdh.sample/.MainActivity
+TotalTime: 1063
+WaitTime: 1067
+Complete

@@ -133,6 +133,10 @@ pub enum Error {
     #[error("unknown revision `{rev}`")]
     UnknownRevision { rev: String },
 
+    /// Something the user has to agree to first (a download, say); never assumed.
+    #[error("{action} needs the user's consent")]
+    NeedsConsent { action: String, retry: String },
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -172,6 +176,7 @@ impl Error {
             Error::MissingSecret { .. } => ErrorCode::MissingSecret,
             Error::NotARepository { .. } => ErrorCode::NotARepository,
             Error::UnknownRevision { .. } => ErrorCode::UnknownRevision,
+            Error::NeedsConsent { .. } => ErrorCode::NeedsConsent,
             Error::Io(_) => ErrorCode::Io,
         }
     }
@@ -289,6 +294,9 @@ impl Error {
             Error::UnknownRevision { .. } => {
                 "pass a branch, tag or commit that exists, e.g. `--base main` or `--base HEAD~1`".into()
             }
+            Error::NeedsConsent { retry, .. } => {
+                format!("ask the user; if they agree, {retry}")
+            }
             Error::Io(_) => "check that the path exists and is accessible".into(),
         }
     }
@@ -331,6 +339,7 @@ pub enum ErrorCode {
     MissingSecret,
     NotARepository,
     UnknownRevision,
+    NeedsConsent,
     Io,
 }
 
@@ -370,6 +379,7 @@ impl ErrorCode {
             ErrorCode::MissingSecret => "MISSING_SECRET",
             ErrorCode::NotARepository => "NOT_A_REPOSITORY",
             ErrorCode::UnknownRevision => "UNKNOWN_REVISION",
+            ErrorCode::NeedsConsent => "NEEDS_CONSENT",
             ErrorCode::Io => "IO",
         }
     }
@@ -390,7 +400,8 @@ impl ErrorCode {
             | ErrorCode::MissingSecret
             | ErrorCode::AmbiguousBuildTarget
             | ErrorCode::UnknownBuildTarget
-            | ErrorCode::UnknownRevision => 2,
+            | ErrorCode::UnknownRevision
+            | ErrorCode::NeedsConsent => 2,
             ErrorCode::BuildFailed | ErrorCode::ProbeFailed | ErrorCode::NoApk => 4,
             ErrorCode::AppCrashed => 5,
             ErrorCode::ToolNotFound

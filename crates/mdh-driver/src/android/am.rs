@@ -8,6 +8,7 @@ pub fn parse_am_start(target: &str, out: &str) -> Result<LaunchInfo> {
         activity: None,
         total_time_ms: 0,
         reused_existing: false,
+        state: None,
     };
     for line in out.lines().map(str::trim) {
         if let Some(message) = line.strip_prefix("Error: ") {
@@ -17,6 +18,8 @@ pub fn parse_am_start(target: &str, out: &str) -> Result<LaunchInfo> {
             });
         } else if let Some(activity) = line.strip_prefix("Activity: ") {
             info.activity = Some(activity.to_owned());
+        } else if let Some(state) = line.strip_prefix("LaunchState: ") {
+            info.state = Some(state.split_whitespace().next().unwrap_or(state).to_owned());
         } else if let Some(ms) = line.strip_prefix("TotalTime: ") {
             info.total_time_ms = ms.parse().unwrap_or_default();
         } else if line.starts_with("Warning: Activity not started") {

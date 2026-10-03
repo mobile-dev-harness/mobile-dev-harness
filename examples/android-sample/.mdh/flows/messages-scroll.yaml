@@ -4,6 +4,11 @@ setup:
   open: mdhsample://messages
 screens:
 - MessagesActivity
+perf:
+  runs: 5
+  budgets:
+    janky_pct: 15
+    frame_p90_ms: 32
 steps:
 - scroll:
     direction: down

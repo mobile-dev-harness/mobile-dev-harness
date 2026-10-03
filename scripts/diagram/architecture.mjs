@@ -111,14 +111,13 @@ function diagram(t) {
   parts.push(arrow(t, 334, 385, 296, 385));
   parts.push(box(t, 340, 290, 790, 190, "none", { dashed: true, weight: 1.4 }));
   parts.push(text(t, 360, 310, "compatibility matrix — the same flows and checks on every device & config", { size: 16, anchor: "start", color: t.muted }));
-  parts.push(box(t, 360, 326, 750, 140, t.planned, { dashed: true, weight: 1.4 }));
-  parts.push(text(t, 378, 346, "verification engine — flows · verdicts · evidence ✓ · baselines next", { size: 17, anchor: "start" }));
+  parts.push(box(t, 360, 326, 750, 140, t.planned, { weight: 1.4 }));
+  parts.push(text(t, 378, 346, "verification engine — flows · verdicts · evidence · baselines ✓", { size: 17, anchor: "start" }));
   const checks = [["Functional", ["assertions on", "screens & logs"]],
-    ["UI consistency", ["baselines · designs", "layout & a11y rules"]],
+    ["UI consistency", ["baselines · configs", "layout & a11y rules"]],
     ["Performance", ["startup · jank", "memory · CPU"]]];
   checks.forEach(([title, lines], i) => {
-    const done = i === 0;
-    parts.push(card(t, 378 + i * 242, 362, 228, 92, done ? t.done : t.bg, done ? `${title} ✓` : title, lines, { dashed: !done, titleSize: 19 }));
+    parts.push(card(t, 378 + i * 242, 362, 228, 92, t.done, `${title} ✓`, lines, { titleSize: 19 }));
   });
   parts.push(text(t, 1110, 310, "dashed = planned", { size: 15, anchor: "end", color: t.muted }));
 

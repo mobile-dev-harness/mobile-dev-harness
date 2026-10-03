@@ -27,9 +27,12 @@ compiles.
    evidence in `.mdh/runs/`; `no crash` is always checked.
 5. `mdh flow run --changed` replays the saved flows that pass the affected screens. Save what you
    did as a flow with `mdh flow save NAME --check '…'`; flows live in `.mdh/flows/` (commit them).
+6. When impact lists `performance` items (startup, list binding), `mdh perf startup` or
+   `mdh perf flow NAME` compares with this device's baseline in `.mdh/baselines/perf/` and says
+   what got slow. Ask the user before `mdh perf setup --yes` downloads the trace processor.
 
-Over MCP the same steps are `mdh_impact`, `mdh_run`, `mdh_observe`, `mdh_act`, `mdh_verify` and
-`mdh_flow`.
+Over MCP the same steps are `mdh_impact`, `mdh_run`, `mdh_observe`, `mdh_act`, `mdh_verify`,
+`mdh_flow` and `mdh_perf`.
 "#;
 
 /// Sets a project up: `.mdh/.gitignore` (keeps flows, ignores session, runs and cache),

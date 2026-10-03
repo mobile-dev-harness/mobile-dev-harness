@@ -97,6 +97,7 @@ impl Driver for FakeDriver {
             activity: None,
             total_time_ms: 100,
             reused_existing: false,
+            state: None,
         })
     }
     async fn stop(&self, _: &Device, package: &str) -> Result<()> {

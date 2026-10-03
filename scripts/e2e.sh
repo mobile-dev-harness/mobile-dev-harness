@@ -28,3 +28,5 @@ run devices "$mdh" devices
 run "mdh run" "$mdh" run
 run flows "$mdh" flow run login-success login-wrong-password settings-bluetooth compose-greeting messages-scroll troubles-layout \
   --junit flows.xml --step-timeout 30 --timeout 10
+# Performance end to end, without judging: the CI emulator has no baseline, so this records one.
+run "perf startup" "$mdh" perf startup --runs 3

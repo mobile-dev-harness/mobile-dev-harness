@@ -9,6 +9,17 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+async-trait.workspace = true
+mdh-control.workspace = true
+mdh-core.workspace = true
+mdh-verify.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10.9"
+tokio.workspace = true
+
+[dev-dependencies]
+mdh-driver.workspace = true
 
 [lints]
 workspace = true

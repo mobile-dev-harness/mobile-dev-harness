@@ -87,7 +87,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | **M2 Project** ✅ | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M4 Verification engine + functional checks** ✅ | F14 change impact ✅ (ADR-0010), F6.1–F6.4 ✅ (the `Check` interface UI and performance checks will implement), F7.1–F7.4 ✅, F9.2 Claude Code plugin ✅, F9.3 ✅; from the state track: data reset ✅, permissions ✅, deep links ✅, animations ✅ (what flow `setup` needs) | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
 | **M5 UI consistency checks v1** ✅ | F13.1 baselines (structural ✅ + pixel ✅), F13.3 cross-config layout checks on one device ✅, F13.4 rule checks (tree ✅, contrast ✅) | A layout regression and a missing label in the sample app show up in a flow's verdict with evidence |
-| **M6 Performance checks v1** | F11.1–F11.5 | A startup and a jank regression in the sample app show up in a verdict against a baseline → **release 0.2.0** |
+| **M6 Performance checks v1** ✅ | F11.1–F11.5 ✅, F11.6 Perfetto traces ✅ | A startup and a jank regression in the sample app show up in a verdict against a baseline → **release 0.2.0** |
 | **M7 Compatibility matrix v1** | F12.1–F12.4 (local emulators and physical devices) | One command runs the sample's flows and their checks across a 3×3 matrix and reports per-cell verdicts |
 | **M8 Ecosystem** | F10.1 RN/Expo, F10.2 Flutter, F13.2 design-mock comparison, F12.5 cloud and vendor devices, F7.5 Maestro import | — |
 | **M9 iOS** | F10.3 | Control and functional checks pass S1–S4 on the iOS simulator |

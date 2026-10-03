@@ -10,7 +10,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use mdh_core::ui::RawTree;
 use mdh_core::{
-    Appearance, AppearanceKind, Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result,
+    Appearance, AppearanceKind, Avd, Device, Error, FrameStats, Input, LaunchInfo, LogEntry,
+    MemoryStats, Platform, Result,
 };
 
 /// A platform backend: low-level device capabilities only. Element targeting, waiting and
@@ -98,6 +99,41 @@ pub trait Driver: Send + Sync {
         _scales: &[(String, Option<String>)],
     ) -> Result<()> {
         Err(unsupported("changing animation settings"))
+    }
+
+    /// Frame timing of `package` since the last reset; with `reset`, starts counting anew.
+    async fn frame_stats(
+        &self,
+        _device: &Device,
+        _package: &str,
+        _reset: bool,
+    ) -> Result<FrameStats> {
+        Err(unsupported("reading frame statistics"))
+    }
+
+    async fn memory(&self, _device: &Device, _package: &str) -> Result<MemoryStats> {
+        Err(unsupported("reading memory statistics"))
+    }
+
+    /// CPU time (user plus system) a process has used, in milliseconds.
+    async fn cpu_time_ms(&self, _device: &Device, _pid: u32) -> Result<u64> {
+        Err(unsupported("reading CPU time"))
+    }
+
+    /// Whether the installed app is a debug build (slower; its numbers only compare with other
+    /// debug builds).
+    async fn debuggable(&self, _device: &Device, _package: &str) -> Result<bool> {
+        Ok(false)
+    }
+
+    /// Starts a system trace with `config` (Perfetto text format) in the background.
+    async fn start_trace(&self, _device: &Device, _config: &str) -> Result<()> {
+        Err(unsupported("system tracing"))
+    }
+
+    /// Stops the trace started by `start_trace` and returns it.
+    async fn stop_trace(&self, _device: &Device) -> Result<Vec<u8>> {
+        Err(unsupported("system tracing"))
     }
 
     /// The current value of an appearance setting, to restore after varying it.
