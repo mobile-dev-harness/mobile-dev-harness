@@ -5,8 +5,9 @@ change); JSON output changes are listed here and carry the `schema` version of t
 
 ## Unreleased
 
-- MCP: the default tool set is the core one (10 tools); `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and
-  `mdh_compat`. Tool definitions and the server instructions are 61% and 38% smaller (compact schemas, one-line
+- MCP: `mdh_wait` is an action of `mdh_act` (`action: wait`) and `mdh_logs` an option of `mdh_observe` (`logs`);
+  actions are one flat object. The default tool set is the core one (8 tools); `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and
+  `mdh_compat`. Tool definitions and the server instructions are 65% and 35% smaller (compact schemas, one-line
   descriptions): fewer tokens on every request. The Claude Code plugin gains `visual`, `perf` and `compat` skills,
   loaded only when needed.
 - The compatibility knowledge base moved to its own repository,

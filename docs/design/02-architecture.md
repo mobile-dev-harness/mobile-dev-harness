@@ -650,8 +650,9 @@ position, size, spacing, color and font size reported with a side-by-side diff.
 - **One session per connection**, in memory; the device is connected on first use (`mdh_status` can switch
   devices or reset). Same session engine as the CLI, so behavior is identical.
 - **Tools.** The default set (`--tools core`): `mdh_status`, `mdh_observe` (optional diff and screenshot), `mdh_act`
-  (a list of actions, stopping at the first failure; each reports what changed), `mdh_wait`, `mdh_logs`, `mdh_app`,
-  `mdh_run`, `mdh_verify`, `mdh_flow`, `mdh_impact`. `--tools all` adds the check kinds `mdh_visual`, `mdh_perf`,
+  (a list of actions, waiting for a target among them, stopping at the first failure; each reports what changed),
+  `mdh_app`, `mdh_run`, `mdh_verify`, `mdh_flow`, `mdh_impact`; `mdh_observe` with `logs` returns the app's recent
+  log lines. Actions are one flat object (an `action` and the fields it uses) rather than a `oneOf` per action. `--tools all` adds the check kinds `mdh_visual`, `mdh_perf`,
   `mdh_compat`; agents with a shell use their CLI commands instead, which cost no context until used (the plugin's
   `visual`, `perf` and `compat` skills describe them). Targets are strings in the same grammar as the CLI, so agents
   learn one syntax.
@@ -666,7 +667,7 @@ position, size, spacing, color and font size reported with a side-by-side diff.
   when needed), and the generated schemas are compacted when the server starts (`schema.rs`): integer formats and
   bounds, `null` alongside optional types and `$defs` references go. The benchmark showed what this costs: the
   previous 13 tools added ~7k tokens to every request, more than a setup with only adb. Now the core tools are
-  6.4k characters (a test keeps them under 7k) and the instructions 0.6k.
+  5.9k characters in 8 tools (a test keeps them under 6.5k) and the instructions 0.6k.
 
 ## 15. Claude Code plugin
 

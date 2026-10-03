@@ -275,10 +275,8 @@ claude mcp add mdh -- mdh mcp
 | 工具 | 作用 |
 |---|---|
 | `mdh_run` | 构建、有变化才安装、重启 App 并显示第一个界面；构建错误以 `文件:行号` 诊断的形式返回 |
-| `mdh_observe` | 当前屏幕；可选只看变化，或附带截图 |
-| `mdh_act` | 一个或多个动作（`tap`、`long_press`、`type`、`swipe`、`scroll`、`key`），每个都报告发生了什么变化 |
-| `mdh_wait` | 等待某个元素出现或消失 |
-| `mdh_logs` | 最近的日志和崩溃报告 |
+| `mdh_observe` | 当前屏幕；可选只看变化、附带截图，或者看 App 最近的日志和崩溃报告 |
+| `mdh_act` | 一个或多个动作（`tap`、`long_press`、`type`、`swipe`、`scroll`、`key`，以及等待某个元素出现或消失的 `wait`），每个都报告发生了什么变化 |
 | `mdh_app` | 启动、停止或安装 App；打开 deep link；清除数据；授予或撤销权限 |
 | `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow（指定名字，或由未提交的改动自动挑选）；返回结论、实际观测值，证据保存在磁盘上 |
 | `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |

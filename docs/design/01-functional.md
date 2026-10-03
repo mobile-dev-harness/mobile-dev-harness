@@ -270,17 +270,15 @@ since the agent last looked; CLI invocations share a session through `.mdh/sessi
 Few, coarse tools: every tool definition costs agent context, so actions are distinguished by parameters rather
 than split into many small tools.
 The default set (`mdh mcp`, `--tools core`) is what an agent uses every turn: driving the app, building, verifying,
-flows, impact; their definitions take about 6.4k characters (a test keeps them under 7k). The check kinds
+flows, impact, in 8 tools whose definitions take about 5.9k characters (a test keeps them under 6.5k). The check kinds
 (`mdh_visual`, `mdh_perf`, `mdh_compat`) come with `--tools all`; agents with a shell use the CLI instead, guided
 by skills loaded only when needed.
 
 | Tool | Purpose | CLI equivalent | Since |
 |---|---|---|---|
 | `mdh_status` | Device and session overview; switch device (remembered), start an emulator the user agreed to, reset the session, animations on/off | devices / emulator / session / state animations | M1 ✅ |
-| `mdh_observe` | Observe (diff, screenshot) | observe / screenshot | M1 ✅ |
-| `mdh_act` | Run one or more actions, each returning what changed | tap / type / scroll / … | M1 ✅ |
-| `mdh_wait` | Wait for a target to appear or disappear | wait | M1 ✅ |
-| `mdh_logs` | Recent logs and crash reports | logs | M1 ✅ |
+| `mdh_observe` | Observe (diff, screenshot), or the app's logs and crash reports | observe / screenshot / logs | M1 ✅ |
+| `mdh_act` | Run one or more actions (waiting for a target is one), each returning what changed | tap / type / scroll / … / wait | M1 ✅ |
 | `mdh_app` | Launch, stop, install, open a deep link, clear data, grant/revoke permissions | launch / stop / install / open / state | M1 ✅, M4 ✅ |
 | `mdh_run` | Build → install → launch → first observation, with progress | run | M2 ✅ |
 | `mdh_state` | Snapshots, appearance (locale, dark mode, font scale) | state | M5, M7 |

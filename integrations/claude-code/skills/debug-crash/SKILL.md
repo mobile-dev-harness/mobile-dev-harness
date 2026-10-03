@@ -7,7 +7,7 @@ description: Find and fix the cause of an Android app crash, native crash or ANR
 
 1. **Read the report you already have.** mdh puts the crash in the result: the exception, the
    app's own stack frames first (framework frames folded), `caused by:` lines, and the steps that
-   led there (`after: …`). Call `mdh_logs` for the surrounding log lines if you need more.
+   led there (`after: …`). Call `mdh_observe` with `logs: "info"` for the surrounding log lines if you need more.
 2. **Find the cause in the code.** Start at the deepest app frame of the root cause (the last
    `caused by:`), not at the first frame. For an ANR, look for work on the main thread (I/O, locks,
    long loops, `Thread.sleep`) in the code the last action triggered. For a native crash (signal),

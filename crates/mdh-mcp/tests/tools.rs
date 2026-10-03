@@ -120,14 +120,12 @@ async fn lists_the_tools_with_object_schemas() {
             "mdh_compat",
             "mdh_flow",
             "mdh_impact",
-            "mdh_logs",
             "mdh_observe",
             "mdh_perf",
             "mdh_run",
             "mdh_status",
             "mdh_verify",
-            "mdh_visual",
-            "mdh_wait"
+            "mdh_visual"
         ]
     );
     for tool in &tools {
@@ -146,7 +144,7 @@ async fn core_tools_leave_out_the_check_kinds_and_stay_small() {
     let client = connect_with(Tools::Core).await;
     let tools = client.list_all_tools().await.unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
-    assert_eq!(names.len(), 10, "{names:?}");
+    assert_eq!(names.len(), 8, "{names:?}");
     assert!(
         !names
             .iter()
@@ -156,7 +154,7 @@ async fn core_tools_leave_out_the_check_kinds_and_stay_small() {
         .iter()
         .map(|t| serde_json::to_string(t).unwrap().len())
         .sum();
-    assert!(size < 7_000, "core tool definitions take {size} characters");
+    assert!(size < 6_500, "core tool definitions take {size} characters");
     for t in &tools {
         let schema = serde_json::to_string(&t.input_schema).unwrap();
         assert!(
@@ -196,4 +194,31 @@ async fn observe_then_act_and_errors_carry_codes() {
     .unwrap();
     assert_eq!(missing.is_error, Some(true));
     assert!(text(&missing.content).contains("error[ELEMENT_NOT_FOUND]"));
+
+    // Waiting is an action too; a step without what it needs says which field.
+    let waited = call(
+        "mdh_act",
+        serde_json::json!({ "actions": [{ "action": "wait", "target": "Wi-Fi", "timeout_s": 1 }] }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(waited.is_error, Some(false), "{}", text(&waited.content));
+    let incomplete = call(
+        "mdh_act",
+        serde_json::json!({ "actions": [{ "action": "tap" }] }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(incomplete.is_error, Some(true));
+    assert!(
+        text(&incomplete.content).contains("needs `target`"),
+        "{}",
+        text(&incomplete.content)
+    );
+
+    // Logs are an observation.
+    let logs = call("mdh_observe", serde_json::json!({ "logs": "warn" }))
+        .await
+        .unwrap();
+    assert_eq!(logs.is_error, Some(false), "{}", text(&logs.content));
 }

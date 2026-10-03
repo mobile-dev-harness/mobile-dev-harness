@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use base64::Engine;
 use mdh_control::{
-    ActOutcome, Action, ConnectOptions, Control, DEFAULT_DEVICE_FILE, Direction, Observation,
-    RunOptions, Session, Target, launch_text,
+    Action, ConnectOptions, Control, DEFAULT_DEVICE_FILE, Direction, RunOptions, Session, Target,
+    launch_text,
 };
 use mdh_core::output::Timings;
 use mdh_core::{Error, LogLevel, Result};
@@ -155,48 +155,59 @@ pub struct ObserveParams {
     pub diff: Option<bool>,
     /// Add a screenshot: for opaque regions, images, visual details.
     pub screenshot: Option<bool>,
+    /// Instead, the app's recent log lines and crash reports at this level and above.
+    pub logs: Option<Level>,
+    /// With `logs`: most recent lines, default 50.
+    pub lines: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ActParams {
     /// In order; stops at the first failure.
-    pub actions: Vec<ActSpec>,
+    pub actions: Vec<ActStep>,
 }
 
-/// One action on a target (ref, label, selector or x,y).
+/// One action. Targets are a ref, a label, a selector or x,y.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum ActSpec {
-    Tap {
-        target: String,
-    },
-    LongPress {
-        target: String,
-        duration_ms: Option<u32>,
-    },
-    /// Sets the field's text (any language), tapping `into` first if given.
-    Type {
-        text: String,
-        into: Option<String>,
-        append: Option<bool>,
-        /// Press ENTER after.
-        enter: Option<bool>,
-    },
-    Swipe {
-        from: [i32; 2],
-        to: [i32; 2],
-        duration_ms: Option<u32>,
-    },
-    /// `down` shows what is below; stops once `until` is on screen.
-    Scroll {
-        direction: ScrollDirection,
-        within: Option<String>,
-        until: Option<String>,
-    },
-    /// BACK, HOME, ENTER, …
-    Key {
-        name: String,
-    },
+pub struct ActStep {
+    pub action: ActKind,
+    /// tap, long_press, wait: the element; scroll: the container (optional).
+    pub target: Option<String>,
+    /// type: the text (any language).
+    pub text: Option<String>,
+    /// type: tap this field first.
+    pub into: Option<String>,
+    /// type: append instead of replacing.
+    pub append: Option<bool>,
+    /// type: press ENTER after.
+    pub enter: Option<bool>,
+    /// key: BACK, HOME, ENTER, …
+    pub key: Option<String>,
+    /// scroll: `down` shows what is below.
+    pub direction: Option<ScrollDirection>,
+    /// scroll: stop once this is on screen.
+    pub until: Option<String>,
+    /// swipe: [x, y].
+    pub from: Option<[i32; 2]>,
+    pub to: Option<[i32; 2]>,
+    /// long_press, swipe.
+    pub duration_ms: Option<u32>,
+    /// wait: for the target to disappear.
+    pub gone: Option<bool>,
+    /// wait: seconds, default 10.
+    pub timeout_s: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActKind {
+    Tap,
+    LongPress,
+    Type,
+    Swipe,
+    Scroll,
+    Key,
+    Wait,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
@@ -348,23 +359,6 @@ pub enum CompatCommand {
     Run,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct WaitParams {
-    pub target: String,
-    /// Wait for it to disappear.
-    pub gone: Option<bool>,
-    /// Seconds, default 10.
-    pub timeout_s: Option<u64>,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct LogsParams {
-    /// Minimum level, default warn.
-    pub level: Option<Level>,
-    /// Most recent lines, default 50.
-    pub lines: Option<usize>,
-}
-
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
@@ -373,6 +367,18 @@ pub enum Level {
     Info,
     Warn,
     Error,
+}
+
+impl From<Level> for LogLevel {
+    fn from(l: Level) -> Self {
+        match l {
+            Level::Verbose => LogLevel::Verbose,
+            Level::Debug => LogLevel::Debug,
+            Level::Info => LogLevel::Info,
+            Level::Warn => LogLevel::Warn,
+            Level::Error => LogLevel::Error,
+        }
+    }
 }
 
 // MCP requires an object at the root of every input schema, so this is a struct rather than a
@@ -452,12 +458,19 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "The current screen as a compact tree with refs; only what changed, or a screenshot, on request."
+        description = "The current screen as a compact tree with refs; only what changed, a screenshot, or the app's logs and crashes on request."
     )]
     async fn mdh_observe(
         &self,
         Parameters(p): Parameters<ObserveParams>,
     ) -> std::result::Result<CallToolResult, ErrorData> {
+        if let Some(level) = p.logs {
+            let lines = p.lines.unwrap_or(50);
+            let result = self
+                .with_session(async |s| Ok(s.logs(level.into(), lines).await?.text()))
+                .await;
+            return Ok(text_result(result));
+        }
         let diff = p.diff.unwrap_or(false);
         let screenshot = p.screenshot.unwrap_or(false);
         let result = self
@@ -491,7 +504,7 @@ impl MdhServer {
     }
 
     #[tool(
-        description = "Run actions in order (tap, long_press, type, swipe, scroll, key); each reports what changed."
+        description = "Run actions in order (tap, long_press, type, swipe, scroll, key, wait); each reports what changed."
     )]
     async fn mdh_act(
         &self,
@@ -503,18 +516,39 @@ impl MdhServer {
         let mut texts = Vec::new();
         let mut crash = None;
         let mut failure = None;
-        for spec in p.actions {
-            let outcome: Result<ActOutcome> = match to_action(spec) {
-                Ok(action) => {
-                    self.with_session(async |s| s.act(action, &mut Timings::default()).await)
+        for step in p.actions {
+            // (text, logs) of what the step reported.
+            let outcome: Result<(String, Option<LogDigest>)> = match step.action {
+                ActKind::Wait => match step.target.as_deref().map(Target::parse) {
+                    Some(Ok(target)) => {
+                        let gone = step.gone.unwrap_or(false);
+                        let timeout = Duration::from_secs(step.timeout_s.unwrap_or(10));
+                        self.with_session(async |s| {
+                            let o = s
+                                .wait(&target, gone, timeout, &mut Timings::default())
+                                .await?;
+                            Ok((o.text, o.logs))
+                        })
                         .await
-                }
-                Err(e) => Err(e),
+                    }
+                    Some(Err(e)) => Err(e),
+                    None => Err(missing_field("wait", "target")),
+                },
+                _ => match to_action(step) {
+                    Ok(action) => {
+                        self.with_session(async |s| {
+                            let o = s.act(action, &mut Timings::default()).await?;
+                            Ok((o.text, o.logs))
+                        })
+                        .await
+                    }
+                    Err(e) => Err(e),
+                },
             };
             match outcome {
-                Ok(outcome) => {
-                    texts.push(outcome.text.clone());
-                    crash = crash_error(outcome.logs.as_ref());
+                Ok((text, logs)) => {
+                    texts.push(text);
+                    crash = crash_error(logs.as_ref());
                     if crash.is_some() {
                         break;
                     }
@@ -596,48 +630,6 @@ impl MdhServer {
             },
             Err(e) => error_result(&e),
         })
-    }
-
-    #[tool(description = "Wait until a target appears, or with `gone` disappears.")]
-    async fn mdh_wait(
-        &self,
-        Parameters(p): Parameters<WaitParams>,
-    ) -> std::result::Result<CallToolResult, ErrorData> {
-        let gone = p.gone.unwrap_or(false);
-        let timeout = Duration::from_secs(p.timeout_s.unwrap_or(10));
-        let result: Result<Observation> = match Target::parse(&p.target) {
-            Ok(target) => {
-                self.with_session(async |s| {
-                    s.wait(&target, gone, timeout, &mut Timings::default())
-                        .await
-                })
-                .await
-            }
-            Err(e) => Err(e),
-        };
-        Ok(match result {
-            Ok(o) => observed(&o.text, o.logs.as_ref()),
-            Err(e) => error_result(&e),
-        })
-    }
-
-    #[tool(description = "Recent log lines and crash reports of the app.")]
-    async fn mdh_logs(
-        &self,
-        Parameters(p): Parameters<LogsParams>,
-    ) -> std::result::Result<CallToolResult, ErrorData> {
-        let level = match p.level.unwrap_or(Level::Warn) {
-            Level::Verbose => LogLevel::Verbose,
-            Level::Debug => LogLevel::Debug,
-            Level::Info => LogLevel::Info,
-            Level::Warn => LogLevel::Warn,
-            Level::Error => LogLevel::Error,
-        };
-        let lines = p.lines.unwrap_or(50);
-        let result = self
-            .with_session(async |s| Ok(s.logs(level, lines).await?.text()))
-            .await;
-        Ok(text_result(result))
     }
 
     #[tool(
@@ -964,57 +956,60 @@ impl ServerHandler for MdhServer {
     }
 }
 
-fn to_action(spec: ActSpec) -> Result<Action> {
+fn missing_field(action: &str, field: &str) -> Error {
+    Error::InvalidTarget {
+        target: format!("{action} action"),
+        reason: format!("needs `{field}`"),
+    }
+}
+
+fn to_action(step: ActStep) -> Result<Action> {
     let target = |s: &str| Target::parse(s);
     let optional = |s: Option<String>| s.as_deref().map(target).transpose();
-    Ok(match spec {
-        ActSpec::Tap { target: t } => Action::Tap {
-            target: target(&t)?,
+    let need = |v: Option<String>, field: &str, action: &str| {
+        v.ok_or_else(|| missing_field(action, field))
+    };
+    Ok(match step.action {
+        ActKind::Tap => Action::Tap {
+            target: target(&need(step.target, "target", "tap")?)?,
         },
-        ActSpec::LongPress {
-            target: t,
-            duration_ms,
-        } => Action::LongPress {
-            target: target(&t)?,
-            duration_ms: duration_ms.unwrap_or(800),
+        ActKind::LongPress => Action::LongPress {
+            target: target(&need(step.target, "target", "long_press")?)?,
+            duration_ms: step.duration_ms.unwrap_or(800),
         },
-        ActSpec::Type {
-            text,
-            into,
-            append,
-            enter,
-        } => Action::Type {
-            text,
-            into: optional(into)?,
-            append: append.unwrap_or(false),
-            enter: enter.unwrap_or(false),
+        ActKind::Type => Action::Type {
+            text: need(step.text, "text", "type")?,
+            into: optional(step.into)?,
+            append: step.append.unwrap_or(false),
+            enter: step.enter.unwrap_or(false),
         },
-        ActSpec::Swipe {
-            from,
-            to,
-            duration_ms,
-        } => Action::Swipe {
-            from: (from[0], from[1]),
-            to: (to[0], to[1]),
-            duration_ms: duration_ms.unwrap_or(300),
-        },
-        ActSpec::Scroll {
-            direction,
-            within,
-            until,
-        } => Action::Scroll {
-            direction: match direction {
+        ActKind::Swipe => {
+            let (Some(from), Some(to)) = (step.from, step.to) else {
+                return Err(missing_field("swipe", "from` and `to"));
+            };
+            Action::Swipe {
+                from: (from[0], from[1]),
+                to: (to[0], to[1]),
+                duration_ms: step.duration_ms.unwrap_or(300),
+            }
+        }
+        ActKind::Scroll => Action::Scroll {
+            direction: match step
+                .direction
+                .ok_or_else(|| missing_field("scroll", "direction"))?
+            {
                 ScrollDirection::Up => Direction::Up,
                 ScrollDirection::Down => Direction::Down,
                 ScrollDirection::Left => Direction::Left,
                 ScrollDirection::Right => Direction::Right,
             },
-            within: optional(within)?,
-            until: optional(until)?,
+            within: optional(step.target)?,
+            until: optional(step.until)?,
         },
-        ActSpec::Key { name } => Action::Key {
-            name: name.to_uppercase(),
+        ActKind::Key => Action::Key {
+            name: need(step.key, "key", "key")?.to_uppercase(),
         },
+        ActKind::Wait => unreachable!("waits are handled by mdh_act"),
     })
 }
 

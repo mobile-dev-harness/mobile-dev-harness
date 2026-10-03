@@ -287,10 +287,8 @@ claude mcp add mdh -- mdh mcp
 | Tool | What it does |
 |---|---|
 | `mdh_run` | Build, install if changed, restart and show the first screen; build errors as `file:line` diagnostics |
-| `mdh_observe` | The current screen; optionally only what changed, or a screenshot |
-| `mdh_act` | One or more actions (`tap`, `long_press`, `type`, `swipe`, `scroll`, `key`), each reporting what changed |
-| `mdh_wait` | Wait until an element appears or disappears |
-| `mdh_logs` | Recent log lines and crash reports |
+| `mdh_observe` | The current screen; optionally only what changed, a screenshot, or the app's recent logs and crash reports |
+| `mdh_act` | One or more actions (`tap`, `long_press`, `type`, `swipe`, `scroll`, `key`, `wait` for an element to appear or disappear), each reporting what changed |
 | `mdh_app` | Launch, stop or install an app; open a deep link; clear its data; grant or revoke a permission |
 | `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows — named, or the ones the uncommitted change needs; a verdict with what was observed and evidence on disk |
 | `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
