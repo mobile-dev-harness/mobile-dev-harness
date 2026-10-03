@@ -153,7 +153,10 @@ impl Driver for Fake {
     }
     async fn appearance(&self, _: &Device, kind: &AppearanceKind) -> Result<Appearance> {
         Ok(match kind {
-            AppearanceKind::Rotation => Appearance::Rotation(None),
+            AppearanceKind::Rotation => Appearance::Rotation {
+                auto: true,
+                user: 0,
+            },
             _ => Appearance::Display {
                 size: None,
                 density: None,
@@ -280,6 +283,9 @@ async fn an_api_branch_runs_on_both_sides_and_fails_on_the_old_one() {
             "emulator-5556 (api32, API 32)"
         ]
     );
+    let failure = report.failure().expect("a risk failed");
+    assert_eq!(failure.code().as_str(), "VERIFICATION_FAILED");
+    assert!(failure.to_string().ends_with(" risks failed"), "{failure}");
     // No display or rotation was touched for API cells.
     assert!(driver.appearance.lock().unwrap().is_empty());
     let _ = std::fs::remove_dir_all(&dir);

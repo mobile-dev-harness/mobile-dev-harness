@@ -81,8 +81,9 @@ pub enum Appearance {
     NightMode(String),
     /// The app's own languages, comma-separated tags; empty follows the system.
     AppLocales { package: String, locales: String },
-    /// A fixed rotation (0–3, quarter turns), or `None` for auto-rotate.
-    Rotation(Option<u32>),
+    /// Auto-rotate on or off, and the rotation used while it's off (0–3, quarter turns). Both are
+    /// kept, so restoring a device puts back exactly what it had.
+    Rotation { auto: bool, user: u32 },
     /// Display size (px) and density overrides; `None` is the panel's own.
     Display {
         size: Option<(u32, u32)>,

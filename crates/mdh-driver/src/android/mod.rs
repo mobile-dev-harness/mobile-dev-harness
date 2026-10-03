@@ -558,7 +558,7 @@ impl Driver for AndroidDriver {
                 let mut lines = out.lines().map(str::trim);
                 let auto = lines.next() != Some("0");
                 let user = lines.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-                Appearance::Rotation((!auto).then_some(user))
+                Appearance::Rotation { auto, user }
             }
             AppearanceKind::Display => {
                 let out = shell("wm size; wm density".into()).await?;
@@ -594,10 +594,10 @@ impl Driver for AndroidDriver {
                 shell_quote(package),
                 shell_quote(locales)
             ),
-            Appearance::Rotation(None) => "settings put system accelerometer_rotation 1".into(),
-            Appearance::Rotation(Some(n)) => format!(
-                "settings put system accelerometer_rotation 0; settings put system user_rotation {}",
-                n % 4
+            Appearance::Rotation { auto, user } => format!(
+                "settings put system user_rotation {}; settings put system accelerometer_rotation {}",
+                user % 4,
+                u8::from(*auto)
             ),
             Appearance::Display { size, density } => format!(
                 "wm size {}; wm density {}",

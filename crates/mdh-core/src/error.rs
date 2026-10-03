@@ -127,6 +127,10 @@ pub enum Error {
     #[error("verification failed: {failed} of {total} checks")]
     VerificationFailed { failed: usize, total: usize },
 
+    /// A compatibility run in which risks failed; same code as a failed verification.
+    #[error("compatibility: {failed} of {total} risks failed")]
+    RisksFailed { failed: usize, total: usize },
+
     #[error("{dir} is not inside a git repository")]
     NotARepository { dir: String },
 
@@ -170,7 +174,9 @@ impl Error {
             Error::InstallFailed { .. } => ErrorCode::InstallFailed,
             Error::Unsupported { .. } => ErrorCode::Unsupported,
             Error::InvalidAssertion { .. } => ErrorCode::InvalidAssertion,
-            Error::VerificationFailed { .. } => ErrorCode::VerificationFailed,
+            Error::VerificationFailed { .. } | Error::RisksFailed { .. } => {
+                ErrorCode::VerificationFailed
+            }
             Error::InvalidFlow { .. } => ErrorCode::InvalidFlow,
             Error::FlowNotFound { .. } => ErrorCode::FlowNotFound,
             Error::MissingSecret { .. } => ErrorCode::MissingSecret,
@@ -280,6 +286,11 @@ impl Error {
             Error::FlowNotFound { available, .. } => format!("saved flows: {}", available.join(", ")),
             Error::MissingSecret { name } => {
                 format!("the flow types `${{env:{name}}}`; set {name} in the environment of mdh")
+            }
+            Error::RisksFailed { .. } => {
+                "each failed risk says on which device or configuration and what broke; unverified risks say what's \
+                 missing"
+                    .into()
             }
             Error::VerificationFailed { .. } => {
                 "the verdict shows what was observed for each failed check; evidence (screenshot, tree, \

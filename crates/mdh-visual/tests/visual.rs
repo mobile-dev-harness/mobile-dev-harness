@@ -52,7 +52,10 @@ impl Driver for FakeDriver {
                 package: package.clone(),
                 locales: String::new(),
             },
-            AppearanceKind::Rotation => Appearance::Rotation(None),
+            AppearanceKind::Rotation => Appearance::Rotation {
+                auto: true,
+                user: 0,
+            },
             AppearanceKind::Display => Appearance::Display {
                 size: None,
                 density: None,

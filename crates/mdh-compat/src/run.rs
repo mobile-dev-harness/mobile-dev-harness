@@ -124,7 +124,7 @@ impl CompatReport {
             .iter()
             .filter(|r| r.status == RiskStatus::Failed)
             .count();
-        (failed > 0).then_some(Error::VerificationFailed {
+        (failed > 0).then_some(Error::RisksFailed {
             failed,
             total: self.risks.len(),
         })
@@ -522,9 +522,7 @@ async fn apply(session: &mut Session, shape: Shape) -> Result<Restore> {
     }
     if shape == Shape::Landscape {
         restore.rotation = Some(control.appearance(&AppearanceKind::Rotation).await?);
-        control
-            .set_appearance(&Appearance::Rotation(Some(1)))
-            .await?;
+        control.set_appearance(&landscape()).await?;
     }
     if shape != Shape::Default {
         tokio::time::sleep(SETTLE).await;
@@ -538,6 +536,14 @@ async fn restore_shape(session: &mut Session, restore: Restore) -> Result<()> {
         control.set_appearance(&value).await?;
     }
     Ok(())
+}
+
+/// Turned to landscape, auto-rotate off so it stays there.
+fn landscape() -> Appearance {
+    Appearance::Rotation {
+        auto: false,
+        user: 1,
+    }
 }
 
 /// The display override that shows `w`×`h` dp on `panel`: the density goes down until the size
@@ -580,11 +586,14 @@ async fn state_check(session: &mut Session, timings: &mut Timings) -> Vec<String
     let Ok(original) = control.appearance(&AppearanceKind::Rotation).await else {
         return Vec::new();
     };
-    let turned = control.set_appearance(&Appearance::Rotation(Some(1))).await;
+    let turned = control.set_appearance(&landscape()).await;
     tokio::time::sleep(SETTLE).await;
     let back = session
         .control()
-        .set_appearance(&Appearance::Rotation(Some(0)))
+        .set_appearance(&Appearance::Rotation {
+            auto: false,
+            user: 0,
+        })
         .await;
     tokio::time::sleep(SETTLE).await;
     let _ = session.control().set_appearance(&original).await;
