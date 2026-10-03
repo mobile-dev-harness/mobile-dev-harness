@@ -15,6 +15,11 @@ pub struct Record {
     pub kind: Kind,
     pub setup: String,
     pub rep: usize,
+    /// The model, and the provider when it isn't Anthropic.
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub provider: Option<String>,
     pub outcome: Outcome,
     /// The agent's answer: PASS / FIXED is true.
     pub answer: Option<bool>,
@@ -56,7 +61,21 @@ fn pct(n: usize, d: usize) -> String {
 }
 
 pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
+    let mut models: Vec<String> = records
+        .iter()
+        .map(|r| match &r.provider {
+            Some(p) => format!("{} ({p})", r.model),
+            None if r.model.is_empty() => "claude-sonnet-5-5".to_owned(),
+            None => r.model.clone(),
+        })
+        .collect();
+    models.sort();
+    models.dedup();
+    // Claude Code prices other providers' tokens as if they were Anthropic's, or not at all.
+    let priced = records.iter().all(|r| r.provider.is_none());
     let mut out = vec![
+        format!("Model: {}", models.join(", ")),
+        String::new(),
         "| | Correct | False pass | False fail | Fixed | No answer | Cost / run | Tokens / run | Tool calls | Screenshots | Time / run |".to_owned(),
         "|---|---|---|---|---|---|---|---|---|---|---|".to_owned(),
     ];
@@ -91,14 +110,18 @@ pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
         let fixes: Vec<&&Record> = r.iter().filter(|x| x.kind == Kind::Fix).collect();
         let fixed = fixes.iter().filter(|x| x.works == Some(true)).count();
         out.push(format!(
-            "| {} | {} | {} | {} | {} | {} | ${:.2} | {:.0}k | {:.0} | {:.0} | {:.1} min |",
+            "| {} | {} | {} | {} | {} | {} | {} | {:.0}k | {:.0} | {:.0} | {:.1} min |",
             s.name(),
             pct(count(Outcome::Correct), r.len()),
             pct(count(Outcome::FalsePass), broken),
             pct(count(Outcome::FalseFail), working),
             pct(fixed, fixes.len()),
             pct(count(Outcome::NoAnswer), r.len()),
-            m(&|x| x.cost_usd),
+            if priced {
+                format!("${:.2}", m(&|x| x.cost_usd))
+            } else {
+                "–".into()
+            },
             m(&|x| x.tokens as f64) / 1000.0,
             m(&|x| x.tool_calls as f64),
             m(&|x| x.images as f64),

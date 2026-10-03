@@ -14,9 +14,73 @@ use crate::task::{Kind, Task};
 #[derive(Debug, Clone)]
 pub struct AgentOptions {
     pub model: String,
+    /// Another Anthropic-compatible provider: the environment Claude Code needs to reach it
+    /// (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, model overrides). Never logged.
+    pub provider: Option<Provider>,
     /// Per run, passed to `--max-budget-usd`.
     pub max_usd: f64,
     pub timeout: Duration,
+}
+
+/// A model provider other than Anthropic, read from a `KEY=VALUE` file outside the repository
+/// (`~/.config/mdh-bench/<name>.env`): the variables its documentation gives for Claude Code, plus
+/// `MODEL`, the model to pass to `--model`.
+#[derive(Debug, Clone)]
+pub struct Provider {
+    pub name: String,
+    pub model: String,
+    env: Vec<(String, String)>,
+}
+
+impl Provider {
+    pub fn env_vars(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.env.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
+    pub fn load(name: &str) -> Result<Provider, String> {
+        let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
+        let path = Path::new(&home).join(format!(".config/mdh-bench/{name}.env"));
+        let text =
+            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path)
+                .map(|m| m.permissions().mode())
+                .unwrap_or(0);
+            if mode & 0o077 != 0 {
+                return Err(format!(
+                    "{} is readable by others; run chmod 600 on it",
+                    path.display()
+                ));
+            }
+        }
+        let mut env = Vec::new();
+        let mut model = None;
+        for line in text.lines().map(str::trim) {
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let line = line.strip_prefix("export ").unwrap_or(line);
+            let Some((k, v)) = line.split_once('=') else {
+                return Err(format!("{}: `{line}` is not KEY=VALUE", path.display()));
+            };
+            let v = v.trim().trim_matches(['"', '\'']).to_owned();
+            if k.trim() == "MODEL" {
+                model = Some(v);
+            } else {
+                env.push((k.trim().to_owned(), v));
+            }
+        }
+        if !env.iter().any(|(k, _)| k == "ANTHROPIC_BASE_URL") {
+            return Err(format!("{}: needs ANTHROPIC_BASE_URL", path.display()));
+        }
+        Ok(Provider {
+            name: name.to_owned(),
+            model: model.ok_or_else(|| format!("{}: needs MODEL", path.display()))?,
+            env,
+        })
+    }
 }
 
 /// What a run cost and did.
@@ -80,6 +144,9 @@ pub fn run(
     let _ = std::fs::write(&mcp, setup.mcp(env).to_string());
     let system = format!("{COMMON}\n{}", setup.brief(env));
     let mut cmd = Command::new("claude");
+    if let Some(p) = &options.provider {
+        cmd.envs(p.env_vars());
+    }
     cmd.current_dir(workspace)
         .env("PATH", setup.path(env))
         .env("ANDROID_HOME", &env.sdk)

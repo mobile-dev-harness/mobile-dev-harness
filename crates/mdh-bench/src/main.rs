@@ -53,8 +53,12 @@ enum Cmd {
         setups: Vec<String>,
         #[arg(long, default_value_t = 1)]
         reps: usize,
+        /// Ignored with --provider, whose file names the model
         #[arg(long, default_value = "claude-sonnet-5-5")]
         model: String,
+        /// Another Anthropic-compatible provider, configured in ~/.config/mdh-bench/<name>.env
+        #[arg(long)]
+        provider: Option<String>,
         /// Stop starting runs once this much is spent, in USD
         #[arg(long, default_value_t = 300.0)]
         budget: f64,
@@ -67,6 +71,13 @@ enum Cmd {
     },
     /// Print the results table of a run directory
     Report { out: PathBuf },
+    /// Check a provider before a run: it answers, calls a tool, and reads an image (screenshots)
+    Probe {
+        #[arg(long)]
+        provider: Option<String>,
+        #[arg(long, default_value = "claude-sonnet-5-5")]
+        model: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -80,23 +91,32 @@ fn main() -> ExitCode {
             setups,
             reps,
             model,
+            provider,
             budget,
             max_run_usd,
             timeout_min,
-        } => run(
-            &cli.repo,
-            &out,
-            &tasks,
-            &setups,
-            reps,
-            agent::AgentOptions {
-                model,
-                max_usd: max_run_usd,
-                timeout: Duration::from_secs(timeout_min * 60),
-            },
-            budget,
-        ),
+        } => provider
+            .as_deref()
+            .map(agent::Provider::load)
+            .transpose()
+            .and_then(|provider| {
+                run(
+                    &cli.repo,
+                    &out,
+                    &tasks,
+                    &setups,
+                    reps,
+                    agent::AgentOptions {
+                        model: provider.as_ref().map_or(model, |p| p.model.clone()),
+                        provider,
+                        max_usd: max_run_usd,
+                        timeout: Duration::from_secs(timeout_min * 60),
+                    },
+                    budget,
+                )
+            }),
         Cmd::Report { out } => report(&out),
+        Cmd::Probe { provider, model } => probe(provider.as_deref(), &model),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -277,6 +297,8 @@ fn one(
         task: t.id.clone(),
         kind: t.kind,
         setup: s.key().to_owned(),
+        model: options.model.clone(),
+        provider: options.provider.as_ref().map(|p| p.name.clone()),
         rep,
         outcome,
         answer,
@@ -299,6 +321,107 @@ fn one(
                 .map(|(n, st)| format!("MCP server {n}: {st}"))
         }),
     })
+}
+
+fn probe(provider: Option<&str>, model: &str) -> Result<(), String> {
+    let provider = provider.map(agent::Provider::load).transpose()?;
+    let model = provider
+        .as_ref()
+        .map_or(model.to_owned(), |p| p.model.clone());
+    let dir = scratch("probe");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // A 64×64 red PNG: can the model see screenshots?
+    let png: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x40, 0x08, 0x02, 0x00, 0x00, 0x00, 0x25,
+        0x0B, 0xE6, 0x89, 0x00, 0x00, 0x00, 0x7F, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0xD5, 0xCE,
+        0x41, 0x11, 0x00, 0x20, 0x0C, 0xC0, 0xB0, 0x52, 0x21, 0xF3, 0x2F, 0x0A, 0x31, 0x88, 0xE0,
+        0xB1, 0x6B, 0x14, 0xE4, 0xDC, 0x19, 0xCA, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E,
+        0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0x24, 0x4E, 0xE2, 0xDC, 0x0E, 0xFC, 0x7A, 0x08,
+        0x9D, 0x01, 0x98, 0xF0, 0x16, 0xB9, 0x60, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+        0xAE, 0x42, 0x60, 0x82,
+    ];
+    std::fs::write(dir.join("square.png"), png).map_err(|e| e.to_string())?;
+    let checks = [
+        (
+            "answers",
+            "Reply with the single word: ready".to_owned(),
+            "ready",
+        ),
+        (
+            "calls a tool",
+            "Use the Bash tool to run `echo mdh-$((6*7))` and reply with exactly its output."
+                .to_owned(),
+            "mdh-42",
+        ),
+        (
+            "reads an image",
+            format!(
+                "Use the Read tool to look at {} and reply with its color in one lowercase word.",
+                dir.join("square.png").display()
+            ),
+            "red",
+        ),
+    ];
+    for (what, prompt, expect) in checks {
+        let mut cmd = std::process::Command::new("claude");
+        if let Some(p) = &provider {
+            cmd.envs(p.env_vars());
+        }
+        let out = cmd
+            .current_dir(&dir)
+            .args(["-p", &prompt, "--model", &model, "--output-format", "json"])
+            .args([
+                "--no-session-persistence",
+                "--setting-sources",
+                "",
+                "--strict-mcp-config",
+            ])
+            .args(["--permission-mode", "bypassPermissions"])
+            .output()
+            .map_err(|e| format!("claude: {e}"))?;
+        let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+        let result = v["result"]
+            .as_str()
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase();
+        let models: Vec<&String> = v["modelUsage"]
+            .as_object()
+            .map(|m| m.keys().collect())
+            .unwrap_or_default();
+        let ok = result.contains(expect);
+        println!(
+            "{} {what}: {:?}{}",
+            if ok { "ok  " } else { "FAIL" },
+            result.chars().take(80).collect::<String>(),
+            if models.is_empty() {
+                format!(
+                    " ({})",
+                    String::from_utf8_lossy(&out.stderr)
+                        .lines()
+                        .next()
+                        .unwrap_or("no output")
+                )
+            } else {
+                format!(
+                    " — model {}",
+                    models
+                        .iter()
+                        .map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }
 
 fn load(path: &Path) -> Vec<Record> {
