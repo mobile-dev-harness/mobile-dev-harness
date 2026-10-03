@@ -273,6 +273,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_app` | 启动、停止或安装 App；打开 deep link；清除数据；授予或撤销权限 |
 | `mdh_verify` | 检查 App 当前的状态（`visible`、`enabled`、`text`、`screen`、`no crash` 等），或重放保存的 flow（指定名字，或由未提交的改动自动挑选）；返回结论、实际观测值，证据保存在磁盘上 |
 | `mdh_flow` | 把刚才做过的操作（连同检查）保存成 flow，列出或查看 flow |
+| `mdh_visual` | 检查当前界面的 UI 一致性：规则检查和结构基线；接受基线变化 |
 | `mdh_impact` | 未提交的改动（或自某个版本以来的改动）影响到哪里：受影响的界面及进入方式、失效的调用点、需要校验什么 |
 | `mdh_status` | 设备和会话状态；切换设备、重置会话、关闭或恢复系统动画 |
 
@@ -304,6 +305,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | 把会话中录制的步骤保存为 `.mdh/flows/NAME.yaml` |
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
 | `mdh flow run --changed [--base REF]` | 重放经过未提交改动所影响界面的 flow |
+| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET]` · `mdh visual approve [NAME]` | 检查当前界面的 UI 一致性：触控区域、标签、重叠、被系统栏遮住的控件、重复标签；带 `--baseline` 时，对比基线报告哪些元素移动、改变大小、新增、消失或文字变了；`approve` 接受这些变化作为新基线 |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |
 | `mdh open URI [--package P]` | 打开 deep link |
@@ -364,7 +366,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 ## 示例 App
 
 [`examples/android-sample`](examples/android-sample) 是一个专门用来体验所有功能的小 App：View 和 Compose 页面、
-登录表单、100 条的长列表、联动的开关、WebView、深链、运行时权限、一个故意留下的 edge-to-edge 布局 bug，
+登录表单、100 条的长列表、联动的开关、WebView、深链、运行时权限、一个故意留下的 edge-to-edge 布局 bug、一个没有标签且尺寸过小的图标按钮，
 还有会崩溃、会 native 崩溃、会卡死（ANR）、加载很慢和会打印错误日志的按钮。
 
 ```sh
@@ -386,7 +388,7 @@ mdh launch dev.mdh.sample
 | ✅ | **影响面分析** | 通过静态分析得出一处代码改动影响到哪些界面、在那里需要校验什么（已完成） |
 | ✅ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放（CI 中也可以）、根据改动的影响面自动挑选 flow、JUnit 报告、Claude Code 插件（已完成）；基线随 UI 检查一起提供；检查类型可插拔： |
 | ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
-| ⏳ | ↳ **UI 一致性检查** | 与基线对比、与设计稿对比、跨配置的布局检查、无障碍规则 |
+| ⏳ | ↳ **UI 一致性检查** | 无障碍和布局规则、结构基线（已完成）；接下来是像素基线、对比度、跨配置的布局检查、与设计稿对比 |
 | ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |
 | ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |

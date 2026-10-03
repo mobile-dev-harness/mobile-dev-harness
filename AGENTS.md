@@ -24,7 +24,9 @@ verification engine in `mdh-verify` (`Check` interface, functional checks, verdi
 `mdh_verify`, `mdh_flow`), the flows a change needs picked from its impact (`flow run --changed`),
 state for flows (animations, permissions, data reset, deep links: `mdh state`, `mdh open`), the
 Claude Code plugin (`integrations/claude-code`, hooks via `mdh hook`), `mdh init` (AGENTS.md
-section), and the emulator e2e job replaying the sample's flows. Next: M5 (UI consistency checks).
+section), and the emulator e2e job replaying the sample's flows. M5 so far: `mdh-visual` rule checks and structural baselines
+(`mdh visual`, `mdh_visual`, flows' `visual:` section); next pixel baselines, contrast and
+cross-config layout checks.
 State and config is a track that grows with each milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -48,7 +50,7 @@ crates/
   mdh-control/   control: session engine, targeting, actions, waiting, app lifecycle, `run`
   mdh-verify/    verification engine: Check interface, functional checks, verdicts and evidence, flows
                  (YAML via serde_norway behind `yaml.rs`), replay, JUnit
-  mdh-visual/    check kind: UI consistency                                 — empty until M5
+  mdh-visual/    check kind: UI consistency — rules on the tree, structural baselines (M5 in progress)
   mdh-perf/      check kind: performance                                    — empty until M6
   mdh-compat/    matrix: compatibility across devices and configurations   — empty until M7
   mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
@@ -164,6 +166,14 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
   changing the plugin or the marketplace.
 - Verdict text is what agents read: one line per check, observed values only for failures, evidence
   as file paths (never inline screenshots).
+
+## UI consistency checks
+
+- Tested against a scripted driver in `crates/mdh-visual/tests/visual.rs` (density 480, so 3 px per
+  dp); rules are pure functions over the compact tree.
+- Rules must not produce false fails on correct screens: run `mdh visual check` on every sample screen
+  after changing one (`OverlapActivity` and the Troubles share button are the deliberate failures).
+- Baselines are per device profile; never compare across sizes or densities.
 
 ## Impact analysis
 

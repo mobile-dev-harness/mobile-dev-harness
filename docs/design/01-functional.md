@@ -201,10 +201,10 @@ A check kind of the verification engine (F6.4): deviations and rule violations a
 
 | ID | Feature | Behavior |
 |---|---|---|
-| F13.1 | Baselines | Per screen (or flow step): a stored screenshot and compact tree. Comparison is structural first (elements added, missing, moved, resized, text changed — cheap and explains *what* changed), then pixels with masks for dynamic regions (status bar, clock, regions by selector). Baselines are approved explicitly |
+| F13.1 | Baselines (structural ✅, pixels next) | Per flow checkpoint (each `assert` step and the end) or named screen, per device profile: the compact tree in dp. Comparison is structural first (elements added, missing, moved or resized beyond 4 dp, text changed — cheap and explains *what* changed), then pixels with masks for dynamic regions (status bar, clock, regions by selector). The first run records the baseline; a deviation fails the check and leaves a candidate that `mdh visual approve` makes the baseline |
 | F13.2 | Design mocks (later) | Imports frames from Figma (rendered image and node data), maps them to screens, and reports measured deviations of matched elements (position, size, spacing, color, font size) plus a side-by-side diff |
 | F13.3 | Cross-config layout | On each matrix cell or configuration: text truncation, overlapping interactive elements, elements clipped or pushed off-screen, missing elements compared with the default configuration |
-| F13.4 | Rule checks | On the tree and pixels: touch targets ≥ 48 dp, interactive elements without a label, text contrast (sampled from the screenshot), duplicate labels; findings reference refs and selectors |
+| F13.4 | Rule checks (tree ✅, contrast next) | On the tree: touch targets ≥ 48 dp, controls without a label, overlapping controls, controls under the system bars, duplicate labels (a warning); on pixels: text contrast sampled from the screenshot. In flows they fail the verdict when the flow lists them in `visual.rules` and are warnings otherwise. Content pushed off the screen can't be found in the tree (accessibility clips bounds to the visible area) |
 | F13.5 | Design tokens (later) | Colors and text styles on screen checked against the design system's tokens |
 
 ### F14 Change impact analysis (`mdh-impact`, ADR-0010)
@@ -250,7 +250,7 @@ mdh flow save <name> [--last N] [--check CHECK]... [--force] | list | show <name
 mdh flow run <name...> | --changed [--base REF]  [--junit out.xml] [--step-timeout 10] [--timeout 3]
 mdh perf startup [--runs 10] | flow <name> [--runs 5] | baseline save|show
 mdh compat run [--matrix <name>] [flows...] | devices
-mdh visual check [screen|flow] | baseline save|approve | rules
+mdh visual check [--baseline NAME] [--rules all|none|r1,r2] [--ignore TARGET]... | approve [NAME|FLOW]
 mdh session show | reset
 mdh mcp
 ```
@@ -280,7 +280,7 @@ than split into many small tools.
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches and what to verify | impact | M4 |
 | `mdh_verify` | Run checks or replay flows (named, or those the uncommitted change needs), return a verdict | verify / flow run | M4 ✅ |
 | `mdh_flow` | Save, list and show flows | flow save / list / show | M4 ✅ |
-| `mdh_visual` | Baseline comparison, cross-config layout and rule checks | visual | M5 |
+| `mdh_visual` | Rule checks and structural baselines of the current screen; approve candidates; cross-config layout next | visual | M5 ◐ |
 | `mdh_perf` | Measure startup, a flow or a scroll; compare with the baseline | perf | M6 |
 | `mdh_compat` | Run flows across a matrix; matrix report | compat | M7 |
 
@@ -402,6 +402,10 @@ steps:
   - open: mdhsample://settings
   - assert:                                         # checks in the middle of a flow
       - visible "Messages"
+visual:                                             # UI consistency at every checkpoint (assert steps, the end)
+  rules: [touch_target, label]                      # fail on these (`all`, `none`); unlisted: all rules, as warnings
+  baseline: true                                    # compare with .mdh/baselines/visual/<flow>/<checkpoint>/
+  ignore: [id=clock]                                # left out of the comparison
 assert:                                             # checks after the last step; `no crash` is implied
   - screen .MessagesActivity
   - text: { target: id=title, equals: Messages }    # the structured form of `text id=title == "Messages"`

@@ -62,7 +62,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
 | `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
-| `mdh-visual` | check kind | UI consistency: structural and pixel comparison with baselines, cross-config layout checks, rule checks, design mocks | M5, M8 |
+| `mdh-visual` | check kind | UI consistency: rule checks and structural baselines ✅; pixel comparison, cross-config layout checks, design mocks next (§13) | M5, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
 | `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
 | `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
@@ -507,31 +507,47 @@ devices. Leases record manufacturer and ROM version, and a small knowledge base 
 
 ## 13. UI consistency checks (`mdh-visual`)
 
-A check kind (ADR-0009): it implements `Check` and reports deviations and rule violations as findings, with
-screenshots and tree excerpts as evidence; baselines come from the engine's baseline store.
+A check kind (ADR-0009): `Visual` implements `Check` and reports rule violations and baseline deviations as
+findings, with a screenshot of the failing checkpoint (`visual-<checkpoint>.jpg` in the run directory) as
+evidence. The entry points pass it to every verification (`VerifyOptions::checks`); flows run it at each
+checkpoint — every `assert` step (`step-N`) and the end (`final`) — with the flow's `visual:` section as its
+configuration, which the engine passes through uninterpreted.
 
+**Inputs.** The compact tree (roles, labels, bounds, states), the screen density (`wm density`, override first)
+to convert pixels to dp, later a full-resolution screenshot (not the downscaled agent JPEG).
 
-**Inputs.** The compact tree (roles, labels, bounds, stable keys), a full-resolution screenshot (not the downscaled
-agent JPEG) and the screen density (`wm density`) to convert pixels to dp.
+**Rule checks (✅).** On the tree, for controls (buttons, items, inputs, toggles, sliders, tabs):
 
-**Baselines.** `.mdh/baselines/visual/<screen-key>/<config-key>.{png,tree.json}`, where the screen key is a flow step
-or activity plus route and the config key identifies device profile and configuration. Candidates are produced by
-every check; `visual baseline approve` promotes them. Baselines are never updated automatically.
+| Rule | Fails when |
+|---|---|
+| `touch_target` | narrower or lower than 48 dp; rows clipped by their scrolling container and controls cut by the screen edge are skipped, they can't be measured |
+| `label` | no text or content description |
+| `overlap` | two controls, neither containing the other, cover ≥ 30% of the smaller one |
+| `obscured` | mostly under the status or navigation bar (not while the keyboard is up) |
+| `duplicate_label` | two controls outside lists share a label; always a warning |
 
-**Comparison.** Structural first: match elements by stable key and report added, missing, moved or resized beyond a
-dp tolerance, and text changes — cheap, and it says what changed. Then pixels: mask the status and navigation bars,
-regions given by selectors and explicit rectangles; compare with a per-pixel tolerance plus block-wise SSIM; emit a
-diff image and map changed regions back to the elements that cover them.
+Without a `visual:` section every rule runs and violations are warnings, so verdicts report them without failing
+on them; `rules: [...]` or `all` makes them fail, `none` turns them off. Content pushed off the screen can't be
+found this way: accessibility bounds are clipped to the visible area, so a control cut by the edge looks like one
+that ends there. Contrast needs pixels (next).
 
-**Cross-config layout checks.** Overlap (bounds of two text or interactive leaves intersect, excluding ancestors),
-clipping (element partially outside the screen or its container), and elements missing compared with the default
-configuration. Truncation needs data accessibility doesn't expose; candidates are OCR of the element region compared
-with its text, or an optional hook in debug builds — decided in M5.
+**Structural baselines (✅).** `.mdh/baselines/visual/<scope>/<checkpoint>/<profile>.tree.json`: the scope is the
+flow (or the name given to `mdh visual check --baseline`), the profile the screen size and density
+(`1344x2992-480dpi`), since layouts differ by device. A snapshot lists every element with an identity (role and
+id, else role and label, plus an occurrence index), its label, detail and bounds in dp; `ignore` targets
+(clocks, counters) are left out. Comparison reports elements added and missing, text and detail changes, and moves
+or resizes beyond `tolerance_dp` (4). The first run records the baseline (a warning: commit it); a deviation fails
+the check and writes `<profile>.tree.new.json`, which `mdh visual approve [scope]` promotes. A matching run removes a
+stale candidate. Baselines are committed with the project (`.mdh/baselines/`).
 
-**Rule checks.** Touch targets ≥ 48 dp for interactive elements; interactive elements without a label; text
-contrast from foreground and background colors sampled in the element's region (WCAG 4.5:1, 3:1 for large text);
-duplicate labels. Google's Accessibility Test Framework could run in an optional second helper APK later; the base
-helper stays dependency-free.
+**Pixels (next).** Mask the status and navigation bars, regions given by selectors and explicit rectangles;
+compare with a per-pixel tolerance plus block-wise SSIM, only against the same device profile; emit a diff image
+and map changed regions back to the elements that cover them.
+
+**Cross-config layout checks (next).** On one device: font scale 1.3, dark mode and an RTL locale; the rules
+above plus elements missing compared with the default configuration. Truncation needs data accessibility doesn't
+expose; candidates are OCR of the element region compared with its text, or the helper reading `Layout` ellipsis
+counts of `TextView`s.
 
 **Design mocks (M8).** Figma's REST API provides rendered frames and node geometry, text and styles. Frames are mapped
 to screens, elements matched by text or layer name, geometry compared after scaling by density, and deviations in

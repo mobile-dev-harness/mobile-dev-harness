@@ -284,6 +284,7 @@ claude mcp add mdh -- mdh mcp
 | `mdh_app` | Launch, stop or install an app; open a deep link; clear its data; grant or revoke a permission |
 | `mdh_verify` | Check the app now (`visible`, `enabled`, `text`, `screen`, `no crash`, …) or replay saved flows — named, or the ones the uncommitted change needs; a verdict with what was observed and evidence on disk |
 | `mdh_flow` | Save what you did as a flow (with checks), list flows, show one |
+| `mdh_visual` | UI consistency of the current screen: rule checks and structural baselines; approve deviations |
 | `mdh_impact` | What the uncommitted change (or the change since a ref) reaches: affected screens and how to reach them, broken call sites, what to verify |
 | `mdh_status` | Device and session status; switch device, reset, turn animations off or back on |
 
@@ -316,6 +317,7 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | Save the session's recorded steps as `.mdh/flows/NAME.yaml` |
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
 | `mdh flow run --changed [--base REF]` | Replay the flows that pass the screens the uncommitted change reaches |
+| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET]` · `mdh visual approve [NAME]` | UI consistency of the current screen: touch targets, labels, overlap, controls under the system bars, duplicate labels; with `--baseline`, what moved, resized, appeared, disappeared or changed text since the baseline; `approve` accepts the deviations |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
 | `mdh open URI [--package P]` | Open a deep link |
@@ -382,7 +384,8 @@ Things to know:
 
 [`examples/android-sample`](examples/android-sample) is a small app made to exercise every feature: View and Compose
 screens, a login form, a 100-row list, linked switches, a WebView, deep links, a runtime permission, a deliberate
-edge-to-edge layout bug, and buttons that crash, crash natively, freeze (ANR), load slowly and log errors.
+edge-to-edge layout bug, an unlabeled undersized icon button, and buttons that crash, crash natively, freeze (ANR),
+load slowly and log errors.
 
 ```sh
 cd examples/android-sample && ./gradlew assembleDebug
@@ -406,7 +409,7 @@ matrix that repeats it across devices:
 | ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
 | ✅ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests (in CI too), the flows a change needs picked from its impact, JUnit reports, a Claude Code plugin (done); baselines arrive with UI checks — with pluggable check kinds: |
 | ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
-| ⏳ | ↳ **UI consistency checks** | Baselines, design-mock comparison, layout checks across configurations, accessibility rules |
+| ⏳ | ↳ **UI consistency checks** | Accessibility and layout rules, structural baselines (done); pixel baselines, contrast, layout checks across configurations, design-mock comparison next |
 | ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
 | ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
