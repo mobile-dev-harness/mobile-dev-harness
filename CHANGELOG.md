@@ -5,7 +5,7 @@ change); JSON output changes are listed here and carry the `schema` version of t
 
 ## Unreleased
 
-### Compatibility (in progress)
+### Compatibility
 - `mdh compat risks`: compatibility risks of the change, from impact analysis and a knowledge base with sources —
   API-level branches (both sides), behavior changes of the app's target SDK and of newer Android versions,
   `minSdk` and `targetSdk` changes, large-screen and orientation resources, window size classes, folding, saved

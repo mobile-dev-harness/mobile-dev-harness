@@ -154,7 +154,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional, UI consistency and performance (done) — and compatibility repeats them on the devices and configurations the change puts at risk (in progress); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
+  <img alt="Architecture: coding agents use mdh mcp and people, CI and scripts use the mdh CLI; both drive the same engine. Control (done) drives the app; the verification engine runs flows and pluggable checks — functional, UI consistency and performance (done) — and compatibility repeats them on the devices and configurations the change puts at risk (done); all on a shared foundation (observe, project, driver, core). On the Android device, the mdh helper keeps a UiAutomation connection warm and talks to the driver over adb forward in about 10 ms; crashes, ANRs and errors flow from logcat into observe." src="docs/assets/architecture-light.svg">
 </picture>
 
 - **Two entry points, one engine.** Agents connect over MCP, people, CI and scripts use the CLI; both get the same
@@ -418,8 +418,8 @@ Test account: `alice@example.com` / `correct-horse`.
 
 Working today (Android): building and running from source, observing screens, acting on them, waiting, logs and
 crash reports, change impact analysis, verdicts with evidence, flows saved and replayed (JUnit), UI consistency and
-performance checks, compatibility risks with screen-size, rotation and state checks, the CLI and the MCP server.
-Planned: compatibility on more devices, more platforms and a benchmark:
+performance checks, compatibility verified risk by risk, the CLI and the MCP server. Planned: more platforms and a
+benchmark:
 
 | | Layer | What's planned |
 |---|---|---|
@@ -430,7 +430,7 @@ Planned: compatibility on more devices, more platforms and a benchmark:
 | ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
 | ✅ | ↳ **UI consistency checks** | Accessibility and layout rules with contrast, structural and pixel baselines, layout checks at a larger font, in dark mode and right to left (done); design-mock comparison later |
 | ✅ | ↳ **Performance checks** | Startup time, jank, memory and CPU over repeated runs against per-device baselines and budgets, regressions explained by a Perfetto trace (done) |
-| 🚧 | **Compatibility** | Risks from the change (OS versions, device types, vendors, screen sizes) verified on the fewest configurations that show them; screen sizes, rotation and state on one emulator work today, other API levels and vendor devices in progress |
+| ✅ | **Compatibility** | Risks from the change (OS versions, device types, vendors, screen sizes) verified on the fewest configurations that show them: screen sizes, rotation and saved state on one emulator, API levels on other AVDs, vendors on connected devices (done); cloud device farms later |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
 | ⏳ | **Benchmark** | Seeded-bug tasks measuring false passes, false fails, success and tokens: agent alone vs. adb and screenshots vs. mobile-mcp vs. mdh |
 

@@ -62,6 +62,24 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// As results name it: the device, and the configuration it was put in.
+    pub fn name(&self) -> String {
+        let device = match &self.target {
+            Target::Device { describe, .. } => describe.clone(),
+            Target::Start {
+                avd,
+                api: Some(api),
+            } => format!("{avd} (API {api})"),
+            Target::Start { avd, api: None } => avd.clone(),
+        };
+        if self.shape == Shape::Default {
+            device
+        } else {
+            format!("{device} as {} (simulated)", self.shape.describe())
+        }
+    }
+
+    /// As plans show it: what it costs too.
     pub fn describe(&self) -> String {
         if self.shape == Shape::Default {
             self.target.describe()

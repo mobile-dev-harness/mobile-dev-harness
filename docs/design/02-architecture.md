@@ -565,7 +565,10 @@ evidence), unverified (needs); identical failures across cells are reported once
 passes, the screen it ended on is checked with the tree rules that are never deliberate (`touch_target`,
 `label`, `overlap`, `obscured`), keyed by rule and element; for screen-size and device-type risks a violation the
 reference doesn't have fails the risk (`tablet 1280×800 dp: overlap — #email overlaps #sign_in`). A flow failing
-only on a cell fails its risks; failing on the reference too is reported as not a compatibility difference. The
+only on a cell fails its risks, its crash first if it crashed (`Pixel_6_API_32 (API 32): login-wrong-password: no
+crash: … NullPointerException`); failing on the reference too is reported as not a compatibility difference, and
+failing on the reference cell itself as a functional failure to fix first. A flow that couldn't run (a missing
+secret) says so; a cell where nothing relevant ran leaves its risks unverified. The
 state check rotates to landscape and back and compares the elements with a unique id: input values, check states,
 texts (`#selected: text "Opened Message 40" → "Tap a message"`), elements gone. A risk with no flow or deep link
 through its screens is unverified ("save a flow that does"); risks from build settings (`targetSdk`, `minSdk`)

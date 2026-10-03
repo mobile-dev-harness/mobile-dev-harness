@@ -103,6 +103,9 @@ pub struct Outcome {
     pub state_lost: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run_dir: Option<PathBuf>,
+    /// It couldn't run (a missing secret, an invalid flow): not a result either way.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub not_run: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -433,21 +436,31 @@ async fn run_cell(
                     step_timeout: options.step_timeout,
                 };
                 match run_flow(session, flow, &flow_options, timings).await {
-                    Ok(v) => Outcome {
-                        passed: v.status == Status::Pass,
-                        failure: v
+                    Ok(v) => {
+                        let failed: Vec<&mdh_verify::Finding> = v
                             .findings
                             .iter()
-                            .find(|f| f.outcome > mdh_verify::Outcome::Warn)
-                            .map(|f| match &f.observed {
+                            .filter(|f| f.outcome > mdh_verify::Outcome::Warn)
+                            .collect();
+                        // A crash explains the steps that failed after it.
+                        let first = failed
+                            .iter()
+                            .find(|f| f.check == "no crash")
+                            .or(failed.first());
+                        Outcome {
+                            passed: v.status == Status::Pass,
+                            failure: first.map(|f| match &f.observed {
                                 Some(o) => format!("{}: {o}", f.check),
                                 None => f.check.clone(),
                             }),
-                        run_dir: v.run_dir.clone(),
-                        ..Outcome::default()
-                    },
+                            run_dir: v.run_dir.clone(),
+                            ..Outcome::default()
+                        }
+                    }
+                    // Couldn't run at all (a missing secret, an invalid flow): nothing learned.
                     Err(e) => Outcome {
                         failure: Some(e.to_string()),
+                        not_run: true,
                         ..Outcome::default()
                     },
                 }
@@ -666,7 +679,7 @@ fn judge(
             let cell = &plan.cells[i];
             let run = &runs[i];
             if let Some(e) = &run.error {
-                notes.push(format!("{}: {e}", cell.describe()));
+                notes.push(format!("{}: {e}", cell.name()));
                 unverified = true;
                 continue;
             }
@@ -677,7 +690,7 @@ fn judge(
             if mine.is_empty() {
                 notes.push(format!(
                     "{}: no flow or deep link reaches {}; save a flow that does",
-                    cell.describe(),
+                    cell.name(),
                     if risk.screens.is_empty() {
                         "the changed code".to_owned()
                     } else {
@@ -687,20 +700,38 @@ fn judge(
                 unverified = true;
                 continue;
             }
+            // Something has to have run on the cell for it to say anything.
+            let ran = mine
+                .iter()
+                .any(|k| run.runs.get(k).is_some_and(|o| !o.not_run));
+            if !ran {
+                unverified = true;
+            }
             for key in &mine {
                 let Some(o) = run.runs.get(key) else { continue };
                 let base = reference.runs.get(key);
+                let name = cell.name();
+                if o.not_run {
+                    notes.push(format!(
+                        "{name}: {key} couldn't run: {}",
+                        o.failure.as_deref().unwrap_or("unknown")
+                    ));
+                    continue;
+                }
                 if !o.passed {
-                    let also = base.is_some_and(|b| !b.passed) && i != 0;
                     let what = o.failure.clone().unwrap_or_else(|| "failed".into());
-                    if also {
+                    if i == 0 {
                         notes.push(format!(
-                            "{}: {key} fails on the reference too ({what}): not a compatibility difference",
-                            cell.describe()
+                            "{name}: {key} fails on the device as it is ({what}): a functional failure, fix it first"
+                        ));
+                        unverified = true;
+                    } else if base.is_some_and(|b| !b.passed && !b.not_run) {
+                        notes.push(format!(
+                            "{name}: {key} fails on the reference too ({what}): not a compatibility difference"
                         ));
                         unverified = true;
                     } else {
-                        notes.push(format!("{}: {key}: {what}", cell.describe()));
+                        notes.push(format!("{name}: {key}: {what}"));
                         failed = true;
                     }
                     continue;
@@ -712,15 +743,14 @@ fn judge(
                             continue;
                         }
                         notes.push(format!(
-                            "{}: {key}: {} — {detail}",
-                            cell.describe(),
+                            "{name}: {key}: {} — {detail}",
                             k.split(' ').next().unwrap_or(k)
                         ));
                         failed = true;
                     }
                 }
                 for l in &o.state_lost {
-                    notes.push(format!("{}: {key}: rotation lost {l}", cell.describe()));
+                    notes.push(format!("{name}: {key}: rotation lost {l}"));
                     failed = true;
                 }
             }
@@ -733,7 +763,7 @@ fn judge(
             RiskStatus::Passed
         };
         if status == RiskStatus::Passed {
-            let on: Vec<String> = cells.iter().map(|&i| plan.cells[i].describe()).collect();
+            let on: Vec<String> = cells.iter().map(|&i| plan.cells[i].name()).collect();
             notes.push(format!("passed on {}", on.join("; ")));
         }
         out.push(RiskResult {

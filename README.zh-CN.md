@@ -149,7 +149,7 @@ screen dev.mdh.sample/.MainActivity  1344x2992  overlay:android
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（均已完成）；兼容性在改动涉及风险的设备和配置上重复这些检查（进行中）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
+  <img alt="系统架构：编程 agent 通过 mdh mcp 接入，人、CI 和脚本使用 mdh CLI，两者驱动同一套引擎。控制（已完成）负责驱动 App；校验引擎运行 flow 和可插拔的检查类型：功能、UI 一致性、性能（均已完成）；兼容性在改动涉及风险的设备和配置上重复这些检查（已完成）；它们都建立在共享的基础层（observe、project、driver、core）之上。在 Android 设备上，mdh helper 保持一个常驻的 UiAutomation 连接，通过 adb forward 与 driver 通信，约 10 毫秒；崩溃、ANR 和错误从 logcat 流入 observe。" src="docs/assets/architecture-light.svg">
 </picture>
 
 - **两个入口，一套引擎**：agent 通过 MCP 接入，人、CI 和脚本使用 CLI，拿到的是同样的紧凑文本。
@@ -396,7 +396,7 @@ mdh launch dev.mdh.sample
 
 ## 状态与路线图
 
-目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、带证据的验证结论、flow 的保存与重放（JUnit）、UI 一致性检查和性能检查、兼容性风险分析及屏幕尺寸/旋转/状态检查、CLI 以及 MCP server。后续计划：在更多设备上做兼容性验证、支持更多平台，以及 benchmark：
+目前已经可用（Android）：从源码构建并运行、观测屏幕、操作界面、等待、日志和崩溃报告、改动影响面分析、带证据的验证结论、flow 的保存与重放（JUnit）、UI 一致性检查和性能检查、逐条风险验证的兼容性检查、CLI 以及 MCP server。后续计划：支持更多平台，以及 benchmark：
 
 | | 层次 | 计划内容 |
 |---|---|---|
@@ -407,7 +407,7 @@ mdh launch dev.mdh.sample
 | ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
 | ✅ | ↳ **UI 一致性检查** | 无障碍和布局规则（含对比度）、结构基线和像素基线、大字号/深色模式/从右到左布局下的检查（已完成）；与设计稿对比放在以后 |
 | ✅ | ↳ **性能检查** | 多次运行，对照每台设备各自的基线和预算检查启动耗时、卡顿、内存和 CPU，用 Perfetto trace 解释退化原因（已完成） |
-| 🚧 | **兼容性** | 从改动推出风险（系统版本、设备类型、厂商、屏幕尺寸），在最少的配置上验证；屏幕尺寸、旋转和状态保留已经可以在一台模拟器上完成，其他 API 级别和厂商真机还在进行中 |
+| ✅ | **兼容性** | 从改动推出风险（系统版本、设备类型、厂商、屏幕尺寸），在最少的配置上验证：一台模拟器上的屏幕尺寸、旋转和状态保留，其他 AVD 上的 API 级别，已连接设备上的厂商（已完成）；云测平台以后再接 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |
 | ⏳ | **Benchmark** | 用预先埋好 bug 的任务，衡量误判通过率、误判失败率、任务成功率和 token：只有 agent、agent + adb 和截图、agent + mobile-mcp、agent + mdh 四种配置对比 |
 

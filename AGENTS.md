@@ -27,9 +27,9 @@ Claude Code plugin (`integrations/claude-code`, hooks via `mdh hook`), `mdh init
 section), and the emulator e2e job replaying the sample's flows. M5 done: `mdh-visual` rule checks with contrast, structural and pixel baselines,
 cross-config layout checks (`mdh visual`, `mdh_visual`, flows' `visual:` section). M6 done:
 `mdh-perf` (startup, frames, memory, CPU against per-device baselines and budgets; regressions
-explained by a Perfetto trace; `mdh perf`, `mdh_perf`, flows' `perf:` section). M7 in progress:
+explained by a Perfetto trace; `mdh perf`, `mdh_perf`, flows' `perf:` section). M7 done:
 `mdh-compat` (ADR-0011: risks from the change with a knowledge base, the fewest cells, a verdict per
-risk; `mdh compat`, `mdh_compat`).
+risk; `mdh compat`, `mdh_compat`). Next: M8 (ecosystem) or M10 (benchmark).
 State and config is a track that grows with each milestone; the benchmark is the last milestone (M10).
 Feature IDs like `F4.1` refer to docs/design/01-functional.md.
 
@@ -210,9 +210,9 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Display, rotation and other device settings are restored on every path; check the emulator
   after a run (`wm size`, `settings get system accelerometer_rotation`).
 - Starting emulators needs consent (`NEEDS_CONSENT` otherwise); at most `--max-emulators` new ones.
-- Cross-device runs are tested against scripted devices (`crates/mdh-compat/tests/run.rs`); the
-  single-emulator cells against the sample app (seed a `layout-sw600dp` overlap or state lost on
-  rotation, run `mdh compat run`, revert).
+- Cross-device runs are tested against scripted devices (`crates/mdh-compat/tests/run.rs`) and on
+  the sample with a second AVD (API 32): seed a bug (a `layout-sw600dp` overlap, state lost on
+  rotation, a broken branch below an `SDK_INT` check), run `mdh compat run`, revert.
 
 ## Impact analysis
 
