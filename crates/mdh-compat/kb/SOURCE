@@ -1,5 +1,5 @@
 # The knowledge base is vendored from its own repository; change it there, then update this snapshot
 # with scripts/update-kb.sh <version>. The test in src/kb.rs checks android.yaml against this checksum.
-repository = https://github.com/mobile-dev-harness/android-compat-kb
+repository = https://github.com/mobile-dev-harness/compat-kb
 version = v1.0.0
 sha256 = 9dea694a8b9361beece84f8226f3a10cfd2eb38ac274c7f7e171dac2b50a772e

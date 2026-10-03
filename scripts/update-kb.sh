@@ -1,10 +1,10 @@
 #!/bin/sh
-# Replaces the vendored compatibility knowledge base with a release of android-compat-kb, checking its
+# Replaces the vendored compatibility knowledge base with a release of compat-kb, checking its
 # SHA-256. Usage: scripts/update-kb.sh v1.1.0
 set -eu
 version=${1:?usage: scripts/update-kb.sh <version, e.g. v1.1.0>}
 cd "$(dirname "$0")/../crates/mdh-compat/kb"
-base=https://github.com/mobile-dev-harness/android-compat-kb/releases/download/$version
+base=https://github.com/mobile-dev-harness/compat-kb/releases/download/$version
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 curl -fsSL -o "$tmp/android.yaml" "$base/android.yaml"

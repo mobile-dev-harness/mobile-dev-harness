@@ -9,7 +9,7 @@
 | Document | Contents |
 |---|---|
 | [design/01-functional.md](design/01-functional.md) | Functional design: users and scenarios, core concepts, feature modules (F1–F14), CLI/MCP/config/flow/output interfaces, non-functional requirements |
-| [adr/0012-repositories.md](adr/0012-repositories.md) | Which parts live in their own repositories, and why |
+| [adr/0012-repositories.md](adr/0012-repositories.md) | Code in one repository, platforms by directory; data and the benchmark in their own |
 | [design/02-architecture.md](design/02-architecture.md) | Technical architecture: crates, core abstractions, key flows, UI tree compression, stability, logs, Gradle probing, helper, the perf/compat/visual domains, impact analysis, MCP, plugin, error model, testing, release, security |
 | [adr/](adr/) | Architecture decision records |
 
@@ -81,25 +81,18 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 
 ## Repositories (ADR-0012)
 
-The `mobile-dev-harness` GitHub organization holds the project. The engine stays in one repository: its crates
-are modules already, and features cut across them. A part gets its own repository when it has users without mdh,
-a different toolchain, its own release rhythm, or needs to be neutral.
+Code lives in one repository, platforms by directory; only data and neutral ground get their own. A second
+platform adds directories, not repositories.
 
-| Repository | What | Why on its own | When |
-|---|---|---|---|
-| `mobile-dev-harness` | CLI, MCP server, engine crates, Claude Code plugin, sample app, e2e | — | ✅ |
-| `android-compat-kb` | The compatibility knowledge base: behavior changes by API level, device-type triggers, vendor quirks, each with its source | Data, updated with Android releases and ROM changes; open to contributions; usable by other tools | Phase 1 |
-| `mobile-agent-bench` | The benchmark: tasks, runner, graders, results | Neutral ground: any tool can enter, results don't ship with mdh | Phase 1 |
-| `android-helper` | The on-device helper APK and its protocol | Gradle and Java; reusable by other tools | Phase 2 |
-| `android-impact` | Change impact analysis as its own CLI and crate | Useful without a device or mdh: CI and code review | Phase 2 |
-| `setup-mdh` | A GitHub Action: emulator, `mdh flow run --changed`, `mdh compat`, the verdict as a PR comment | Distribution | Phase 2 |
-| `skills` | Skills and rules for agents beyond Claude Code (Codex, Cursor, …) | Distribution | Phase 3 |
-| `ios-helper` | The on-device agent for iOS (or reuse an existing one) | Swift; M9 | Phase 3 |
-| `homebrew-tap` | `brew install mobile-dev-harness/tap/mdh` | Distribution | Any time |
+| Repository | What | Per platform |
+|---|---|---|
+| [`mobile-dev-harness`](https://github.com/mobile-dev-harness/mobile-dev-harness) | CLI, MCP server and engine crates; on-device helpers; impact analysis; integrations for agents (Claude Code plugin, more agents later); a GitHub Action (`action.yml`, later); sample app and e2e | `android-helper/` → `helpers/<platform>/`; impact parsers by language; `integrations/<agent>/` |
+| [`compat-kb`](https://github.com/mobile-dev-harness/compat-kb) | The compatibility knowledge base: behavior changes by OS version, device-type triggers, vendor quirks, each with its source. Data with its own rhythm and contributors; mdh vendors a pinned release | `android.yaml`, `ios.yaml` |
+| `mobile-agent-bench` | The benchmark: tasks, runner, graders, results. Neutral ground, results don't ship with mdh | `tasks/<platform>/` |
+| `homebrew-tap` (when needed) | `brew install mobile-dev-harness/tap/mdh`; Homebrew requires the name | — |
 
-What stays: the check kinds and the verification engine share one `Check` interface and one verdict; split, every
-feature would need changes in several repositories at once. Data a binary needs (the knowledge base) is vendored
-at a pinned version with its checksum and updated by a script, never fetched at build time.
+Data a binary needs is vendored at a pinned version with its checksum and updated by a script
+(`scripts/update-kb.sh`), never fetched at build time.
 
 ## Roadmap
 

@@ -1,5 +1,5 @@
 //! The knowledge base (ADR-0011): Android behavior changes, form-factor triggers and vendor quirks,
-//! each entry with its source. It lives in its own repository (`android-compat-kb`, ADR-0012); a
+//! each entry with its source. It lives in its own repository (`compat-kb`, ADR-0012); a
 //! pinned release is compiled into the binary (`kb/android.yaml`, version and checksum in
 //! `kb/SOURCE`), and `MDH_COMPAT_KB` points a binary at another copy.
 
@@ -174,7 +174,7 @@ mod tests {
         let actual = format!("{:x}", Sha256::digest(BUILT_IN.as_bytes()));
         assert_eq!(
             actual, pinned,
-            "kb/android.yaml was edited in place: change android-compat-kb, release it, then run \
+            "kb/android.yaml was edited in place: change compat-kb, release it, then run \
              scripts/update-kb.sh <version>"
         );
     }

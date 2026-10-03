@@ -203,7 +203,7 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 ## Compatibility
 
 - Risk-driven (ADR-0011): never add a mode that runs every flow on every device by default.
-- The knowledge base lives in [android-compat-kb](https://github.com/mobile-dev-harness/android-compat-kb)
+- The knowledge base lives in [compat-kb](https://github.com/mobile-dev-harness/compat-kb)
   (ADR-0012). `crates/mdh-compat/kb/android.yaml` is a pinned snapshot: never edit it here (a test
   checks it against `kb/SOURCE`); change the KB repository, release it, then run
   `scripts/update-kb.sh <version>`. Try unreleased entries with `MDH_COMPAT_KB=<file>`. Every entry

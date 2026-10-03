@@ -6,7 +6,7 @@ change); JSON output changes are listed here and carry the `schema` version of t
 ## Unreleased
 
 - The compatibility knowledge base moved to its own repository,
-  [android-compat-kb](https://github.com/mobile-dev-harness/android-compat-kb); mdh ships a pinned release
+  [compat-kb](https://github.com/mobile-dev-harness/compat-kb); mdh ships a pinned release
   (`scripts/update-kb.sh` updates it) and reads another copy from `MDH_COMPAT_KB`.
 - The repository moved to the [mobile-dev-harness](https://github.com/mobile-dev-harness) organization.
 
