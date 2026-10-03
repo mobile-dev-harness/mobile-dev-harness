@@ -6,15 +6,18 @@
 //! target size, missing labels, contrast, design tokens). Implements `mdh_verify::Check`; findings
 //! land in the run's verdict.
 //!
-//! So far: rule checks on the tree ([`rules`]) and structural baselines ([`baseline`]).
+//! So far: rule checks on the tree ([`rules`]), structural baselines ([`baseline`]), pixel
+//! baselines and contrast ([`pixels`]).
 
 pub mod baseline;
+pub mod pixels;
 pub mod rules;
 
 use std::path::PathBuf;
 
 use async_trait::async_trait;
 use mdh_control::{Target, find_matches};
+use mdh_core::ui::Rect;
 use mdh_core::{Error, Result};
 use mdh_observe::UiNode;
 use mdh_verify::{Check, CheckContext, CheckKind, Finding, Outcome};
@@ -49,6 +52,12 @@ pub struct Config {
     /// How far an element may move or resize, in dp, before it counts as a deviation.
     #[serde(default)]
     pub tolerance_dp: Option<i32>,
+    /// With `baseline`, also compare pixels (default true).
+    #[serde(default)]
+    pub pixels: Option<bool>,
+    /// Rectangles left out of the pixel comparison: `[left, top, width, height]` in dp.
+    #[serde(default)]
+    pub mask: Vec<[i32; 4]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -121,16 +130,32 @@ impl Check for Visual {
             return Ok(Vec::new());
         }
         let observed = cx.session.observe(false, cx.timings).await?;
-        let density = cx
-            .session
-            .control()
-            .density()
-            .await
-            .unwrap_or(FALLBACK_DENSITY);
+        let control = cx.session.control();
+        let density = control.density().await.unwrap_or(FALLBACK_DENSITY);
+        let pixels_wanted = rules.iter().any(|r| r.on_pixels())
+            || (config.baseline && config.pixels != Some(false));
+        // One full-resolution screenshot serves contrast and the pixel baseline.
+        let screenshot = if pixels_wanted {
+            control
+                .screenshot_png()
+                .await
+                .ok()
+                .and_then(|png| pixels::decode(&png).ok())
+        } else {
+            None
+        };
         let mut findings = Vec::new();
 
-        let violations = rules::check(&observed.tree, &observed.screen, density, &rules);
+        let mut violations = rules::check(&observed.tree, &observed.screen, density, &rules);
+        if rules.contains(&Rule::Contrast)
+            && let Some(image) = &screenshot
+        {
+            violations.extend(pixels::contrast(&observed.tree, image, density));
+        }
         for rule in &rules {
+            if rule.on_pixels() && screenshot.is_none() {
+                continue;
+            }
             let mine: Vec<&rules::Violation> =
                 violations.iter().filter(|v| v.rule == *rule).collect();
             let Some(first) = mine.first() else { continue };
@@ -141,25 +166,23 @@ impl Check for Visual {
             };
             let observed = match mine.len() {
                 1 => first.detail.clone(),
-                n => format!("{n} controls; {}", first.detail),
+                n => format!("{n} elements; {}", first.detail),
             };
+            let rest: Vec<String> = mine.iter().skip(1).map(|v| v.detail.clone()).collect();
             findings.push(finding(
                 outcome,
                 format!("ui: {}", rule.describe()),
                 Some(observed),
-                listed(
-                    &mine
-                        .iter()
-                        .skip(1)
-                        .map(|v| v.detail.clone())
-                        .collect::<Vec<_>>(),
-                ),
+                listed(&rest),
             ));
         }
         if !rules.is_empty() && violations.is_empty() {
             findings.push(finding(
                 Outcome::Pass,
-                format!("ui: {} rules hold", rules.len()),
+                match rules.len() {
+                    1 => format!("ui: the {} rule holds", rules[0].name()),
+                    n => format!("ui: {n} rules hold"),
+                },
                 None,
                 Vec::new(),
             ));
@@ -167,57 +190,58 @@ impl Check for Visual {
 
         if config.baseline {
             let ignored = ignored(&config.ignore, &observed.tree)?;
-            let snapshot = Snapshot::of(
-                &observed.tree,
-                observed.screen.activity.as_deref(),
-                density,
-                &ignored,
-            );
             let screen = observed.tree.screen;
             let profile = format!("{}x{}-{density}dpi", screen.width(), screen.height());
             let scope = cx.scope.unwrap_or("screen");
             let store = Store {
                 dir: self.baselines.clone(),
             };
-            let path = store.path(scope, cx.checkpoint, &profile);
-            let check = format!("ui matches baseline {scope}/{}", cx.checkpoint);
-            match Store::load(&path)? {
-                None => {
-                    Store::write(&path, &snapshot)?;
-                    findings.push(finding(
+            let at = Baseline {
+                store: &store,
+                scope,
+                checkpoint: cx.checkpoint,
+                profile: &profile,
+            };
+            let snapshot = Snapshot::of(
+                &observed.tree,
+                observed.screen.activity.as_deref(),
+                density,
+                &ignored,
+            );
+            findings.push(at.structure(&snapshot, config.tolerance_dp.unwrap_or(TOLERANCE_DP))?);
+            if config.pixels != Some(false) {
+                match &screenshot {
+                    None => findings.push(finding(
                         Outcome::Warn,
-                        check,
-                        Some(format!(
-                            "no baseline yet; recorded {} as the baseline (commit it)",
-                            path.display()
-                        )),
+                        format!("ui pixels match baseline {scope}/{}", cx.checkpoint),
+                        Some("no screenshot from this device; pixels not compared".into()),
                         Vec::new(),
-                    ));
-                }
-                Some(base) => {
-                    let deviations =
-                        snapshot.deviations(&base, config.tolerance_dp.unwrap_or(TOLERANCE_DP));
-                    let candidate = store.candidate(scope, cx.checkpoint, &profile);
-                    if deviations.is_empty() {
-                        let _ = std::fs::remove_file(&candidate);
-                        findings.push(finding(Outcome::Pass, check, None, Vec::new()));
-                    } else {
-                        Store::write(&candidate, &snapshot)?;
-                        let mut evidence = listed(&deviations[1..]);
-                        evidence.push(format!(
-                            "intended? `mdh visual approve {scope}` makes this the baseline"
-                        ));
-                        findings.push(finding(
-                            Outcome::Fail,
-                            check,
-                            Some(format!(
-                                "{} deviation{}: {}",
-                                deviations.len(),
-                                if deviations.len() == 1 { "" } else { "s" },
-                                deviations[0]
-                            )),
-                            evidence,
-                        ));
+                    )),
+                    Some(image) => {
+                        // Dynamic areas: system bars and keyboard, ignored elements, focused inputs
+                        // (the cursor blinks), and rectangles given in dp.
+                        let mut masks: Vec<Rect> = observed.screen.obstructions.clone();
+                        masks.extend(ignored.iter().map(|n| n.bounds));
+                        masks.extend(
+                            observed
+                                .tree
+                                .iter()
+                                .filter(|n| n.state.focused && n.role == mdh_observe::Role::Textbox)
+                                .map(|n| n.bounds),
+                        );
+                        let px = |dp: i32| dp * density as i32 / 160;
+                        masks.extend(
+                            config.mask.iter().map(|[l, t, w, h]| {
+                                Rect::new(px(*l), px(*t), px(l + w), px(t + h))
+                            }),
+                        );
+                        findings.push(at.pixels(
+                            image,
+                            &masks,
+                            &observed.tree,
+                            density,
+                            cx.run_dir,
+                        )?);
                     }
                 }
             }
@@ -240,6 +264,160 @@ impl Check for Visual {
         }
         Ok(findings)
     }
+}
+
+/// One checkpoint's baselines.
+struct Baseline<'a> {
+    store: &'a Store,
+    scope: &'a str,
+    checkpoint: &'a str,
+    profile: &'a str,
+}
+
+impl Baseline<'_> {
+    fn approve_hint(&self) -> String {
+        format!(
+            "intended? `mdh visual approve {}` makes this the baseline",
+            self.scope
+        )
+    }
+
+    /// Elements compared with the structural baseline; the first run records it.
+    fn structure(&self, snapshot: &Snapshot, tolerance_dp: i32) -> Result<Finding> {
+        let path = self.store.path(self.scope, self.checkpoint, self.profile);
+        let check = format!("ui matches baseline {}/{}", self.scope, self.checkpoint);
+        let Some(base) = Store::load(&path)? else {
+            Store::write(&path, snapshot)?;
+            return Ok(finding(
+                Outcome::Warn,
+                check,
+                Some(format!(
+                    "no baseline yet; recorded {} as the baseline (commit it)",
+                    path.display()
+                )),
+                Vec::new(),
+            ));
+        };
+        let deviations = snapshot.deviations(&base, tolerance_dp);
+        let candidate = self
+            .store
+            .candidate(self.scope, self.checkpoint, self.profile);
+        if deviations.is_empty() {
+            let _ = std::fs::remove_file(&candidate);
+            return Ok(finding(Outcome::Pass, check, None, Vec::new()));
+        }
+        Store::write(&candidate, snapshot)?;
+        let mut evidence = listed(&deviations[1..]);
+        evidence.push(self.approve_hint());
+        Ok(finding(
+            Outcome::Fail,
+            check,
+            Some(format!(
+                "{} deviation{}: {}",
+                deviations.len(),
+                plural(deviations.len()),
+                deviations[0]
+            )),
+            evidence,
+        ))
+    }
+
+    /// The screenshot compared with the pixel baseline, changed regions named by the elements they
+    /// fall in; a diff image goes to the run directory.
+    fn pixels(
+        &self,
+        image: &image::RgbImage,
+        masks: &[Rect],
+        tree: &mdh_observe::UiTree,
+        density: u32,
+        run_dir: Option<&std::path::Path>,
+    ) -> Result<Finding> {
+        let frame = pixels::frame(image);
+        let path = self.store.image(self.scope, self.checkpoint, self.profile);
+        let check = format!(
+            "ui pixels match baseline {}/{}",
+            self.scope, self.checkpoint
+        );
+        let Some(base) = pixels::load(&path)? else {
+            pixels::save(&path, &frame)?;
+            return Ok(finding(
+                Outcome::Warn,
+                check,
+                Some(format!(
+                    "no pixel baseline yet; recorded {} (commit it)",
+                    path.display()
+                )),
+                Vec::new(),
+            ));
+        };
+        let candidate = self
+            .store
+            .image_candidate(self.scope, self.checkpoint, self.profile);
+        let comparison = pixels::compare(&base, &frame, masks);
+        if comparison.size_mismatch {
+            pixels::save(&candidate, &frame)?;
+            return Ok(finding(
+                Outcome::Fail,
+                check,
+                Some(format!(
+                    "the screenshot is {}×{}, the baseline {}×{}",
+                    frame.width(),
+                    frame.height(),
+                    base.width(),
+                    base.height()
+                )),
+                vec![self.approve_hint()],
+            ));
+        }
+        if comparison.regions.is_empty() {
+            let _ = std::fs::remove_file(&candidate);
+            return Ok(finding(Outcome::Pass, check, None, Vec::new()));
+        }
+        pixels::save(&candidate, &frame)?;
+        let dp = |px: i32| px * 160 / density.max(1) as i32;
+        let describe = |r: &pixels::Region| {
+            let where_ = pixels::element_at(tree, &r.rect)
+                .map(|n| format!(" in {}", mdh_observe::render_line(n)))
+                .unwrap_or_default();
+            format!(
+                "{}×{} dp at {},{} ({:.0}% of its pixels){where_}",
+                dp(r.rect.width()),
+                dp(r.rect.height()),
+                dp(r.rect.left),
+                dp(r.rect.top),
+                r.changed * 100.0
+            )
+        };
+        let lines: Vec<String> = comparison.regions.iter().map(describe).collect();
+        let mut evidence = listed(&lines[1..]);
+        if let Some(dir) = run_dir {
+            let name = format!("visual-{}-diff.png", self.checkpoint);
+            if pixels::save(
+                &dir.join(&name),
+                &pixels::diff_image(&frame, &comparison.regions),
+            )
+            .is_ok()
+            {
+                evidence.push(format!("diff: {name}"));
+            }
+        }
+        evidence.push(self.approve_hint());
+        Ok(finding(
+            Outcome::Fail,
+            check,
+            Some(format!(
+                "{} region{} changed: {}",
+                lines.len(),
+                plural(lines.len()),
+                lines[0]
+            )),
+            evidence,
+        ))
+    }
+}
+
+fn plural(n: usize) -> &'static str {
+    if n == 1 { "" } else { "s" }
 }
 
 /// Promotes candidate baselines (all, or one scope's) after deviations were reviewed.

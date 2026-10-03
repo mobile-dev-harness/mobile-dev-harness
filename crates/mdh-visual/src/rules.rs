@@ -25,15 +25,19 @@ pub enum Rule {
     Obscured,
     /// Controls on one screen don't share a label (screen readers can't tell them apart).
     DuplicateLabel,
+    /// Text stands out from its background (WCAG AA: 4.5:1, 3:1 for large text). Measured on the
+    /// screenshot, see `pixels::contrast`.
+    Contrast,
 }
 
 impl Rule {
-    pub const ALL: [Rule; 5] = [
+    pub const ALL: [Rule; 6] = [
         Rule::TouchTarget,
         Rule::Label,
         Rule::Overlap,
         Rule::Obscured,
         Rule::DuplicateLabel,
+        Rule::Contrast,
     ];
 
     pub fn name(self) -> &'static str {
@@ -43,6 +47,7 @@ impl Rule {
             Rule::Overlap => "overlap",
             Rule::Obscured => "obscured",
             Rule::DuplicateLabel => "duplicate_label",
+            Rule::Contrast => "contrast",
         }
     }
 
@@ -58,12 +63,18 @@ impl Rule {
             Rule::Overlap => "controls don't overlap",
             Rule::Obscured => "controls clear of the system bars",
             Rule::DuplicateLabel => "control labels are unique",
+            Rule::Contrast => "text contrast ≥ 4.5:1",
         }
     }
 
     /// Duplicate labels are often deliberate (a "Delete" per row); everything else is a bug.
     pub fn advisory(self) -> bool {
         self == Rule::DuplicateLabel
+    }
+
+    /// Needs the screenshot rather than the tree.
+    pub fn on_pixels(self) -> bool {
+        self == Rule::Contrast
     }
 }
 
@@ -244,6 +255,7 @@ pub fn check(tree: &UiTree, screen: &ScreenInfo, density: u32, rules: &[Rule]) -
                     }
                 }
             }
+            Rule::Contrast => {}
         }
     }
     out

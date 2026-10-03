@@ -15,6 +15,8 @@ use mdh_visual::Visual;
 /// Serves one screen, replaceable between checks; density 480 (3 px per dp).
 struct FakeDriver {
     screen: Mutex<Vec<RawNode>>,
+    /// What `screenshot` returns, as PNG.
+    png: Mutex<Option<Vec<u8>>>,
 }
 
 #[async_trait]
@@ -42,7 +44,7 @@ impl Driver for FakeDriver {
         Ok(())
     }
     async fn screenshot(&self, _: &Device) -> Result<Vec<u8>> {
-        Err(Error::Unsupported {
+        self.png.lock().unwrap().clone().ok_or(Error::Unsupported {
             operation: "screenshots".into(),
         })
     }
@@ -138,6 +140,7 @@ async fn run(
 #[tokio::test]
 async fn rules_find_small_unlabeled_and_overlapping_controls() {
     let driver = Arc::new(FakeDriver {
+        png: Mutex::new(None),
         screen: Mutex::new(root(vec![
             // 360×150 px at 480 dpi = 120×50 dp: fine.
             control(
@@ -170,7 +173,7 @@ async fn rules_find_small_unlabeled_and_overlapping_controls() {
         [
             "Fail ui: touch targets ≥ 48 dp — [e2] button #share: 36×36 dp, needs 48×48",
             "Fail ui: controls have labels — [e2] button #share: no label; screen readers can't name it",
-            r#"Fail ui: controls don't overlap — 2 controls; [e1] button "OK" #ok: overlaps [e3] button "Cancel" #cancel | [e2] button #share: overlaps [e3] button "Cancel" #cancel"#,
+            r#"Fail ui: controls don't overlap — 2 elements; [e1] button "OK" #ok: overlaps [e3] button "Cancel" #cancel | [e2] button #share: overlaps [e3] button "Cancel" #cancel"#,
         ],
     );
     // Without a `visual:` section the same rules only warn.
@@ -201,10 +204,11 @@ async fn baselines_are_recorded_compared_and_approved() {
     };
     let driver = Arc::new(FakeDriver {
         screen: Mutex::new(screen(600, "Sign in")),
+        png: Mutex::new(None),
     });
     let dir = std::env::temp_dir().join(format!("mdh-visual-baseline-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let config = serde_json::json!({ "baseline": true, "rules": "none" });
+    let config = serde_json::json!({ "baseline": true, "rules": "none", "pixels": false });
 
     let first = run(&driver, &dir, config.clone()).await;
     assert_eq!(first[0].0, Outcome::Warn, "{first:?}");
@@ -230,5 +234,73 @@ async fn baselines_are_recorded_compared_and_approved() {
     assert_eq!(store.approve(Some("login")).unwrap().len(), 1);
     let approved = run(&driver, &dir, config).await;
     assert_eq!(approved[0].0, Outcome::Pass, "{approved:?}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+fn png(paint: Option<(Rect, [u8; 3])>) -> Vec<u8> {
+    let mut img = image::RgbImage::from_pixel(1080, 2400, image::Rgb([255, 255, 255]));
+    if let Some((r, color)) = paint {
+        for y in r.top..r.bottom {
+            for x in r.left..r.right {
+                img.put_pixel(x as u32, y as u32, image::Rgb(color));
+            }
+        }
+    }
+    let mut out = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut out, image::ImageFormat::Png).unwrap();
+    out.into_inner()
+}
+
+#[tokio::test]
+async fn pixel_baselines_name_the_element_that_changed() {
+    let button = Rect::new(0, 600, 1080, 750);
+    let driver = Arc::new(FakeDriver {
+        screen: Mutex::new(root(vec![control(
+            "android.widget.Button",
+            "sign_in",
+            Some("Sign in"),
+            button,
+        )])),
+        png: Mutex::new(Some(png(Some((button, [30, 100, 200]))))),
+    });
+    let dir = std::env::temp_dir().join(format!("mdh-visual-pixels-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let config = serde_json::json!({ "baseline": true, "rules": "none" });
+
+    let first = run(&driver, &dir, config.clone()).await;
+    assert_eq!(
+        first.iter().filter(|(o, _)| *o == Outcome::Warn).count(),
+        2,
+        "{first:?}"
+    );
+    let same = run(&driver, &dir, config.clone()).await;
+    assert!(same.iter().all(|(o, _)| *o == Outcome::Pass), "{same:?}");
+
+    // The button turns red: the tree is the same, the pixels aren't.
+    *driver.png.lock().unwrap() = Some(png(Some((button, [200, 30, 30]))));
+    let changed = run(&driver, &dir, config.clone()).await;
+    let (outcome, line) = changed
+        .iter()
+        .find(|(_, l)| l.starts_with("ui pixels"))
+        .unwrap();
+    assert_eq!(*outcome, Outcome::Fail);
+    // Regions are whole 16 px blocks, so they start a little above the button.
+    assert!(
+        line.contains("1 region changed: 360×53 dp at 0,197"),
+        "{line}"
+    );
+    assert!(
+        line.contains(r#"in [e1] button "Sign in" #sign_in"#),
+        "{line}"
+    );
+
+    // A mask over the button hides the change.
+    let masked =
+        serde_json::json!({ "baseline": true, "rules": "none", "mask": [[0, 196, 360, 56]] });
+    let hidden = run(&driver, &dir, masked).await;
+    assert!(
+        hidden.iter().all(|(o, _)| *o == Outcome::Pass),
+        "{hidden:?}"
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }

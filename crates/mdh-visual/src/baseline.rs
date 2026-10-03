@@ -188,6 +188,20 @@ impl Store {
             .join(format!("{profile}.tree.new.json"))
     }
 
+    pub fn image(&self, scope: &str, checkpoint: &str, profile: &str) -> PathBuf {
+        self.dir
+            .join(scope)
+            .join(checkpoint)
+            .join(format!("{profile}.png"))
+    }
+
+    pub fn image_candidate(&self, scope: &str, checkpoint: &str, profile: &str) -> PathBuf {
+        self.dir
+            .join(scope)
+            .join(checkpoint)
+            .join(format!("{profile}.new.png"))
+    }
+
     pub fn load(path: &Path) -> Result<Option<Snapshot>> {
         match std::fs::read(path) {
             Ok(bytes) => Ok(serde_json::from_slice::<Snapshot>(&bytes)
@@ -227,10 +241,15 @@ impl Store {
                 let p = entry.path();
                 if p.is_dir() {
                     stack.push(p);
-                } else if let Some(name) = p.file_name().and_then(|n| n.to_str())
-                    && let Some(stem) = name.strip_suffix(".tree.new.json")
-                {
-                    let target = p.with_file_name(format!("{stem}.tree.json"));
+                } else if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                    let target = match (
+                        name.strip_suffix(".tree.new.json"),
+                        name.strip_suffix(".new.png"),
+                    ) {
+                        (Some(stem), _) => p.with_file_name(format!("{stem}.tree.json")),
+                        (None, Some(stem)) => p.with_file_name(format!("{stem}.png")),
+                        _ => continue,
+                    };
                     std::fs::rename(&p, &target)?;
                     approved.push(target);
                 }

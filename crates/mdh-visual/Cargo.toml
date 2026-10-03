@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+image = { version = "0.25.9", default-features = false, features = ["png"] }
 mdh-control.workspace = true
 mdh-core.workspace = true
 mdh-observe.workspace = true
@@ -18,6 +19,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
+image = { version = "0.25.9", default-features = false, features = ["png"] }
 mdh-driver.workspace = true
 tokio.workspace = true
 

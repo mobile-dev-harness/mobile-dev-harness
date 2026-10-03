@@ -92,6 +92,11 @@ impl Control {
         Ok((compress(&raw.roots), raw.windows, raw.source))
     }
 
+    /// The screen at full resolution, as PNG.
+    pub async fn screenshot_png(&self) -> Result<Vec<u8>> {
+        self.driver.screenshot(&self.device).await
+    }
+
     /// A JPEG of the screen downscaled to `max_edge`.
     pub async fn capture(&self, max_edge: u32, timings: &mut Timings) -> Result<Jpeg> {
         let started = Instant::now();
