@@ -1,8 +1,8 @@
 {
   "name": "mobile-dev-harness",
   "owner": {
-    "name": "qkmaosjtu",
-    "url": "https://github.com/qkmaosjtu"
+    "name": "mobile-dev-harness",
+    "url": "https://github.com/mobile-dev-harness"
   },
   "description": "mobile-dev-harness: precise verification for coding agents on Android",
   "plugins": [

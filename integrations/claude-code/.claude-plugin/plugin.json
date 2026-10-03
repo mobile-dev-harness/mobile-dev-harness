@@ -7,8 +7,8 @@
     "name": "qkmaosjtu",
     "url": "https://github.com/qkmaosjtu"
   },
-  "homepage": "https://github.com/qkmaosjtu/mobile-dev-harness",
-  "repository": "https://github.com/qkmaosjtu/mobile-dev-harness",
+  "homepage": "https://github.com/mobile-dev-harness/mobile-dev-harness",
+  "repository": "https://github.com/mobile-dev-harness/mobile-dev-harness",
   "license": "MIT OR Apache-2.0",
   "keywords": ["android", "mobile", "verification", "testing", "mcp"]
 }

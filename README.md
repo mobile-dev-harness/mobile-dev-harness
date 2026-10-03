@@ -208,11 +208,11 @@ way as the performance, visual and compatibility checks do far more work per cal
 Prebuilt for macOS (Apple silicon, Intel) and Linux (x64, arm64):
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/qkmaosjtu/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/mobile-dev-harness/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
 mdh doctor
 ```
 
-Or from source: `cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness`.
+Or from source: `cargo install --git https://github.com/mobile-dev-harness/mobile-dev-harness mobile-dev-harness`.
 
 `mdh doctor` checks the SDK, adb, emulators, the JDK and connected devices, and says how to fix what's missing:
 
@@ -266,7 +266,7 @@ To try every feature, use the [sample app](#sample-app).
 before it stops with app changes that have no passing verdict:
 
 ```text
-/plugin marketplace add qkmaosjtu/mobile-dev-harness
+/plugin marketplace add mobile-dev-harness/mobile-dev-harness
 /plugin install mobile-dev-harness@mobile-dev-harness
 ```
 

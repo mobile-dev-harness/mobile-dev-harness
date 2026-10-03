@@ -660,7 +660,7 @@ position, size, spacing, color and font size reported with a side-by-side diff.
 
 ## 15. Claude Code plugin
 
-The repository doubles as a plugin marketplace (`/plugin marketplace add qkmaosjtu/mobile-dev-harness`, then
+The repository doubles as a plugin marketplace (`/plugin marketplace add mobile-dev-harness/mobile-dev-harness`, then
 `/plugin install mobile-dev-harness@mobile-dev-harness`):
 
 ```

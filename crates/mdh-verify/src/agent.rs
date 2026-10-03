@@ -13,7 +13,7 @@ const END: &str = "<!-- mdh:end -->";
 /// it; the Claude Code plugin brings the same protocol as a skill).
 pub const AGENTS_SECTION: &str = r#"## Verifying changes (mobile-dev-harness)
 
-This app is verified with [mobile-dev-harness](https://github.com/qkmaosjtu/mobile-dev-harness)
+This app is verified with [mobile-dev-harness](https://github.com/mobile-dev-harness/mobile-dev-harness)
 (`mdh`). A change is done when it has a passing verdict on a device or emulator, not when it
 compiles.
 

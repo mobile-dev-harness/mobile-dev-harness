@@ -197,11 +197,11 @@ harness 本身不再额外增加开销，并且在性能、视觉和兼容性检
 预编译版本支持 macOS（Apple 芯片、Intel）和 Linux（x64、arm64）：
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/qkmaosjtu/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/mobile-dev-harness/mobile-dev-harness/releases/latest/download/mobile-dev-harness-installer.sh | sh
 mdh doctor
 ```
 
-也可以从源码安装：`cargo install --git https://github.com/qkmaosjtu/mobile-dev-harness mobile-dev-harness`。
+也可以从源码安装：`cargo install --git https://github.com/mobile-dev-harness/mobile-dev-harness mobile-dev-harness`。
 
 `mdh doctor` 会检查 SDK、adb、模拟器、JDK 和已连接的设备，并告诉你缺了什么、怎么解决：
 
@@ -254,7 +254,7 @@ mdh logs                             # 最近的警告、错误和崩溃报告
 告诉 agent 有哪些在线设备；agent 结束前，如果有改动还没有通过的验证结论，会提醒它一次：
 
 ```text
-/plugin marketplace add qkmaosjtu/mobile-dev-harness
+/plugin marketplace add mobile-dev-harness/mobile-dev-harness
 /plugin install mobile-dev-harness@mobile-dev-harness
 ```
 
