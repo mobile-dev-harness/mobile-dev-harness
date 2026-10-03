@@ -76,7 +76,8 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
   through it — and it is better on Android (compact trees, stable refs, diffs, waiting, ~50× faster trees via the
   helper), but we don't compete on breadth there. It gets finished, not polished further.
 - **Verification is where agents have nothing today**: evidence-backed verdicts covering behavior, UI and
-  performance, repeatable as flows and across a device matrix. That is where the project's value is.
+  performance, repeatable as flows, and repeated on the devices and configurations a change puts at risk. That is
+  where the project's value is.
 - The core is agent-agnostic (CLI + MCP); the Claude Code plugin is the first and best-supported integration.
 
 ## Repositories (ADR-0012)

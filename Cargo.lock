@@ -604,7 +604,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "mdh-bench"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "serde",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-compat"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "mdh-control",
@@ -632,7 +632,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-control"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "mdh-core",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-driver"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "mdh-core",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-impact"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "insta",
  "serde",
@@ -681,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-mcp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -702,7 +702,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-observe"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "image",
  "insta",
@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-perf"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "mdh-control",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-project"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "mdh-core",
  "serde",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-risk"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "mdh-impact",
  "serde",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-verify"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "mdh-control",
@@ -764,7 +764,7 @@ dependencies = [
 
 [[package]]
 name = "mdh-visual"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "image",
@@ -817,7 +817,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-dev-harness"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "mdh-compat",

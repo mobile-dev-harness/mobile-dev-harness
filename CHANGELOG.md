@@ -3,17 +3,43 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
-## Unreleased
+## 0.4.0
 
-- MCP: `mdh_wait` is an action of `mdh_act` (`action: wait`) and `mdh_logs` an option of `mdh_observe` (`logs`);
-  actions are one flat object. The default tool set is the core one (8 tools); `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and
-  `mdh_compat`. Tool definitions and the server instructions are 65% and 35% smaller (compact schemas, one-line
-  descriptions): fewer tokens on every request. The Claude Code plugin gains `visual`, `perf` and `compat` skills,
-  loaded only when needed.
-- The compatibility knowledge base moved to its own repository,
-  [compat-kb](https://github.com/mobile-dev-harness/compat-kb); mdh ships a pinned release
-  (`scripts/update-kb.sh` updates it) and reads another copy from `MDH_COMPAT_KB`.
-- The repository moved to the [mobile-dev-harness](https://github.com/mobile-dev-harness) organization.
+Fewer tokens on every request, a benchmark, and a home in the mobile-dev-harness organization.
+
+### Breaking changes (MCP)
+- `mdh_wait` is an action of `mdh_act` (`{"action": "wait", "target": …, "gone": …, "timeout_s": …}`) and
+  `mdh_logs` an option of `mdh_observe` (`{"logs": "warn", "lines": 50}`).
+- An action is one flat object, an `action` kind plus the fields it uses (`target`, `text`, `into`, `key`,
+  `direction`, `until`, `from`, `to`, …): scroll's container is `target` (was `within`), a key is `key` (was
+  `name`).
+- `mdh mcp` offers the core tools by default (8: status, observe, act, app, run, verify, flow, impact).
+  `mdh mcp --tools all` adds `mdh_visual`, `mdh_perf` and `mdh_compat` for clients without a shell; agents with a
+  shell use `mdh visual|perf|compat`, which the Claude Code plugin's new `visual`, `perf` and `compat` skills
+  describe.
+
+### Fewer tokens
+- Every tool definition is sent with every request: schemas are compacted when the server starts and
+  descriptions are one sentence, guidance having moved into skills loaded only when used. Measured on Claude
+  Code's first request, mdh adds 3.2k tokens instead of 7.4k. A test keeps the core definitions under 6,500
+  characters.
+- The verify skill says to look at a screenshot when images or drawings matter.
+
+### Benchmark
+- `mdh-bench`: seeded-bug tasks in the sample app (verify tasks in correct/broken pairs, fix tasks graded by hidden
+  mdh flows), run by Claude Code in four setups — alone, with adb, with mobile-mcp, with mdh — on fresh copies of
+  the app and a reset emulator, reporting false passes, false fails, fixes, tokens, tool calls, screenshots and
+  time. `validate` checks the graders first; `--provider` runs other models through Anthropic-compatible
+  endpoints, `probe` checks one. Method in `bench/README.md`.
+
+### Project
+- The repository moved to the [mobile-dev-harness](https://github.com/mobile-dev-harness) organization; old links
+  redirect.
+- The compatibility knowledge base lives in [compat-kb](https://github.com/mobile-dev-harness/compat-kb); mdh
+  vendors a pinned release (`scripts/update-kb.sh`), and `MDH_COMPAT_KB` points it at another copy.
+- Repositories follow layers (ADR-0012): impact analysis and compatibility risk analysis (`mdh-impact`, the new
+  `mdh-risk`) depend on no device crate; `mdh-impact` has its own error type.
+- A security policy (private vulnerability reporting), issue forms, a pull request template, and a logo.
 
 ## 0.3.0
 
