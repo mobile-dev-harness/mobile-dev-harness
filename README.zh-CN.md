@@ -1,5 +1,7 @@
 [English](README.md) | **简体中文**
 
+<img src="docs/assets/logo.svg" width="88" alt="" align="right">
+
 # mobile-dev-harness
 
 **为编程 agent 提供 Android 上的精准校验：比 agent 自己做更准确，也更省 token。**

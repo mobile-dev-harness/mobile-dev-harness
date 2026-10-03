@@ -1,5 +1,7 @@
 **English** | [简体中文](README.zh-CN.md)
 
+<img src="docs/assets/logo.svg" width="88" alt="" align="right">
+
 # mobile-dev-harness
 
 **Precise verification for coding agents on Android: more accurate and fewer tokens than an agent manages on its own.**
