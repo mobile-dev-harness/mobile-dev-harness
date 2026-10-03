@@ -210,6 +210,9 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 - Display, rotation and other device settings are restored on every path; check the emulator
   after a run (`wm size`, `settings get system accelerometer_rotation`).
 - Starting emulators needs consent (`NEEDS_CONSENT` otherwise); at most `--max-emulators` new ones.
+- Cross-device runs are tested against scripted devices (`crates/mdh-compat/tests/run.rs`); the
+  single-emulator cells against the sample app (seed a `layout-sw600dp` overlap or state lost on
+  rotation, run `mdh compat run`, revert).
 
 ## Impact analysis
 

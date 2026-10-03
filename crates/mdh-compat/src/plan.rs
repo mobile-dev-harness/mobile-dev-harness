@@ -217,6 +217,11 @@ fn target_for(
                 api: a.api,
             })
         }
+        Some(a) if options.max_starts == 0 => Err(format!(
+            "needs the emulator {} ({}), left out: this run starts no emulators",
+            a.name,
+            need.describe()
+        )),
         Some(a) => Err(format!(
             "needs {} ({}), over the limit of {} new emulators per run",
             a.name,

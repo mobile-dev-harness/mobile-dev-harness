@@ -43,6 +43,9 @@ pub struct CompatOptions {
     pub no_start: bool,
     pub plan: PlanOptions,
     pub step_timeout: Duration,
+    /// Build once and install on every device before its cells; off when the app is installed
+    /// already (tests with scripted devices).
+    pub install: bool,
 }
 
 impl Default for CompatOptions {
@@ -56,6 +59,7 @@ impl Default for CompatOptions {
             no_start: false,
             plan: PlanOptions::default(),
             step_timeout: Duration::from_secs(10),
+            install: true,
         }
     }
 }
@@ -153,11 +157,11 @@ pub async fn prepare(
     })?;
     let risks = risks(&report);
     let inv = inventory(session).await?;
-    let mut inv_for_plan = inv.clone();
+    let mut plan_options = options.plan;
     if options.no_start {
-        inv_for_plan.avds.clear();
+        plan_options.max_starts = 0;
     }
-    let plan = plan(&risks, &inv_for_plan, options.plan);
+    let plan = plan(&risks, &inv, plan_options);
     Ok((report, risks, plan))
 }
 
@@ -281,21 +285,25 @@ pub async fn run(
             }
         };
         // Build once, install wherever it runs.
-        let installed = device_session
-            .run(
-                BuildOptions {
-                    project: options.project.clone(),
-                    module: None,
-                    variant: None,
-                    build: !built,
-                    grant: false,
-                    reinstall: false,
-                },
-                timings,
-                |_| {},
-            )
-            .await
-            .and_then(|mut r| r.take_failure().map_or(Ok(()), Err));
+        let installed = if !options.install {
+            Ok(())
+        } else {
+            device_session
+                .run(
+                    BuildOptions {
+                        project: options.project.clone(),
+                        module: None,
+                        variant: None,
+                        build: !built,
+                        grant: false,
+                        reinstall: false,
+                    },
+                    timings,
+                    |_| {},
+                )
+                .await
+                .and_then(|mut r| r.take_failure().map_or(Ok(()), Err))
+        };
         built = true;
         if let Err(e) = installed {
             for &i in &indices {
