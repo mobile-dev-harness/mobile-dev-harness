@@ -12,6 +12,7 @@
 pub mod baseline;
 pub mod pixels;
 pub mod rules;
+pub mod variants;
 
 use std::path::PathBuf;
 
@@ -25,6 +26,7 @@ use serde::Deserialize;
 
 use crate::baseline::{Snapshot, Store};
 use crate::rules::Rule;
+use crate::variants::Variant;
 
 /// Where baselines live, relative to the working directory (committed with the project).
 pub const BASELINES_DIR: &str = ".mdh/baselines/visual";
@@ -58,6 +60,9 @@ pub struct Config {
     /// Rectangles left out of the pixel comparison: `[left, top, width, height]` in dp.
     #[serde(default)]
     pub mask: Vec<[i32; 4]>,
+    /// Configurations to check the last screen in as well: `font_scale`, `dark`, `rtl`, or `all`.
+    #[serde(default)]
+    pub configs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -76,6 +81,13 @@ impl Config {
                 reason: e.to_string(),
             }),
         }
+    }
+
+    fn variants(&self) -> Result<Vec<Variant>> {
+        if self.configs.iter().any(|c| c == "all") {
+            return Ok(Variant::ALL.to_vec());
+        }
+        self.configs.iter().map(|c| Variant::parse(c)).collect()
     }
 
     /// The rules to run and whether their violations fail the verdict.
@@ -126,7 +138,7 @@ impl Check for Visual {
     async fn run(&self, cx: &mut CheckContext<'_>) -> Result<Vec<Finding>> {
         let config = Config::parse(cx.config)?;
         let (rules, strict) = config.rules()?;
-        if rules.is_empty() && !config.baseline {
+        if rules.is_empty() && !config.baseline && config.configs.is_empty() {
             return Ok(Vec::new());
         }
         let observed = cx.session.observe(false, cx.timings).await?;
@@ -247,6 +259,35 @@ impl Check for Visual {
             }
         }
 
+        // Other configurations, on the screen a flow ends on (or the one checked on its own):
+        // varying them recreates the app's activities, which a flow's next steps wouldn't expect.
+        let variants = config.variants()?;
+        if !variants.is_empty() && matches!(cx.checkpoint, "final" | "screen") {
+            let package = observed
+                .screen
+                .activity
+                .as_deref()
+                .and_then(|a| a.split_once('/'))
+                .map(|(p, _)| p.to_owned())
+                .or_else(|| cx.session.app().map(str::to_owned))
+                .unwrap_or_default();
+            let known: std::collections::HashSet<(Rule, String)> = violations
+                .iter()
+                .map(|v| (v.rule, v.element.clone()))
+                .collect();
+            let ids: Vec<String> = observed.tree.iter().filter_map(|n| n.id.clone()).collect();
+            let base = DefaultScreen {
+                known: &known,
+                ids: &ids,
+                rules: &rules,
+                strict,
+                density,
+            };
+            for v in variants {
+                findings.extend(check_variant(cx, v, &package, &base).await);
+            }
+        }
+
         // A picture of what failed, next to the verdict's own evidence.
         if findings.iter().any(|f| f.outcome == Outcome::Fail)
             && let Some(dir) = cx.run_dir
@@ -264,6 +305,163 @@ impl Check for Visual {
         }
         Ok(findings)
     }
+}
+
+/// The screen in its default configuration, which the variants are compared with.
+struct DefaultScreen<'a> {
+    /// Rule violations already reported for the default configuration.
+    known: &'a std::collections::HashSet<(Rule, String)>,
+    /// Ids of the elements on the default screen.
+    ids: &'a [String],
+    rules: &'a [Rule],
+    strict: bool,
+    density: u32,
+}
+
+/// Switches to `variant`, checks the screen, and switches back, whatever happened in between.
+async fn check_variant(
+    cx: &mut CheckContext<'_>,
+    variant: Variant,
+    package: &str,
+    base: &DefaultScreen<'_>,
+) -> Vec<Finding> {
+    let check = format!("ui {}", variant.describe());
+    let skipped = |why: String| {
+        vec![finding(
+            Outcome::Warn,
+            check.clone(),
+            Some(format!("not checked: {why}")),
+            Vec::new(),
+        )]
+    };
+    if variant == Variant::Rtl && package.is_empty() {
+        return skipped("no app on screen to switch languages for".into());
+    }
+    let original = match cx
+        .session
+        .control()
+        .appearance(&variant.kind(package))
+        .await
+    {
+        Ok(o) => o,
+        Err(e) => return skipped(e.to_string()),
+    };
+    if let Err(e) = cx
+        .session
+        .control()
+        .set_appearance(&variant.value(package))
+        .await
+    {
+        return skipped(e.to_string());
+    }
+    let mut findings = match variant_findings(cx, variant, &check, base).await {
+        Ok(f) => f,
+        Err(e) => vec![finding(
+            Outcome::Error,
+            check.clone(),
+            Some(e.to_string()),
+            Vec::new(),
+        )],
+    };
+    if let Err(e) = cx.session.control().set_appearance(&original).await {
+        findings.push(finding(
+            Outcome::Warn,
+            check.clone(),
+            Some(format!("couldn't restore the setting ({e}); `mdh session reset` won't either, reset it by hand")),
+            Vec::new(),
+        ));
+    }
+    let _ = settled(cx).await;
+    findings
+}
+
+async fn variant_findings(
+    cx: &mut CheckContext<'_>,
+    variant: Variant,
+    check: &str,
+    base: &DefaultScreen<'_>,
+) -> Result<Vec<Finding>> {
+    let observed = settled(cx).await?;
+    let mut violations = rules::check(&observed.tree, &observed.screen, base.density, base.rules);
+    if base.rules.contains(&Rule::Contrast)
+        && let Ok(png) = cx.session.control().screenshot_png().await
+        && let Ok(image) = pixels::decode(&png)
+    {
+        violations.extend(pixels::contrast(&observed.tree, &image, base.density));
+    }
+    // What breaks only in this configuration.
+    violations.retain(|v| !base.known.contains(&(v.rule, v.element.clone())));
+    let present: std::collections::HashSet<&str> = observed
+        .tree
+        .iter()
+        .filter_map(|n| n.id.as_deref())
+        .collect();
+    let missing: Vec<String> = base
+        .ids
+        .iter()
+        .filter(|id| !present.contains(id.as_str()))
+        .map(|id| format!("#{id}"))
+        .collect();
+    let mut findings = Vec::new();
+    if !missing.is_empty() {
+        findings.push(finding(
+            Outcome::Fail,
+            check.to_owned(),
+            Some(format!(
+                "missing compared with the default configuration: {}",
+                missing.join(", ")
+            )),
+            Vec::new(),
+        ));
+    }
+    for rule in base.rules {
+        let mine: Vec<&rules::Violation> = violations.iter().filter(|v| v.rule == *rule).collect();
+        let Some(first) = mine.first() else { continue };
+        let outcome = if base.strict && !rule.advisory() {
+            Outcome::Fail
+        } else {
+            Outcome::Warn
+        };
+        let rest: Vec<String> = mine.iter().skip(1).map(|v| v.detail.clone()).collect();
+        findings.push(finding(
+            outcome,
+            format!("{check}: {}", rule.describe()),
+            Some(first.detail.clone()),
+            listed(&rest),
+        ));
+    }
+    if findings.is_empty() {
+        findings.push(finding(
+            Outcome::Pass,
+            format!("{check}: layout holds"),
+            None,
+            Vec::new(),
+        ));
+    } else if let Some(dir) = cx.run_dir
+        && let Ok(image) = cx.session.control().capture(1024, cx.timings).await
+    {
+        let name = format!("visual-{}-{}.jpg", cx.checkpoint, variant.name());
+        if std::fs::write(dir.join(&name), &image.bytes).is_ok() {
+            findings[0].evidence.push(format!("screenshot: {name}"));
+        }
+    }
+    Ok(findings)
+}
+
+/// Observes until the screen stops changing: a configuration change recreates activities.
+async fn settled(cx: &mut CheckContext<'_>) -> Result<mdh_control::Observation> {
+    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+    let mut last = cx.session.observe(false, cx.timings).await?;
+    for _ in 0..10 {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        let next = cx.session.observe(false, cx.timings).await?;
+        let same = next.tree.fingerprint() == last.tree.fingerprint();
+        last = next;
+        if same {
+            break;
+        }
+    }
+    Ok(last)
 }
 
 /// One checkpoint's baselines.

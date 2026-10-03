@@ -23,7 +23,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::{RawTree, TreeSource};
-use mdh_core::{Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result};
+use mdh_core::{
+    Appearance, AppearanceKind, Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result,
+};
 
 use crate::Driver;
 
@@ -382,6 +384,64 @@ impl Driver for AndroidDriver {
             tool: "wm density".into(),
             detail: out,
         })
+    }
+
+    async fn appearance(&self, device: &Device, kind: &AppearanceKind) -> Result<Appearance> {
+        let shell = |cmd: String| async move { self.adb.shell(&device.id, &cmd).await };
+        Ok(match kind {
+            AppearanceKind::FontScale => {
+                let v = shell("settings get system font_scale".into()).await?;
+                let v = v.trim();
+                Appearance::FontScale((v != "null" && !v.is_empty()).then(|| v.to_owned()))
+            }
+            AppearanceKind::NightMode => {
+                let out = shell("cmd uimode night".into()).await?;
+                let v = out
+                    .trim()
+                    .rsplit(':')
+                    .next()
+                    .unwrap_or("no")
+                    .trim()
+                    .to_owned();
+                Appearance::NightMode(v)
+            }
+            AppearanceKind::AppLocales { package } => {
+                // `Locales for dev.app for user 0 are [ar,en]`
+                let out = shell(format!(
+                    "cmd locale get-app-locales {}",
+                    shell_quote(package)
+                ))
+                .await?;
+                let locales = out
+                    .split_once('[')
+                    .and_then(|(_, r)| r.split_once(']'))
+                    .map(|(l, _)| l.trim().to_owned())
+                    .unwrap_or_default();
+                Appearance::AppLocales {
+                    package: package.clone(),
+                    locales,
+                }
+            }
+        })
+    }
+
+    async fn set_appearance(&self, device: &Device, value: &Appearance) -> Result<()> {
+        let command = match value {
+            Appearance::FontScale(Some(v)) => {
+                format!("settings put system font_scale {}", shell_quote(v))
+            }
+            Appearance::FontScale(None) => "settings delete system font_scale".into(),
+            Appearance::NightMode(v) => format!("cmd uimode night {}", shell_quote(v)),
+            Appearance::AppLocales { package, locales } if locales.is_empty() => {
+                format!("cmd locale set-app-locales {}", shell_quote(package))
+            }
+            Appearance::AppLocales { package, locales } => format!(
+                "cmd locale set-app-locales {} --locales {}",
+                shell_quote(package),
+                shell_quote(locales)
+            ),
+        };
+        self.adb.shell(&device.id, &command).await.map(drop)
     }
 
     async fn animation_scales(&self, device: &Device) -> Result<Vec<(String, Option<String>)>> {

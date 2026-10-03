@@ -81,6 +81,8 @@ impl Rule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Violation {
     pub rule: Rule,
+    /// The element, the same across configurations: `#sign_in`, else `button "OK"`.
+    pub element: String,
     /// `[e5] button "OK" #ok: 36×36 dp, needs 48×48`.
     pub detail: String,
 }
@@ -155,6 +157,7 @@ pub fn check(tree: &UiTree, screen: &ScreenInfo, density: u32, rules: &[Rule]) -
     let mut add = |rule: Rule, n: &UiNode, what: String| {
         out.push(Violation {
             rule,
+            element: element_name(n),
             detail: format!("{}: {what}", render_line(n)),
         });
     };
@@ -259,4 +262,13 @@ pub fn check(tree: &UiTree, screen: &ScreenInfo, density: u32, rules: &[Rule]) -
         }
     }
     out
+}
+
+/// An element's name that survives configuration changes better than its ref.
+pub fn element_name(n: &UiNode) -> String {
+    match (&n.id, &n.label) {
+        (Some(id), _) => format!("#{id}"),
+        (None, Some(label)) => format!("{} {label:?}", n.role.as_str()),
+        (None, None) => n.role.as_str().to_owned(),
+    }
 }

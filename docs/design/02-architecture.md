@@ -62,7 +62,7 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
 | `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
-| `mdh-visual` | check kind | UI consistency: rule checks and structural baselines ✅; pixel comparison, cross-config layout checks, design mocks next (§13) | M5, M8 |
+| `mdh-visual` | check kind | UI consistency: rule checks, structural and pixel baselines, contrast, cross-config layout checks ✅; design mocks next (§13) | M5 ✅, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets against baselines; later traces | M6 |
 | `mdh-compat` | matrix | Compatibility: matrices, device pool and providers, config application, scheduling, aggregated reports | M7, M8 |
 | `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
@@ -529,7 +529,7 @@ to convert pixels to dp, later a full-resolution screenshot (not the downscaled 
 Without a `visual:` section every rule runs and violations are warnings, so verdicts report them without failing
 on them; `rules: [...]` or `all` makes them fail, `none` turns them off. Content pushed off the screen can't be
 found this way: accessibility bounds are clipped to the visible area, so a control cut by the edge looks like one
-that ends there. Contrast needs pixels (next).
+that ends there. Contrast is measured on pixels (below).
 
 **Structural baselines (✅).** `.mdh/baselines/visual/<scope>/<checkpoint>/<profile>.tree.json`: the scope is the
 flow (or the name given to `mdh visual check --baseline`), the profile the screen size and density
@@ -540,14 +540,31 @@ or resizes beyond `tolerance_dp` (4). The first run records the baseline (a warn
 the check and writes `<profile>.tree.new.json`, which `mdh visual approve [scope]` promotes. A matching run removes a
 stale candidate. Baselines are committed with the project (`.mdh/baselines/`).
 
-**Pixels (next).** Mask the status and navigation bars, regions given by selectors and explicit rectangles;
-compare with a per-pixel tolerance plus block-wise SSIM, only against the same device profile; emit a diff image
-and map changed regions back to the elements that cover them.
+**Pixel baselines (✅).** With `baseline` (unless `pixels: false`) each checkpoint also keeps
+`<profile>.png`, the full-resolution screenshot halved (averaging away most anti-aliasing). Comparison runs in
+8×8 blocks of the half frame (16 device px): a pixel differs when a channel moved by more than 32, a block changed
+when at least 8% of its unmasked pixels (and 6 or more) differ, and 8-connected changed blocks form one region,
+reported with its size and position in dp, the share of its pixels that changed and the smallest element
+containing its center. Masks: system bars and keyboard (`ScreenInfo.obstructions`), `ignore` elements, focused
+text fields (the cursor blinks) and `mask` rectangles in dp. Frames of another size fail as such. A failure writes
+`visual-<checkpoint>-diff.png` (the frame dimmed, regions outlined) and the candidate `<profile>.new.png`, approved
+with the tree. Same device profile only: GPUs and software rendering differ too much for cross-device pixels.
 
-**Cross-config layout checks (next).** On one device: font scale 1.3, dark mode and an RTL locale; the rules
-above plus elements missing compared with the default configuration. Truncation needs data accessibility doesn't
-expose; candidates are OCR of the element region compared with its text, or the helper reading `Layout` ellipsis
-counts of `TextView`s.
+**Contrast (✅).** On the full-resolution screenshot, per labeled leaf element (texts, buttons, items, toggles,
+tabs; disabled controls exempt): colors bucketed to 4 bits per channel (bucket means, so results don't depend on
+sampling order), the most common bucket is the background, the most contrasting bucket covering at least 0.5% of
+the samples is the text; WCAG ratio against 4.5:1, or 3:1 for text elements at least 32 dp tall. Thin or
+multi-colored text is measured on its most visible color only, so contrast stays a warning unless a flow lists it.
+
+**Cross-config layout checks (✅, one device).** `configs` (`font_scale`, `dark`, `rtl`, `all`) run at the `final`
+checkpoint (or for `mdh visual check`), since switching recreates the app's activities and later steps wouldn't
+expect that. Each variant reads the setting (`settings get system font_scale`, `cmd uimode night`, `cmd locale
+get-app-locales`), sets it (1.3; dark; the app's language `ar`, right to left when the app supports RTL), waits for
+the screen to settle again, and reports elements with an id missing compared with the default screen and rule
+violations that only appear in that configuration (by rule and element, so known problems aren't repeated). The
+setting is restored whatever happened; a failed restore is reported. A failing variant gets its own screenshot.
+Truncation needs data accessibility doesn't expose; candidates are OCR of the element region compared with its
+text, or the helper reading `Layout` ellipsis counts of `TextView`s (backlog).
 
 **Design mocks (M8).** Figma's REST API provides rendered frames and node geometry, text and styles. Frames are mapped
 to screens, elements matched by text or layer name, geometry compared after scaling by density, and deviations in

@@ -17,6 +17,7 @@ mdh-observe.workspace = true
 mdh-verify.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 image = { version = "0.25.9", default-features = false, features = ["png"] }

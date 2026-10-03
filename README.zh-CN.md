@@ -306,7 +306,7 @@ CLI 打印的紧凑文本一样；App 崩溃时会以错误的形式返回，并
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | 把会话中录制的步骤保存为 `.mdh/flows/NAME.yaml` |
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | 从干净的状态重放 flow（关闭动画），每个 flow 一份结论 |
 | `mdh flow run --changed [--base REF]` | 重放经过未提交改动所影响界面的 flow |
-| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET]` · `mdh visual approve [NAME]` | 检查当前界面的 UI 一致性：触控区域、标签、重叠、被系统栏遮住的控件、重复标签；带 `--baseline` 时，对比基线报告哪些元素移动、改变大小、新增、消失或文字变了；`approve` 接受这些变化作为新基线 |
+| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET] [--configs font_scale,dark,rtl]` · `mdh visual approve [NAME]` | 检查当前界面的 UI 一致性：触控区域、标签、重叠、被系统栏遮住的控件、重复标签、文字对比度；带 `--baseline` 时，对比基线报告哪些元素移动、改变大小、新增、消失或文字变了，以及哪些区域的像素变了；带 `--configs` 时，检查大字号、深色模式、从右到左布局下哪里坏了；`approve` 接受这些变化作为新基线 |
 | `mdh impact [--project DIR] [--base REF]` | 自 `REF`（默认 `HEAD`，即未提交的改动）以来的改动影响到哪里、需要校验什么；不需要设备 |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | 启动、停止、安装 App |
 | `mdh open URI [--package P]` | 打开 deep link |
@@ -393,7 +393,7 @@ mdh launch dev.mdh.sample
 | ✅ | **影响面分析** | 通过静态分析得出一处代码改动影响到哪些界面、在那里需要校验什么（已完成） |
 | ✅ | **校验引擎** | 每次运行产出一份带证据的验证结论、录制的 flow 可作为回归测试回放（CI 中也可以）、根据改动的影响面自动挑选 flow、JUnit 报告、Claude Code 插件（已完成）；基线随 UI 检查一起提供；检查类型可插拔： |
 | ✅ | ↳ **功能检查** | 针对界面和日志的断言：App 的行为对不对？（已完成） |
-| ⏳ | ↳ **UI 一致性检查** | 无障碍和布局规则、结构基线（已完成）；接下来是像素基线、对比度、跨配置的布局检查、与设计稿对比 |
+| ✅ | ↳ **UI 一致性检查** | 无障碍和布局规则（含对比度）、结构基线和像素基线、大字号/深色模式/从右到左布局下的检查（已完成）；与设计稿对比放在以后 |
 | ⏳ | ↳ **性能检查** | 对照基线检查启动耗时、卡顿、内存和 CPU |
 | ⏳ | **兼容性矩阵** | 在不同 Android 版本、屏幕尺寸、系统配置和厂商设备上运行以上所有检查 |
 | ⏳ | **更多平台** | React Native、Expo、Flutter，然后是 iOS |

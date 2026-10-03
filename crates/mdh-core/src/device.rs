@@ -67,3 +67,23 @@ impl Avd {
         }
     }
 }
+
+/// A system appearance setting that UI checks vary, with its value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Appearance {
+    /// The system font scale (`1.3`); `None` is the default.
+    FontScale(Option<String>),
+    /// Dark theme: `yes`, `no` or `auto`.
+    NightMode(String),
+    /// The app's own languages, comma-separated tags; empty follows the system.
+    AppLocales { package: String, locales: String },
+}
+
+/// Which appearance setting to read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppearanceKind {
+    FontScale,
+    NightMode,
+    AppLocales { package: String },
+}

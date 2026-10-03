@@ -240,19 +240,30 @@ pub fn contrast_in(image: &RgbImage, rect: &Rect) -> Option<(f64, Rgb<u8>, Rgb<u
     // Colors bucketed to 4 bits per channel; at most ~20k samples.
     let area = u64::from(x1 - x0) * u64::from(y1 - y0);
     let stride = ((area / 20_000) as f64).sqrt().max(1.0) as u32;
-    let mut buckets: std::collections::HashMap<[u8; 3], (u32, Rgb<u8>)> =
+    // Each bucket's mean color, so the measurement doesn't depend on which pixel came first.
+    let mut sums: std::collections::HashMap<[u8; 3], (u32, [u64; 3])> =
         std::collections::HashMap::new();
     let mut total = 0u32;
     for y in (y0..y1).step_by(stride as usize) {
         for x in (x0..x1).step_by(stride as usize) {
-            let p = *image.get_pixel(x, y);
-            let e = buckets
-                .entry([p.0[0] >> 4, p.0[1] >> 4, p.0[2] >> 4])
-                .or_insert((0, p));
+            let p = image.get_pixel(x, y).0;
+            let e = sums
+                .entry([p[0] >> 4, p[1] >> 4, p[2] >> 4])
+                .or_insert((0, [0; 3]));
             e.0 += 1;
+            for (sum, channel) in e.1.iter_mut().zip(p) {
+                *sum += u64::from(channel);
+            }
             total += 1;
         }
     }
+    let buckets: std::collections::HashMap<[u8; 3], (u32, Rgb<u8>)> = sums
+        .into_iter()
+        .map(|(k, (n, s))| {
+            let mean = |c: usize| (s[c] / u64::from(n.max(1))) as u8;
+            (k, (n, Rgb([mean(0), mean(1), mean(2)])))
+        })
+        .collect();
     let (_, (_, background)) = buckets.iter().max_by_key(|(_, (n, _))| *n)?;
     let lb = luminance(background);
     let ratio = |l: f64| (lb.max(l) + 0.05) / (lb.min(l) + 0.05);
@@ -305,6 +316,7 @@ pub fn contrast(tree: &UiTree, image: &RgbImage, density: u32) -> Vec<Violation>
         if ratio < needed {
             out.push(Violation {
                 rule: Rule::Contrast,
+                element: crate::rules::element_name(n),
                 detail: format!(
                     "{}: contrast {ratio:.1}:1 ({} on {}), needs {needed}:1",
                     render_line(n),

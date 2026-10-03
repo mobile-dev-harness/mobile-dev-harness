@@ -140,6 +140,17 @@ impl Control {
         self.driver.clear_data(&self.device, package).await
     }
 
+    pub async fn appearance(
+        &self,
+        kind: &mdh_core::AppearanceKind,
+    ) -> Result<mdh_core::Appearance> {
+        self.driver.appearance(&self.device, kind).await
+    }
+
+    pub async fn set_appearance(&self, value: &mdh_core::Appearance) -> Result<()> {
+        self.driver.set_appearance(&self.device, value).await
+    }
+
     pub async fn density(&self) -> Result<u32> {
         self.driver.density(&self.device).await
     }

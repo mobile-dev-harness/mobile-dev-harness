@@ -86,7 +86,7 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 | **M1 Control** ✅ | Output envelope ✅, helper ✅ (ADR-0007), observe/screenshot/input/app lifecycle ✅, session engine ✅ (session-stable refs, ref and selector targeting, wait-for-stable, diffs after actions, recording), F4.6–F4.8 logs and crashes ✅, F9.1 MCP server ✅, `examples/android-sample` ✅ | An agent drives every sample-app scenario through MCP alone ✅ |
 | **M2 Project** ✅ | F2.1–F2.6 | Sample app runs with a single `mdh run`; compiler errors come back as structured diagnostics |
 | **M4 Verification engine + functional checks** ✅ | F14 change impact ✅ (ADR-0010), F6.1–F6.4 ✅ (the `Check` interface UI and performance checks will implement), F7.1–F7.4 ✅, F9.2 Claude Code plugin ✅, F9.3 ✅; from the state track: data reset ✅, permissions ✅, deep links ✅, animations ✅ (what flow `setup` needs) | Evidence-backed verdicts; recorded flows replay in CI → **release 0.1.0** |
-| **M5 UI consistency checks v1** | F13.1 baselines (structural ✅ + pixel), F13.3 cross-config layout checks on one device, F13.4 rule checks (tree ✅, contrast) | A layout regression and a missing label in the sample app show up in a flow's verdict with evidence |
+| **M5 UI consistency checks v1** ✅ | F13.1 baselines (structural ✅ + pixel ✅), F13.3 cross-config layout checks on one device ✅, F13.4 rule checks (tree ✅, contrast ✅) | A layout regression and a missing label in the sample app show up in a flow's verdict with evidence |
 | **M6 Performance checks v1** | F11.1–F11.5 | A startup and a jank regression in the sample app show up in a verdict against a baseline → **release 0.2.0** |
 | **M7 Compatibility matrix v1** | F12.1–F12.4 (local emulators and physical devices) | One command runs the sample's flows and their checks across a 3×3 matrix and reports per-cell verdicts |
 | **M8 Ecosystem** | F10.1 RN/Expo, F10.2 Flutter, F13.2 design-mock comparison, F12.5 cloud and vendor devices, F7.5 Maestro import | — |
@@ -103,6 +103,7 @@ configuration and snapshots, and the config file grows with them.
 |---|---|
 | Display size from the helper | `ScreenInfo.size` is derived from window bounds; while a dialog is the only window (crash dialog, permission prompt) it is too small. The helper should report the display's real size. |
 | Compose content without semantics | Drawn Compose content (a canvas without semantics) is absent from the accessibility tree, so opaque-region detection can't see it. Candidate: screenshot-based detection of unexplained drawn areas (M5, `mdh-visual`). |
+| Text truncation | Accessibility reports full text even when it is ellipsized on screen; the helper could read `TextView` layout ellipsis counts (Views) and OCR could cover Compose. Needed for a "truncated at font scale 1.3" finding. |
 | Device recommendation from impact | Let `mdh impact` suggest which devices or configurations a change needs (a manifest `minSdk` change → the lowest API level; a tablet layout → a large screen; a `values-ar` change → RTL), feeding the device choice and later the matrix. |
 | Calls while the app is frozen | Settling abandons tree reads after 2 s, but the helper keeps serving the blocked request; the next call can wait up to ~10 s. A per-request deadline inside the helper would bound it. |
 

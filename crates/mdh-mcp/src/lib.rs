@@ -231,6 +231,9 @@ pub struct VisualParams {
     pub rules: Option<Vec<String>>,
     /// `check`: elements to leave out of the baseline comparison (dynamic content), as targets.
     pub ignore: Option<Vec<String>>,
+    /// `check`: also check the screen at a larger font (`font_scale`), in dark mode (`dark`) and
+    /// right to left (`rtl`); each is switched on, checked against the default and restored.
+    pub configs: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
@@ -680,6 +683,7 @@ impl MdhServer {
                 "rules": rules,
                 "baseline": p.baseline.is_some(),
                 "ignore": p.ignore.unwrap_or_default(),
+                "configs": p.configs.unwrap_or_default(),
             })),
             scope: p.baseline,
             ..mdh_verify::VerifyOptions::default()

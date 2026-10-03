@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_core::ui::RawTree;
-use mdh_core::{Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result};
+use mdh_core::{
+    Appearance, AppearanceKind, Avd, Device, Error, Input, LaunchInfo, LogEntry, Platform, Result,
+};
 
 /// A platform backend: low-level device capabilities only. Element targeting, waiting and
 /// observation live above it and are shared by all backends.
@@ -96,6 +98,16 @@ pub trait Driver: Send + Sync {
         _scales: &[(String, Option<String>)],
     ) -> Result<()> {
         Err(unsupported("changing animation settings"))
+    }
+
+    /// The current value of an appearance setting, to restore after varying it.
+    async fn appearance(&self, _device: &Device, _kind: &AppearanceKind) -> Result<Appearance> {
+        Err(unsupported("reading appearance settings"))
+    }
+
+    /// Changes an appearance setting; running apps get a configuration change.
+    async fn set_appearance(&self, _device: &Device, _value: &Appearance) -> Result<()> {
+        Err(unsupported("changing appearance settings"))
     }
 
     /// Grants or revokes a runtime permission.

@@ -6,6 +6,7 @@
 
     <application
         android:label="mdh sample"
+        android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity

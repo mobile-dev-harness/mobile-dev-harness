@@ -318,7 +318,7 @@ to verify this project" section to `AGENTS.md` for Codex, Cursor and other agent
 | `mdh flow save NAME [--last N] [--check CHECK]... [--force]` | Save the session's recorded steps as `.mdh/flows/NAME.yaml` |
 | `mdh flow run NAME... [--junit FILE] [--step-timeout 10] [--timeout 3]` · `mdh flow list` · `mdh flow show NAME` | Replay flows from a clean start (animations off), one verdict each |
 | `mdh flow run --changed [--base REF]` | Replay the flows that pass the screens the uncommitted change reaches |
-| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET]` · `mdh visual approve [NAME]` | UI consistency of the current screen: touch targets, labels, overlap, controls under the system bars, duplicate labels; with `--baseline`, what moved, resized, appeared, disappeared or changed text since the baseline; `approve` accepts the deviations |
+| `mdh visual check [--baseline NAME] [--rules all\|none\|LIST] [--ignore TARGET] [--configs font_scale,dark,rtl]` · `mdh visual approve [NAME]` | UI consistency of the current screen: touch targets, labels, overlap, controls under the system bars, duplicate labels, text contrast; with `--baseline`, what moved, resized, appeared, disappeared or changed text, and which regions' pixels changed, since the baseline; with `--configs`, what breaks at a larger font, in dark mode or right to left; `approve` accepts the deviations |
 | `mdh impact [--project DIR] [--base REF]` | What the change since `REF` (default `HEAD`: the uncommitted change) reaches and what to verify; no device needed |
 | `mdh launch APP` · `mdh stop PACKAGE` · `mdh install APK [-g]` | App lifecycle |
 | `mdh open URI [--package P]` | Open a deep link |
@@ -415,7 +415,7 @@ matrix that repeats it across devices:
 | ✅ | **Change impact** | Which screens a code change reaches and what to verify there, from static analysis (done) |
 | ✅ | **Verification engine** | One evidence-backed verdict per run, flows recorded and replayed as regression tests (in CI too), the flows a change needs picked from its impact, JUnit reports, a Claude Code plugin (done); baselines arrive with UI checks — with pluggable check kinds: |
 | ✅ | ↳ **Functional checks** | Assertions on screens and logs: does it do what it should? (done) |
-| ⏳ | ↳ **UI consistency checks** | Accessibility and layout rules, structural baselines (done); pixel baselines, contrast, layout checks across configurations, design-mock comparison next |
+| ✅ | ↳ **UI consistency checks** | Accessibility and layout rules with contrast, structural and pixel baselines, layout checks at a larger font, in dark mode and right to left (done); design-mock comparison later |
 | ⏳ | ↳ **Performance checks** | Startup time, jank, memory and CPU against baselines |
 | ⏳ | **Compatibility matrix** | All of the above across Android versions, screen sizes, configurations and vendors |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |

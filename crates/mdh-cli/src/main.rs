@@ -258,6 +258,10 @@ enum VisualCommand {
         /// Elements to leave out of the baseline comparison (dynamic content); repeatable
         #[arg(long)]
         ignore: Vec<String>,
+        /// Also check the screen in these configurations, comma-separated: font_scale, dark,
+        /// rtl, or all (each is switched on, checked and restored)
+        #[arg(long, value_delimiter = ',')]
+        configs: Vec<String>,
     },
     /// Make the candidates left by failed baseline comparisons the new baselines (all, or one
     /// flow's or name's)
@@ -696,6 +700,7 @@ async fn run(
                 baseline,
                 rules,
                 ignore,
+                configs,
             } => {
                 let rules: serde_json::Value = match rules.as_str() {
                     "all" | "none" => rules.clone().into(),
@@ -711,6 +716,7 @@ async fn run(
                         "rules": rules,
                         "baseline": baseline.is_some(),
                         "ignore": ignore,
+                        "configs": configs,
                     })),
                     scope: baseline,
                     ..mdh_verify::VerifyOptions::default()

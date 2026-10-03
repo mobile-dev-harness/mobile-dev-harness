@@ -6,6 +6,7 @@ screens:
 visual:
   baseline: true
   rules: none
+  configs: [font_scale, dark]
 steps:
 - tap: Troubles
 - wait: id=share

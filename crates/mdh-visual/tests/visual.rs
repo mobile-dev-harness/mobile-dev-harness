@@ -7,7 +7,9 @@ use async_trait::async_trait;
 use mdh_control::{Control, Session};
 use mdh_core::output::Timings;
 use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
-use mdh_core::{Device, DeviceState, Error, Input, LaunchInfo, Platform, Result};
+use mdh_core::{
+    Appearance, AppearanceKind, Device, DeviceState, Error, Input, LaunchInfo, Platform, Result,
+};
 use mdh_driver::Driver;
 use mdh_verify::{Check, CheckContext, Outcome};
 use mdh_visual::Visual;
@@ -17,6 +19,8 @@ struct FakeDriver {
     screen: Mutex<Vec<RawNode>>,
     /// What `screenshot` returns, as PNG.
     png: Mutex<Option<Vec<u8>>>,
+    /// Appearance settings written, in order; a large font scale hides `#more`.
+    appearance: Mutex<Vec<Appearance>>,
 }
 
 #[async_trait]
@@ -39,6 +43,37 @@ impl Driver for FakeDriver {
     }
     async fn density(&self, _: &Device) -> Result<u32> {
         Ok(480)
+    }
+    async fn appearance(&self, _: &Device, kind: &AppearanceKind) -> Result<Appearance> {
+        Ok(match kind {
+            AppearanceKind::FontScale => Appearance::FontScale(None),
+            AppearanceKind::NightMode => Appearance::NightMode("no".into()),
+            AppearanceKind::AppLocales { package } => Appearance::AppLocales {
+                package: package.clone(),
+                locales: String::new(),
+            },
+        })
+    }
+    async fn set_appearance(&self, _: &Device, value: &Appearance) -> Result<()> {
+        self.appearance.lock().unwrap().push(value.clone());
+        let mut screen = self.screen.lock().unwrap();
+        let root = &mut screen[0].children;
+        let has_more = root
+            .iter()
+            .any(|n| n.resource_id.as_deref() == Some("com.example:id/more"));
+        match value {
+            Appearance::FontScale(Some(_)) => {
+                root.retain(|n| n.resource_id.as_deref() != Some("com.example:id/more"))
+            }
+            Appearance::FontScale(None) if !has_more => root.push(control(
+                "android.widget.Button",
+                "more",
+                Some("More"),
+                Rect::new(0, 900, 1080, 1050),
+            )),
+            _ => {}
+        }
+        Ok(())
     }
     async fn input(&self, _: &Device, _: &Input) -> Result<()> {
         Ok(())
@@ -141,6 +176,7 @@ async fn run(
 async fn rules_find_small_unlabeled_and_overlapping_controls() {
     let driver = Arc::new(FakeDriver {
         png: Mutex::new(None),
+        appearance: Mutex::default(),
         screen: Mutex::new(root(vec![
             // 360×150 px at 480 dpi = 120×50 dp: fine.
             control(
@@ -205,6 +241,7 @@ async fn baselines_are_recorded_compared_and_approved() {
     let driver = Arc::new(FakeDriver {
         screen: Mutex::new(screen(600, "Sign in")),
         png: Mutex::new(None),
+        appearance: Mutex::default(),
     });
     let dir = std::env::temp_dir().join(format!("mdh-visual-baseline-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -262,6 +299,7 @@ async fn pixel_baselines_name_the_element_that_changed() {
             button,
         )])),
         png: Mutex::new(Some(png(Some((button, [30, 100, 200]))))),
+        appearance: Mutex::default(),
     });
     let dir = std::env::temp_dir().join(format!("mdh-visual-pixels-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -303,4 +341,54 @@ async fn pixel_baselines_name_the_element_that_changed() {
         "{hidden:?}"
     );
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
+async fn other_configurations_find_what_goes_missing_and_restore_the_setting() {
+    let driver = Arc::new(FakeDriver {
+        screen: Mutex::new(root(vec![
+            control(
+                "android.widget.Button",
+                "ok",
+                Some("OK"),
+                Rect::new(0, 100, 1080, 250),
+            ),
+            control(
+                "android.widget.Button",
+                "more",
+                Some("More"),
+                Rect::new(0, 900, 1080, 1050),
+            ),
+        ])),
+        png: Mutex::new(None),
+        appearance: Mutex::default(),
+    });
+    let dir = std::env::temp_dir().join(format!("mdh-visual-configs-{}", std::process::id()));
+    let findings = run(
+        &driver,
+        &dir,
+        serde_json::json!({ "rules": "none", "configs": ["font_scale", "dark"] }),
+    )
+    .await;
+    assert_eq!(
+        findings,
+        [
+            (
+                Outcome::Fail,
+                "ui at font scale 1.3 — missing compared with the default configuration: #more"
+                    .to_owned()
+            ),
+            (Outcome::Pass, "ui in dark mode: layout holds".to_owned()),
+        ]
+    );
+    // Each setting was switched and put back.
+    assert_eq!(
+        *driver.appearance.lock().unwrap(),
+        [
+            Appearance::FontScale(Some("1.3".into())),
+            Appearance::FontScale(None),
+            Appearance::NightMode("yes".into()),
+            Appearance::NightMode("no".into()),
+        ]
+    );
 }
