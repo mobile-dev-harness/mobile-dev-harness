@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -11,17 +11,17 @@ repository = "https://github.com/qkmaosjtu/mobile-dev-harness"
 authors = ["The mobile-dev-harness contributors"]
 
 [workspace.dependencies]
-mdh-compat = { path = "crates/mdh-compat", version = "0.1.0" }
-mdh-control = { path = "crates/mdh-control", version = "0.1.0" }
-mdh-core = { path = "crates/mdh-core", version = "0.1.0" }
-mdh-driver = { path = "crates/mdh-driver", version = "0.1.0" }
-mdh-impact = { path = "crates/mdh-impact", version = "0.1.0" }
-mdh-mcp = { path = "crates/mdh-mcp", version = "0.1.0" }
-mdh-observe = { path = "crates/mdh-observe", version = "0.1.0" }
-mdh-perf = { path = "crates/mdh-perf", version = "0.1.0" }
-mdh-project = { path = "crates/mdh-project", version = "0.1.0" }
-mdh-verify = { path = "crates/mdh-verify", version = "0.1.0" }
-mdh-visual = { path = "crates/mdh-visual", version = "0.1.0" }
+mdh-compat = { path = "crates/mdh-compat", version = "0.2.0" }
+mdh-control = { path = "crates/mdh-control", version = "0.2.0" }
+mdh-core = { path = "crates/mdh-core", version = "0.2.0" }
+mdh-driver = { path = "crates/mdh-driver", version = "0.2.0" }
+mdh-impact = { path = "crates/mdh-impact", version = "0.2.0" }
+mdh-mcp = { path = "crates/mdh-mcp", version = "0.2.0" }
+mdh-observe = { path = "crates/mdh-observe", version = "0.2.0" }
+mdh-perf = { path = "crates/mdh-perf", version = "0.2.0" }
+mdh-project = { path = "crates/mdh-project", version = "0.2.0" }
+mdh-verify = { path = "crates/mdh-verify", version = "0.2.0" }
+mdh-visual = { path = "crates/mdh-visual", version = "0.2.0" }
 
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }

@@ -3,7 +3,9 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
-## Unreleased
+## 0.2.0
+
+Performance and UI consistency checks join functional checks in the verification engine.
 
 ### Performance checks
 - `mdh perf startup [APP] [--hot]`: cold (and hot) start over repeated runs; `mdh perf flow NAME`: janky frames,
