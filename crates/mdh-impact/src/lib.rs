@@ -5,6 +5,7 @@
 //! project is parsed with tree-sitter into declarations and references; changed declarations are
 //! followed through their users up to the screens that show them.
 
+mod error;
 mod git;
 mod impact;
 mod index;
@@ -23,7 +24,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use mdh_core::{Error, Result};
+pub use error::{Error, Result};
 
 pub use git::Status as FileStatus;
 pub use index::Confidence;

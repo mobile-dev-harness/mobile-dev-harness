@@ -48,15 +48,16 @@ crates/
   mdh-driver/    foundation: Driver trait + android/ (SDK, adb, helper client, uiautomator, parsers)
   mdh-observe/   foundation: compact UI trees, stable refs, rendering, diffs, screenshots; logs next
   mdh-project/   foundation: Gradle probe (init script), builds, diagnostics, APK lookup
-  mdh-impact/    verification input: change impact — tree-sitter index of Kotlin/Java/Android XML, git
-                 change set, declaration diff, users up to screens, what to verify (no device, no build)
+  mdh-impact/    analyzer: change impact — tree-sitter index of Kotlin/Java/Android XML, git change set,
+                 declaration diff, users up to screens, what to verify (no device, no build, no mdh crate)
+  mdh-risk/      analyzer: compatibility risks from impact's facts and the vendored knowledge base (kb/)
   mdh-control/   control: session engine, targeting, actions, waiting, app lifecycle, `run`
   mdh-verify/    verification engine: Check interface, functional checks, verdicts and evidence, flows
                  (YAML via serde_norway behind `yaml.rs`), replay, JUnit
   mdh-visual/    check kind: UI consistency — rules, contrast, structural and pixel baselines,
                  font scale / dark / RTL variants
-  mdh-perf/      check kind: performance                                    — empty until M6
-  mdh-compat/    matrix: compatibility across devices and configurations   — empty until M7
+  mdh-perf/      check kind: performance — startup, frames, memory, CPU; Perfetto traces
+  mdh-compat/    compatibility: plans from mdh-risk's risks, cells on devices, a verdict per risk
   mdh-mcp/       entry point: MCP server over stdio (rmcp), compiled into `mdh mcp`
   mdh-cli/       entry point: package `mobile-dev-harness`, binary `mdh` (parsing + rendering only)
 integrations/claude-code/  Claude Code plugin (MCP config, skills, hooks calling `mdh hook`); the
@@ -204,7 +205,7 @@ macOS with `--locked`, so commit `Cargo.lock` changes.
 
 - Risk-driven (ADR-0011): never add a mode that runs every flow on every device by default.
 - The knowledge base lives in [compat-kb](https://github.com/mobile-dev-harness/compat-kb)
-  (ADR-0012). `crates/mdh-compat/kb/android.yaml` is a pinned snapshot: never edit it here (a test
+  (ADR-0012). `crates/mdh-risk/kb/android.yaml` is a pinned snapshot: never edit it here (a test
   checks it against `kb/SOURCE`); change the KB repository, release it, then run
   `scripts/update-kb.sh <version>`. Try unreleased entries with `MDH_COMPAT_KB=<file>`. Every entry
   needs a source link and triggers. Prefer reporting a risk to missing one, but keep triggers

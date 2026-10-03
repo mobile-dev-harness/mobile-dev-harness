@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use mdh_core::{Error, Result};
+use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,7 +36,7 @@ impl Repo {
         };
         match repo.git(&["rev-parse", "--is-inside-work-tree"]) {
             Ok(out) if out.trim() == "true" => Ok(repo),
-            Ok(_) | Err(Error::CommandFailed { .. }) => Err(Error::NotARepository {
+            Ok(_) | Err(Error::Git { .. }) => Err(Error::NotARepository {
                 dir: dir.display().to_string(),
             }),
             Err(e) => Err(e),
@@ -179,7 +179,6 @@ impl Repo {
                 continue;
             };
             let size: usize = size.parse().map_err(|_| Error::Parse {
-                tool: "git cat-file".into(),
                 detail: header.trim().into(),
             })?;
             let mut content = vec![0; size + 1];
@@ -200,7 +199,7 @@ impl Repo {
             .output()
             .map_err(git_missing)?;
         if !output.status.success() {
-            return Err(Error::CommandFailed {
+            return Err(Error::Git {
                 command: format!("git {}", args.join(" ")),
                 code: output.status.code(),
                 stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
@@ -217,10 +216,7 @@ fn harness_file(path: &str) -> bool {
 
 fn git_missing(e: std::io::Error) -> Error {
     if e.kind() == std::io::ErrorKind::NotFound {
-        Error::ToolNotFound {
-            name: "git".into(),
-            hint: "install git and make sure it is on PATH".into(),
-        }
+        Error::GitNotFound
     } else {
         Error::Io(e)
     }

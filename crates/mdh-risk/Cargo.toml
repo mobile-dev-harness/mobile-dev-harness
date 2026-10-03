@@ -1,0 +1,20 @@
+[package]
+name = "mdh-risk"
+description = "Compatibility risks of a mobile code change, from impact analysis and a knowledge base; no device"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+mdh-impact.workspace = true
+serde.workspace = true
+serde_norway = "0.9.42"
+
+[dev-dependencies]
+sha2 = "0.10.9"
+
+[lints]
+workspace = true

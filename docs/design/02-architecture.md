@@ -60,11 +60,12 @@ are in [DESIGN.md](../DESIGN.md#design-principles); these are the architectural 
 | `mdh-observe` | foundation | Compact UI trees (compression, roles, stable keys, refs, rendering, diffs, opaque regions), screenshot processing; logs and crash reports next | ✅ partly |
 | `mdh-project` | foundation | Gradle probing, building, diagnostics, APK selection; later RN, Expo, Flutter, Xcode | ✅ |
 | `mdh-control` | control | Device selection, observation, input, app lifecycle, session engine, `run` ✅; state setup, navigation | M1–M3 |
-| `mdh-impact` | verification engine (input) | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify; depends only on `mdh-core` (§23) | ✅ |
+| `mdh-impact` | analyzer | Change impact: tree-sitter index of Kotlin, Java and Android XML, git change set, declaration diff, users up to screens, what to verify, the facts compatibility needs; no other mdh crate (§23) | ✅ |
+| `mdh-risk` | analyzer | Compatibility risks of a change: rules over impact's facts and the vendored knowledge base (`compat-kb`); depends only on `mdh-impact` (§12) | ✅ |
 | `mdh-verify` | verification engine | `Check` interface, verdicts, evidence, flow save/replay, JUnit reports, functional checks ✅ (§24); baselines next | M4 |
 | `mdh-visual` | check kind | UI consistency: rule checks, structural and pixel baselines, contrast, cross-config layout checks ✅; design mocks next (§13) | M5 ✅, M8 |
 | `mdh-perf` | check kind | Performance: startup, frames, memory, CPU, budgets and baselines; Perfetto traces explain regressions | M6 ✅ |
-| `mdh-compat` | orchestrator | Compatibility (ADR-0011): risk analysis with a knowledge base, verification plans, device pool and providers, config application, verdicts per risk | M7, M8 |
+| `mdh-compat` | orchestrator | Compatibility (ADR-0011): verification plans from `mdh-risk`'s risks, device pool and providers, config application, verdicts per risk | M7 ✅, M8 |
 | `mdh-mcp` | entry | MCP server (`rmcp`, stdio), compiled into the `mdh` binary | ✅ |
 | `mobile-dev-harness` (`crates/mdh-cli`) | entry | CLI `mdh`, the only published binary | ✅ |
 
@@ -533,7 +534,7 @@ the version catalog as text; a value computed at configuration time is reported 
 directories, the manifest's `uses-feature` entries.
 
 **Knowledge base.** Its own repository, [compat-kb](https://github.com/mobile-dev-harness/compat-kb)
-(ADR-0012); a pinned release is compiled into the binary (`crates/mdh-compat/kb/android.yaml`, version and
+(ADR-0012); a pinned release is compiled into the binary (`crates/mdh-risk/kb/android.yaml`, version and
 SHA-256 in `kb/SOURCE`, replaced by `scripts/update-kb.sh <version>`, checked by a test), and `MDH_COMPAT_KB`
 points a binary at another copy. Each entry has a source link:
 

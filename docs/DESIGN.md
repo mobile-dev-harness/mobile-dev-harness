@@ -9,7 +9,7 @@
 | Document | Contents |
 |---|---|
 | [design/01-functional.md](design/01-functional.md) | Functional design: users and scenarios, core concepts, feature modules (F1–F14), CLI/MCP/config/flow/output interfaces, non-functional requirements |
-| [adr/0012-repositories.md](adr/0012-repositories.md) | Code in one repository, platforms by directory; data and the benchmark in their own |
+| [adr/0012-repositories.md](adr/0012-repositories.md) | Repositories by layer — controller, analyzer, product — platforms by directory; data and the benchmark in their own |
 | [design/02-architecture.md](design/02-architecture.md) | Technical architecture: crates, core abstractions, key flows, UI tree compression, stability, logs, Gradle probing, helper, the perf/compat/visual domains, impact analysis, MCP, plugin, error model, testing, release, security |
 | [adr/](adr/) | Architecture decision records |
 
@@ -81,18 +81,23 @@ F2, F10). Entry points: `mdh-cli` and `mdh-mcp`, plus the Claude Code plugin (F9
 
 ## Repositories (ADR-0012)
 
-Code lives in one repository, platforms by directory; only data and neutral ground get their own. A second
-platform adds directories, not repositories.
+Repositories follow the layers: a **controller** that drives devices, an **analyzer** that reads code, and the
+**product** that turns both into verdicts. Platforms are directories inside them, not repositories. Data and the
+benchmark get their own.
 
-| Repository | What | Per platform |
-|---|---|---|
-| [`mobile-dev-harness`](https://github.com/mobile-dev-harness/mobile-dev-harness) | CLI, MCP server and engine crates; on-device helpers; impact analysis; integrations for agents (Claude Code plugin, more agents later); a GitHub Action (`action.yml`, later); sample app and e2e | `android-helper/` → `helpers/<platform>/`; impact parsers by language; `integrations/<agent>/` |
-| [`compat-kb`](https://github.com/mobile-dev-harness/compat-kb) | The compatibility knowledge base: behavior changes by OS version, device-type triggers, vendor quirks, each with its source. Data with its own rhythm and contributors; mdh vendors a pinned release | `android.yaml`, `ios.yaml` |
-| `mobile-agent-bench` | The benchmark: tasks, runner, graders, results. Neutral ground, results don't ship with mdh | `tasks/<platform>/` |
-| `homebrew-tap` (when needed) | `brew install mobile-dev-harness/tap/mdh`; Homebrew requires the name | — |
+| Repository | What | Crates | Per platform |
+|---|---|---|---|
+| `controller` | Driving devices: types and errors, drivers, on-device helpers, compact UI trees, logs and crashes, sessions and actions, builds | `mdh-core`, `mdh-driver`, `mdh-observe`, `mdh-control`, `mdh-project`; `android-helper/` | `helpers/<platform>/`, driver modules |
+| `analyzer` | Reading code, no device: what a change reaches, its compatibility risks | `mdh-impact`, `mdh-risk` | parsers by language |
+| [`mobile-dev-harness`](https://github.com/mobile-dev-harness/mobile-dev-harness) | The product: `mdh` CLI and MCP server, the verification engine, UI, performance and compatibility checks, agent integrations, sample app, e2e | `mdh-cli`, `mdh-mcp`, `mdh-verify`, `mdh-visual`, `mdh-perf`, `mdh-compat` | `integrations/<agent>/` |
+| [`compat-kb`](https://github.com/mobile-dev-harness/compat-kb) | The compatibility knowledge base, each entry with its source; vendored by `mdh-risk` at a pinned release | — | `android.yaml`, `ios.yaml` |
+| `mobile-agent-bench` | The benchmark: tasks, runner, graders, results; neutral ground | `mdh-bench` | `tasks/<platform>/` |
 
-Data a binary needs is vendored at a pinned version with its checksum and updated by a script
-(`scripts/update-kb.sh`), never fetched at build time.
+Dependencies point one way: the product depends on the controller and the analyzer, which don't depend on each
+other or on it. Until the split (after the 2026-10 benchmark run) all crates live in `mobile-dev-harness`; the
+crate boundaries already hold (`mdh-impact` and `mdh-risk` use no controller crate). The product pins the other
+repositories by git tag; local development across them uses Cargo `[patch]`. Data a binary needs is vendored at a
+pinned version with its checksum and updated by a script (`scripts/update-kb.sh`), never fetched at build time.
 
 ## Roadmap
 

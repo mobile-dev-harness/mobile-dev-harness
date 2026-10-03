@@ -3,7 +3,7 @@
 # SHA-256. Usage: scripts/update-kb.sh v1.1.0
 set -eu
 version=${1:?usage: scripts/update-kb.sh <version, e.g. v1.1.0>}
-cd "$(dirname "$0")/../crates/mdh-compat/kb"
+cd "$(dirname "$0")/../crates/mdh-risk/kb"
 base=https://github.com/mobile-dev-harness/compat-kb/releases/download/$version
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

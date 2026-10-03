@@ -622,12 +622,11 @@ dependencies = [
  "mdh-driver",
  "mdh-impact",
  "mdh-observe",
+ "mdh-risk",
  "mdh-verify",
  "mdh-visual",
  "serde",
  "serde_json",
- "serde_norway",
- "sha2",
  "tokio",
 ]
 
@@ -672,8 +671,8 @@ name = "mdh-impact"
 version = "0.3.0"
 dependencies = [
  "insta",
- "mdh-core",
  "serde",
+ "thiserror",
  "tree-sitter",
  "tree-sitter-java",
  "tree-sitter-kotlin-ng",
@@ -735,6 +734,16 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "mdh-risk"
+version = "0.3.0"
+dependencies = [
+ "mdh-impact",
+ "serde",
+ "serde_norway",
+ "sha2",
 ]
 
 [[package]]

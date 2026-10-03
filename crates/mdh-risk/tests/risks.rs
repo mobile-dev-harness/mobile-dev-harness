@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use mdh_compat::{Dimension, Likelihood, Risk};
+use mdh_risk::{Dimension, Likelihood, Risk};
 
 const FILES: &[(&str, &str)] = &[
     ("settings.gradle.kts", "include(\":app\")\n"),
@@ -124,7 +124,7 @@ impl Repo {
             base: "HEAD".into(),
         })
         .unwrap();
-        mdh_compat::risks(&report)
+        mdh_risk::risks(&report)
     }
 }
 

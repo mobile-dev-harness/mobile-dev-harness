@@ -20,6 +20,7 @@ mdh-mcp = { path = "crates/mdh-mcp", version = "0.3.0" }
 mdh-observe = { path = "crates/mdh-observe", version = "0.3.0" }
 mdh-perf = { path = "crates/mdh-perf", version = "0.3.0" }
 mdh-project = { path = "crates/mdh-project", version = "0.3.0" }
+mdh-risk = { path = "crates/mdh-risk", version = "0.3.0" }
 mdh-verify = { path = "crates/mdh-verify", version = "0.3.0" }
 mdh-visual = { path = "crates/mdh-visual", version = "0.3.0" }
 

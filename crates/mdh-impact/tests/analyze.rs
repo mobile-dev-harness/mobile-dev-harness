@@ -288,5 +288,8 @@ fn unknown_base_is_an_error() {
         base: "no-such-branch".into(),
     })
     .unwrap_err();
-    assert_eq!(e.code().as_str(), "UNKNOWN_REVISION");
+    assert!(
+        matches!(&e, mdh_impact::Error::UnknownRevision { rev } if rev == "no-such-branch"),
+        "{e}"
+    );
 }

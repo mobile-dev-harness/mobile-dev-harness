@@ -283,6 +283,34 @@ pub async fn run_flows(
     Ok(FlowRuns::new(verdicts))
 }
 
+/// Impact analysis' errors in mdh's terms: the same codes and hints as any other error.
+pub fn impact_error(e: mdh_impact::Error) -> mdh_core::Error {
+    use mdh_core::Error;
+    match e {
+        mdh_impact::Error::NotARepository { dir } => Error::NotARepository { dir },
+        mdh_impact::Error::UnknownRevision { rev } => Error::UnknownRevision { rev },
+        mdh_impact::Error::ProjectNotFound { dir } => Error::ProjectNotFound { dir },
+        mdh_impact::Error::GitNotFound => Error::ToolNotFound {
+            name: "git".into(),
+            hint: "install git and make sure it is on PATH".into(),
+        },
+        mdh_impact::Error::Git {
+            command,
+            code,
+            stderr,
+        } => Error::CommandFailed {
+            command,
+            code,
+            stderr,
+        },
+        mdh_impact::Error::Parse { detail } => Error::Parse {
+            tool: "git cat-file".into(),
+            detail,
+        },
+        mdh_impact::Error::Io(e) => Error::Io(e),
+    }
+}
+
 /// Saved flows a change needs (functional design F14.6): those passing an affected screen or the
 /// activity hosting it; all of them when the build configuration changed.
 pub fn flows_for(report: &mdh_impact::ImpactReport, store: &FlowStore) -> Result<Vec<String>> {
@@ -316,7 +344,8 @@ pub async fn run_changed(
     let report = mdh_impact::analyze(&mdh_impact::Options {
         project: project.to_owned(),
         base: base.to_owned(),
-    })?;
+    })
+    .map_err(impact_error)?;
     let names = flows_for(&report, store)?;
     if names.is_empty() {
         let screens: Vec<&str> = report.screens.iter().map(|s| s.screen.as_str()).collect();

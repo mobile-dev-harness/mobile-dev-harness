@@ -541,12 +541,14 @@ async fn main() -> ExitCode {
         Command::Hook { event } => hook(event).await,
         Command::Impact { project, base } => {
             report!(
-                mdh_impact::analyze(&mdh_impact::Options { project, base }).and_then(|mut r| {
-                    r.verify.flows =
-                        mdh_verify::flows_for(&r, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
-                    r.verify.compatibility = mdh_compat::summaries(&r);
-                    Ok(r)
-                })
+                mdh_impact::analyze(&mdh_impact::Options { project, base })
+                    .map_err(mdh_verify::impact_error)
+                    .and_then(|mut r| {
+                        r.verify.flows =
+                            mdh_verify::flows_for(&r, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
+                        r.verify.compatibility = mdh_compat::summaries(&r);
+                        Ok(r)
+                    })
             )
         }
         Command::Compat {

@@ -9,8 +9,8 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-mdh-core.workspace = true
 serde.workspace = true
+thiserror.workspace = true
 tree-sitter = "0.26.13"
 tree-sitter-java = "0.23.5"
 tree-sitter-kotlin-ng = "1.1.0"

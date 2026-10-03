@@ -14,16 +14,15 @@ mdh-driver.workspace = true
 mdh-core.workspace = true
 mdh-impact.workspace = true
 mdh-observe.workspace = true
+mdh-risk.workspace = true
 mdh-verify.workspace = true
 mdh-visual.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_norway = "0.9.42"
 tokio.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
-sha2 = "0.10.9"
 
 [lints]
 workspace = true

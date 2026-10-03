@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use mdh_core::{Avd, Device};
 use serde::Serialize;
 
-use crate::kb::Shape;
-use crate::risk::{NEWEST, Need, Risk};
+use mdh_risk::kb::Shape;
+use mdh_risk::risk::{NEWEST, Need, Risk};
 
 /// What there is to run on.
 #[derive(Debug, Clone)]
@@ -259,8 +259,8 @@ fn target_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::risk::{Dimension, Likelihood};
     use mdh_core::{DeviceState, Platform};
+    use mdh_risk::risk::{Dimension, Likelihood};
 
     fn device(id: &str, api: u32, emulator: bool, manufacturer: &str) -> Device {
         Device {

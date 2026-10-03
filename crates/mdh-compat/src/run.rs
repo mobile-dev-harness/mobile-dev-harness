@@ -16,9 +16,9 @@ use mdh_verify::{Flow, FlowOptions, FlowStore, Status, VerifyOptions, run_flow};
 use mdh_visual::rules::{self, Rule};
 use serde::Serialize;
 
-use crate::kb::Shape;
 use crate::plan::{Cell, Inventory, Plan, PlanOptions, Target, plan};
-use crate::risk::{Dimension, Risk, risks};
+use mdh_risk::kb::Shape;
+use mdh_risk::risk::{Dimension, Risk, risks};
 
 /// Rules compared across cells: those on the tree that are never deliberate.
 const RULES: [Rule; 4] = [
@@ -157,7 +157,8 @@ pub async fn prepare(
     let report = mdh_impact::analyze(&mdh_impact::Options {
         project: options.project.clone(),
         base: options.base.clone(),
-    })?;
+    })
+    .map_err(mdh_verify::impact_error)?;
     let risks = risks(&report);
     let inv = inventory(session).await?;
     let mut plan_options = options.plan;

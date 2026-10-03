@@ -642,7 +642,7 @@ impl MdhServer {
             base: p.base.unwrap_or_else(|| "HEAD".into()),
         };
         let result = tokio::task::spawn_blocking(move || {
-            let mut report = mdh_impact::analyze(&options)?;
+            let mut report = mdh_impact::analyze(&options).map_err(mdh_verify::impact_error)?;
             report.verify.flows =
                 mdh_verify::flows_for(&report, &mdh_verify::FlowStore::new(FLOWS_DIR))?;
             report.verify.compatibility = mdh_compat::summaries(&report);
