@@ -89,6 +89,24 @@ pub enum Appearance {
         size: Option<(u32, u32)>,
         density: Option<u32>,
     },
+    /// The system time zone, an Olson id (`Asia/Tokyo`).
+    TimeZone(String),
+}
+
+impl Appearance {
+    /// Which setting this is, to read it before changing it.
+    pub fn kind(&self) -> AppearanceKind {
+        match self {
+            Appearance::FontScale(_) => AppearanceKind::FontScale,
+            Appearance::NightMode(_) => AppearanceKind::NightMode,
+            Appearance::AppLocales { package, .. } => AppearanceKind::AppLocales {
+                package: package.clone(),
+            },
+            Appearance::Rotation { .. } => AppearanceKind::Rotation,
+            Appearance::Display { .. } => AppearanceKind::Display,
+            Appearance::TimeZone(_) => AppearanceKind::TimeZone,
+        }
+    }
 }
 
 /// Which appearance setting to read.
@@ -99,6 +117,7 @@ pub enum AppearanceKind {
     AppLocales { package: String },
     Rotation,
     Display,
+    TimeZone,
 }
 
 /// The panel itself, whatever is overridden: size in px and density in dpi.

@@ -908,8 +908,12 @@ Replay (`run_flow`):
 
 1. Every `${env:…}` the flow uses must be set, or the run fails with `MISSING_SECRET` before touching the app.
 2. Setup: system animations off (unless `setup.animations: true`; restored at the end, and only if the run
-   turned them off), `reset: data` (`pm clear`), `permissions` (`pm grant`), then a clean start: the app is stopped
-   and launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`).
+   turned them off), the `device` settings (each read first and put back at the end, last first; the screen is
+   read before them so the helper is connected: a UiAutomation connection that disconnects puts back the
+   rotation it found), `reset: data` (`pm clear`), `permissions` (`pm grant`), then a clean start: the app is
+   stopped and launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`). After
+   the start the settings are read back and set again if the device dropped one; one that doesn't hold is an
+   ERROR.
 3. Steps run in order. A step aimed at an element first waits for it (`--step-timeout`, 10 s); an element that
    never shows fails the step with what was on screen instead (closest elements, current activity). An app crash
    during a step fails it. The first failing step stops the flow; the remaining steps and the final checks are

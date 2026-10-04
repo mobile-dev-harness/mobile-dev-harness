@@ -5,7 +5,16 @@ change); JSON output changes are listed here and carry the `schema` version of t
 
 ## Unreleased
 
+### Flows
+- A flow can set the device it needs, before the app starts, and puts it back afterwards: `setup.device` with
+  `dark`, `font_scale`, `time_zone`, `locale` (the app's language), `orientation` and `display`
+  (`1600x2560@320`). Settings are read back once the app runs; one the device doesn't keep makes the verdict
+  ERROR.
+
 ### Fixes
+- Locking the rotation (flows, compatibility cells) could fall back to portrait mid-run: turning auto-rotate off
+  made the window manager store the old rotation after mdh had set the new one. It is locked in one step now
+  (`cmd window user-rotation`, Android 11+).
 - `scroll --until` (and a flow's `scroll: {until: …}`) keeps scrolling while the content moves, up to 50
   scrolls, instead of giving up after 10: on a shorter screen a row near the end of a long list was reported
   missing although it was there.

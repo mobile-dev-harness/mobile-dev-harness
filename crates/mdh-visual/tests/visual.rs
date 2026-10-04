@@ -60,6 +60,7 @@ impl Driver for FakeDriver {
                 size: None,
                 density: None,
             },
+            AppearanceKind::TimeZone => Appearance::TimeZone("America/Los_Angeles".into()),
         })
     }
     async fn set_appearance(&self, _: &Device, value: &Appearance) -> Result<()> {

@@ -560,6 +560,12 @@ impl Driver for AndroidDriver {
                 let user = lines.next().and_then(|v| v.parse().ok()).unwrap_or(0);
                 Appearance::Rotation { auto, user }
             }
+            AppearanceKind::TimeZone => Appearance::TimeZone(
+                shell("getprop persist.sys.timezone".into())
+                    .await?
+                    .trim()
+                    .to_owned(),
+            ),
             AppearanceKind::Display => {
                 let out = shell("wm size; wm density".into()).await?;
                 let d = display::parse(&out);
@@ -594,16 +600,26 @@ impl Driver for AndroidDriver {
                 shell_quote(package),
                 shell_quote(locales)
             ),
-            Appearance::Rotation { auto, user } => format!(
-                "settings put system user_rotation {}; settings put system accelerometer_rotation {}",
-                user % 4,
-                u8::from(*auto)
+            // Turning auto-rotate off makes the window manager store the current rotation in
+            // `user_rotation`, after the fact: setting both settings raced it and the device went back
+            // to portrait mid-run. `cmd window user-rotation` (Android 11+) sets both at once; when
+            // turning auto-rotate on, the rotation is written after it for the same reason.
+            Appearance::Rotation { auto: false, user } => format!(
+                "cmd window user-rotation lock {r} 2>/dev/null || {{ settings put system \
+                 accelerometer_rotation 0; settings put system user_rotation {r}; }}",
+                r = user % 4
+            ),
+            Appearance::Rotation { auto: true, user } => format!(
+                "{{ cmd window user-rotation free 2>/dev/null || settings put system \
+                 accelerometer_rotation 1; }}; settings put system user_rotation {}",
+                user % 4
             ),
             Appearance::Display { size, density } => format!(
                 "wm size {}; wm density {}",
                 size.map_or("reset".into(), |(w, h)| format!("{w}x{h}")),
                 density.map_or("reset".into(), |d| d.to_string())
             ),
+            Appearance::TimeZone(tz) => format!("cmd alarm set-timezone {}", shell_quote(tz)),
         };
         self.adb.shell(&device.id, &command).await.map(drop)
     }

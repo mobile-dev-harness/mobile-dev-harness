@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use mdh_control::{Action, Direction, RecordedStep, Session, Target, TextMatch};
 use mdh_core::output::{Timings, millis};
-use mdh_core::{Error, ErrorCode, Result};
+use mdh_core::{Appearance, Error, ErrorCode, Result};
 use mdh_observe::CrashKind;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -60,6 +60,165 @@ pub struct Setup {
     /// System animations during the run: off by default (restored afterwards), `true` keeps them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animations: Option<bool>,
+    /// The device as the flow needs it, put back when the flow ends.
+    #[serde(default, skip_serializing_if = "DeviceSetup::is_empty")]
+    pub device: DeviceSetup,
+}
+
+/// Device settings a flow runs under, set before the app starts and put back afterwards:
+/// `dark: true`, `font_scale: 1.3`, `time_zone: Asia/Tokyo`, `locale: ar` (the app's language),
+/// `orientation: landscape`, `display: 1600x2560@320` (size in px; the density is optional).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceSetup {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dark: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_scale: Option<FontScale>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_zone: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orientation: Option<Orientation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<DisplaySize>,
+}
+
+impl DeviceSetup {
+    pub fn is_empty(&self) -> bool {
+        *self == DeviceSetup::default()
+    }
+
+    /// The settings to change, in order. The app's language needs its package.
+    fn appearances(&self, package: Option<&str>) -> Result<Vec<Appearance>> {
+        let mut out = Vec::new();
+        if let Some(dark) = self.dark {
+            out.push(Appearance::NightMode(
+                if dark { "yes" } else { "no" }.into(),
+            ));
+        }
+        if let Some(scale) = &self.font_scale {
+            out.push(Appearance::FontScale(Some(scale.0.clone())));
+        }
+        if let Some(tz) = &self.time_zone {
+            out.push(Appearance::TimeZone(tz.clone()));
+        }
+        if let Some(locale) = &self.locale {
+            let Some(package) = package else {
+                return Err(Error::InvalidFlow {
+                    flow: "setup".into(),
+                    reason: "`device.locale` sets the app's language: the flow needs an `app`"
+                        .into(),
+                });
+            };
+            out.push(Appearance::AppLocales {
+                package: package.to_owned(),
+                locales: locale.clone(),
+            });
+        }
+        if let Some(o) = self.orientation {
+            out.push(Appearance::Rotation {
+                auto: false,
+                user: match o {
+                    Orientation::Portrait => 0,
+                    Orientation::Landscape => 1,
+                },
+            });
+        }
+        if let Some(d) = self.display {
+            out.push(Appearance::Display {
+                size: Some((d.width, d.height)),
+                density: d.density,
+            });
+        }
+        Ok(out)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Orientation {
+    Portrait,
+    Landscape,
+}
+
+/// A font scale as written (`1.3`), kept as text so it reaches the device unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontScale(pub String);
+
+impl Serialize for FontScale {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        s.serialize_f64(self.0.parse().unwrap_or(1.0))
+    }
+}
+
+impl<'de> Deserialize<'de> for FontScale {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Number(f64),
+            Text(String),
+        }
+        let text = match Raw::deserialize(d)? {
+            Raw::Number(n) => n.to_string(),
+            Raw::Text(t) => t.trim().to_owned(),
+        };
+        match text.parse::<f64>() {
+            Ok(v) if (0.5..=3.0).contains(&v) => Ok(FontScale(text)),
+            _ => Err(serde::de::Error::custom(format!(
+                "font_scale `{text}`: a number from 0.5 to 3"
+            ))),
+        }
+    }
+}
+
+/// `1600x2560`, or `1600x2560@320` with a density.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisplaySize {
+    pub width: u32,
+    pub height: u32,
+    pub density: Option<u32>,
+}
+
+impl fmt::Display for DisplaySize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}x{}", self.width, self.height)?;
+        if let Some(d) = self.density {
+            write!(f, "@{d}")?;
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for DisplaySize {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        s.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for DisplaySize {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        let text = String::deserialize(d)?;
+        let parse = || -> Option<DisplaySize> {
+            let (size, density) = match text.split_once('@') {
+                Some((s, d)) => (s, Some(d.trim().parse().ok()?)),
+                None => (text.as_str(), None),
+            };
+            let (w, h) = size.split_once('x')?;
+            Some(DisplaySize {
+                width: w.trim().parse().ok()?,
+                height: h.trim().parse().ok()?,
+                density,
+            })
+        };
+        parse().ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "display `{text}`: WIDTHxHEIGHT in px, optionally @DENSITY, like 1600x2560@320"
+            ))
+        })
+    }
 }
 
 impl Setup {
@@ -542,6 +701,11 @@ pub async fn run_flow(
     {
         return Err(Error::MissingSecret { name });
     }
+    let package = flow
+        .app
+        .as_deref()
+        .map(|a| a.split_once('/').map_or(a, |(p, _)| p));
+    let settings = flow.setup.device.appearances(package)?;
     let started = Instant::now();
     let since = session.device_time().await?;
     let run_dir = options
@@ -550,15 +714,127 @@ pub async fn run_flow(
         .as_deref()
         .map(|r| mdh_control::new_run_dir(r, &format!("flow-{}", flow.name)))
         .transpose()?;
-    let mut findings = Vec::new();
-    let mut completed = 0;
     // Animations off for the run (best effort: not every device allows it), restored afterwards
     // unless the session had already turned them off.
     let restore_animations = flow.setup.animations != Some(true)
         && !session.animations_off()
         && session.animations(false).await.is_ok();
+    // The device settings before the app starts, so it starts under them. The screen is read
+    // first: a UiAutomation connection puts back the rotation it found when it connected once it
+    // disconnects, so the helper must not (re)connect after the rotation changed.
+    if !settings.is_empty() {
+        let _ = session.control().snapshot().await;
+    }
+    let (originals, applied) = change_settings(session, &settings).await;
+    let replay = Replay {
+        flow,
+        since,
+        run_dir: run_dir.as_deref(),
+        options,
+    };
+    let replayed = replay_flow(session, &replay, &settings, applied, timings).await;
+    let mut restored = restore_settings(session, originals).await;
+    if restore_animations {
+        let _ = session.animations(true).await;
+    }
+    let (mut findings, completed, evidence) = replayed?;
+    findings.append(&mut restored);
+    dedupe_warnings(&mut findings);
+    let mut verdict = Verdict::new(
+        Some(flow.name.clone()),
+        findings,
+        millis(started),
+        run_dir,
+        evidence,
+    );
+    verdict.set_steps(completed, flow.steps.len());
+    write_verdict(&verdict)?;
+    Ok(verdict)
+}
 
-    let setup = setup(session, flow).await;
+/// Applies `settings` in order; returns the values to put back (also when one fails partway,
+/// for those already read) and whether all were applied.
+async fn change_settings(
+    session: &Session,
+    settings: &[Appearance],
+) -> (Vec<Appearance>, Result<()>) {
+    let mut originals = Vec::new();
+    for value in settings {
+        let control = session.control();
+        match control.appearance(&value.kind()).await {
+            Ok(original) => originals.push(original),
+            Err(e) => return (originals, Err(e)),
+        }
+        if let Err(e) = control.set_appearance(value).await {
+            return (originals, Err(e));
+        }
+    }
+    (originals, Ok(()))
+}
+
+/// Reads `settings` back after the app started, setting again any the device dropped (a
+/// reconnecting UiAutomation resets the rotation); one that still doesn't hold is an error.
+async fn confirm_settings(session: &Session, settings: &[Appearance]) -> Result<()> {
+    let control = session.control();
+    for value in settings {
+        if control.appearance(&value.kind()).await? == *value {
+            continue;
+        }
+        control.set_appearance(value).await?;
+        let now = control.appearance(&value.kind()).await?;
+        if now != *value {
+            return Err(Error::Unsupported {
+                operation: format!("keeping {value:?} (the device shows {now:?})"),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Puts the settings back, last changed first; a setting that can't be restored is a warning.
+async fn restore_settings(session: &Session, originals: Vec<Appearance>) -> Vec<Finding> {
+    let mut warnings = Vec::new();
+    for original in originals.into_iter().rev() {
+        if let Err(e) = session.control().set_appearance(&original).await {
+            warnings.push(Finding {
+                kind: CheckKind::Functional,
+                outcome: Outcome::Warn,
+                check: "setup: device".into(),
+                observed: Some(format!(
+                    "couldn't restore {original:?} ({e}); reset it by hand"
+                )),
+                step: None,
+                evidence: Vec::new(),
+            });
+        }
+    }
+    warnings
+}
+
+/// The flow under its settings: setup, steps, final checks and evidence. `applied` is whether the
+/// device settings took; if not, that is the setup's error.
+async fn replay_flow(
+    session: &mut Session,
+    replay: &Replay<'_>,
+    settings: &[Appearance],
+    applied: Result<()>,
+    timings: &mut Timings,
+) -> Result<(Vec<Finding>, usize, Vec<String>)> {
+    let Replay {
+        flow,
+        since,
+        run_dir,
+        options,
+    } = *replay;
+    let mut findings = Vec::new();
+    let mut completed = 0;
+    let setup = match applied {
+        Ok(()) => match setup(session, flow).await {
+            Ok(()) => confirm_settings(session, settings).await,
+            Err(e) => Err(e),
+        },
+        Err(e) => Err(e),
+    };
     let mut failed = setup.is_err();
     if let Err(e) = setup {
         findings.push(step_error(None, "setup".into(), &e));
@@ -567,7 +843,7 @@ pub async fn run_flow(
     if !failed {
         let mut cx = CheckContext {
             session,
-            run_dir: run_dir.as_deref(),
+            run_dir,
             step: None,
             since_ms: Some(since),
             scope: Some(&flow.name),
@@ -584,13 +860,7 @@ pub async fn run_flow(
         if failed {
             break;
         }
-        let replay = Replay {
-            flow,
-            since,
-            run_dir: run_dir.as_deref(),
-            options,
-        };
-        let result = run_step(session, &replay, step, i, timings).await?;
+        let result = run_step(session, replay, step, i, timings).await?;
         failed = result.iter().any(|f| f.outcome >= Outcome::Fail);
         if !failed {
             completed += 1;
@@ -606,7 +876,7 @@ pub async fn run_flow(
     checks.push(Assertion::NoCrash);
     let mut cx = CheckContext {
         session,
-        run_dir: run_dir.as_deref(),
+        run_dir,
         step: None,
         since_ms: Some(since),
         scope: Some(&flow.name),
@@ -626,25 +896,11 @@ pub async fn run_flow(
             findings.extend(check.run(&mut cx).await?);
         }
     }
-
-    let evidence = match &run_dir {
+    let evidence = match run_dir {
         Some(dir) => collect_evidence(cx.session, dir, cx.timings).await,
         None => Vec::new(),
     };
-    if restore_animations {
-        let _ = cx.session.animations(true).await;
-    }
-    dedupe_warnings(&mut findings);
-    let mut verdict = Verdict::new(
-        Some(flow.name.clone()),
-        findings,
-        millis(started),
-        run_dir,
-        evidence,
-    );
-    verdict.set_steps(completed, flow.steps.len());
-    write_verdict(&verdict)?;
-    Ok(verdict)
+    Ok((findings, completed, evidence))
 }
 
 async fn setup(session: &mut Session, flow: &Flow) -> Result<()> {

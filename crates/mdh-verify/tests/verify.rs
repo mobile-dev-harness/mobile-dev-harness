@@ -10,7 +10,8 @@ use mdh_control::{Control, Session};
 use mdh_core::output::Timings;
 use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
 use mdh_core::{
-    Device, DeviceState, Error, Input, LaunchInfo, LogEntry, LogLevel, Platform, Result,
+    Appearance, AppearanceKind, Device, DeviceState, Error, Input, LaunchInfo, LogEntry, LogLevel,
+    Platform, Result,
 };
 use mdh_driver::Driver;
 use mdh_verify::{Assertion, Flow, FlowOptions, Status, VerifyOptions, run_flow, verify};
@@ -24,6 +25,8 @@ struct FakeDriver {
     /// The screen can't be read once the app is launched (uiautomator printed no hierarchy).
     unreadable: Mutex<bool>,
     launched: Mutex<bool>,
+    /// Appearance settings changed so far, the latest last.
+    settings: Mutex<Vec<Appearance>>,
 }
 
 impl FakeDriver {
@@ -116,6 +119,27 @@ impl Driver for FakeDriver {
     }
     async fn clear_data(&self, _: &Device, package: &str) -> Result<()> {
         self.did(format!("clear {package}"));
+        Ok(())
+    }
+    /// What was set last, or the defaults of a fresh emulator.
+    async fn appearance(&self, _: &Device, kind: &AppearanceKind) -> Result<Appearance> {
+        let settings = self.settings.lock().unwrap();
+        if let Some(set) = settings.iter().rev().find(|a| a.kind() == *kind) {
+            return Ok(set.clone());
+        }
+        Ok(match kind {
+            AppearanceKind::NightMode => Appearance::NightMode("no".into()),
+            AppearanceKind::TimeZone => Appearance::TimeZone("America/Los_Angeles".into()),
+            AppearanceKind::Rotation => Appearance::Rotation {
+                auto: true,
+                user: 0,
+            },
+            other => panic!("not scripted: {other:?}"),
+        })
+    }
+    async fn set_appearance(&self, _: &Device, value: &Appearance) -> Result<()> {
+        self.did(format!("set {value:?}"));
+        self.settings.lock().unwrap().push(value.clone());
         Ok(())
     }
 }
@@ -421,6 +445,91 @@ async fn an_unreadable_screen_is_an_error_not_a_failure_of_the_app() {
         "{}",
         verdict.text
     );
+}
+
+const UNDER_SETTINGS: &str = r#"
+name: tokyo-night
+app: com.example
+setup:
+  device:
+    dark: true
+    time_zone: Asia/Tokyo
+    orientation: landscape
+steps:
+  - tap: id=sign_in
+assert:
+  - visible Inbox
+"#;
+
+#[tokio::test]
+async fn a_flow_runs_under_its_device_settings_and_puts_them_back() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([login(true), inbox()]);
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let flow = Flow::parse("tokyo-night", UNDER_SETTINGS).unwrap();
+    let verdict = run_flow(
+        &mut session,
+        &flow,
+        &FlowOptions {
+            verify: options(),
+            step_timeout: Duration::from_millis(500),
+        },
+        &mut Timings::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(verdict.status, Status::Pass, "{}", verdict.text);
+    let done = driver.done.lock().unwrap().clone();
+    let sets: Vec<&str> = done
+        .iter()
+        .map(String::as_str)
+        .filter(|d| d.starts_with("set ") || d.starts_with("launch"))
+        .collect();
+    assert_eq!(
+        sets,
+        [
+            r#"set NightMode("yes")"#,
+            r#"set TimeZone("Asia/Tokyo")"#,
+            "set Rotation { auto: false, user: 1 }",
+            "launch com.example",
+            "set Rotation { auto: true, user: 0 }",
+            r#"set TimeZone("America/Los_Angeles")"#,
+            r#"set NightMode("no")"#,
+        ]
+    );
+    // Written back the way it was read.
+    assert!(
+        flow.to_yaml().contains("time_zone: Asia/Tokyo"),
+        "{}",
+        flow.to_yaml()
+    );
+}
+
+#[test]
+fn device_settings_are_checked_when_the_flow_is_read() {
+    let ok = Flow::parse(
+        "tablet",
+        "name: tablet\napp: com.example\nsetup:\n  device:\n    font_scale: 1.3\n    display: 1600x2560@320\nsteps: []\n",
+    )
+    .unwrap();
+    assert!(ok.to_yaml().contains("font_scale: 1.3"), "{}", ok.to_yaml());
+    assert!(
+        ok.to_yaml().contains("display: 1600x2560@320"),
+        "{}",
+        ok.to_yaml()
+    );
+    for (bad, says) in [
+        ("display: 1600", "WIDTHxHEIGHT"),
+        ("font_scale: 9", "0.5 to 3"),
+        ("night: true", "unknown field"),
+    ] {
+        let err = Flow::parse(
+            "bad",
+            &format!("name: bad\nsetup:\n  device:\n    {bad}\nsteps: []\n"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains(says), "{bad}: {err}");
+    }
 }
 
 #[test]

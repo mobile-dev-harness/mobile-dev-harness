@@ -347,7 +347,7 @@ pub async fn run(
 /// One thing a cell runs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Work {
-    Flow(Flow),
+    Flow(Box<Flow>),
     /// A screen without a flow, opened by its deep link.
     Open {
         screen: String,
@@ -382,7 +382,11 @@ fn work_for(
     links: &BTreeMap<String, String>,
 ) -> Vec<Work> {
     if risk.all_flows {
-        return flows.iter().cloned().map(Work::Flow).collect();
+        return flows
+            .iter()
+            .cloned()
+            .map(|f| Work::Flow(Box::new(f)))
+            .collect();
     }
     let screens: BTreeSet<&str> = risk
         .screens
@@ -393,7 +397,7 @@ fn work_for(
         .iter()
         .filter(|f| f.screens.iter().any(|s| screens.contains(s.as_str())))
         .cloned()
-        .map(Work::Flow)
+        .map(|f| Work::Flow(Box::new(f)))
         .collect();
     for s in &risk.screens {
         let covered = out.iter().any(|w| match w {

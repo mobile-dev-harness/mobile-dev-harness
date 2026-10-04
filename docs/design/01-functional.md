@@ -134,7 +134,7 @@ inspects the screens it passes, the compatibility matrix replays it on every cel
 |---|---|---|
 | F7.1 | Automatic recording ✅ | Every action in a session is recorded as a **selector-based step** (never refs); password input is recorded as `${env:MDH_<FIELD>}` |
 | F7.2 | Save ✅ | `flow save <name> [--last N] [--check …]` turns the recording (or its last N steps) into YAML with checks to run at the end; agents edit the file to change it |
-| F7.3 | Replay ✅ | `flow run` restarts the app (or opens `setup.open`, after `reset: data` and `permissions` if given) and runs the steps; each step waits for its target instead of sleeping; the first step that can't run stops the flow with what was on screen; missing `${env:…}` variables fail before the app is touched |
+| F7.3 | Replay ✅ | `flow run` restarts the app (or opens `setup.open`, after `reset: data`, `permissions` and the `device` settings if given: dark theme, font scale, time zone, the app's language, orientation, display size; put back afterwards) and runs the steps; each step waits for its target instead of sleeping; the first step that can't run stops the flow with what was on screen; missing `${env:…}` variables fail before the app is touched |
 | F7.4 | CI reports ✅ | `--junit FILE` and exit codes; failures produce the same evidence as F6.3 |
 | F7.5 | Maestro import (later) | Imports the common subset of Maestro flows to ease migration |
 
@@ -395,6 +395,13 @@ setup:
   permissions: [android.permission.POST_NOTIFICATIONS]
   open: mdhsample://login      # start from a deep link instead of the launcher activity
   animations: true             # keep system animations; by default they're off during the run, then restored
+  device:                      # the device as the flow needs it, set before the app starts, put back after
+    dark: true
+    font_scale: 1.3
+    time_zone: Asia/Tokyo
+    locale: ar                 # the app's language (API 33+)
+    orientation: landscape     # portrait | landscape
+    display: 1600x2560@320     # size in px, density optional
 screens: [LoginActivity, MessagesActivity]   # recorded on save; picks the flows a change needs
 steps:
   - tap: "Log in"                                   # targets as on the CLI: label, id=…, text~=…, role=…
