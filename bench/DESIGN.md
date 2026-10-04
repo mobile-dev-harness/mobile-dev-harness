@@ -85,8 +85,15 @@ At most a third of the tasks come from source 1.
 
 Each task goes through: write (issue or change, defect, reference fix, checks) → `mdh-bench validate` (the checks
 fail on the defect or broken change and pass on the fix or correct change) → a second, different correct fix
-passes too, where one exists → calibration (3.2) → review by a second person (the issue is fair, the fix is not
-the only possible one, the checks test behavior) → frozen with the set.
+passes too, where one exists → calibration (3.2) → review → frozen with the set.
+
+**Review** is done by a model from another family than the one that wrote the task (tasks are written with
+Claude; reviewed with GLM-5.3 through `mdh-bench review`). The reviewer gets the task, its patches and checks,
+and a checklist: the issue says what a reporter would know and not the cause; the defect matches the issue;
+the reference fix is not the only reasonable one and the alternatives pass; the checks test behavior, not the
+implementation; the level's reasoning holds; nothing in the workspace gives the answer away. It answers per item
+with a reason; every objection is resolved, by a change or a written reply, before the task is frozen. Reviews
+are kept with the task and published with it.
 
 ### 3.5 Format
 
@@ -134,8 +141,8 @@ offline. Article images still come from the network; no check depends on them.
   correct change).
 - **PASS_TO_PASS**: the app's regression flows (start, the three tabs, a topic, search, settings, bookmarking)
   must keep passing; a fix that breaks one isn't resolved.
-- **Conditions**: the grader puts the device in the task's condition before the checks (time zone, dark mode,
-  font scale, rotation, display size, locale) and back afterwards, through `mdh flow` setup options or adb.
+- **Conditions**: the checks set the task's condition with `setup.device` (dark theme, font scale, time zone, the
+  app's language, orientation, display size), which mdh puts back afterwards and verifies held while the app ran.
 - Checks test behavior, never the implementation, and accept every alternative fix.
 - **Infrastructure errors aren't verdicts.** A check that ends in ERROR (the screen unreadable, the device gone) is
   rerun after a device reset; a second ERROR records the run as `grader_error`, left out of every rate and
@@ -182,11 +189,13 @@ source:
 - Bug kinds come from real trackers, not from what mdh can check. Every task is decidable with adb, screenshots
   and logcat alone. Every setup gets the same prompt apart from one paragraph about its tools.
 - The task set is frozen before a published run; tasks, checks, prompts and transcripts are published. 20% of the
-  tasks stay private so later models can't have trained on them.
+  tasks stay private so later models can't have trained on them; only their results are published, and they are
+  run by the maintainers. Reviewing a private task sends it to the reviewer's provider, which is also evaluated:
+  private tasks are reviewed last, after their content is final, and the provider is named in the review.
 - Every workspace is a fresh repository without the app's history.
 - Limits: one agent (Claude Code), one device model, mostly one app until more are added. The author of the
-  tasks also builds mdh; the review step (3.4) and the adb-only rule are the mitigation, publishing everything
-  the check.
+  tasks also builds mdh and the reviewer is a model under evaluation; the review checklist, the adb-only rule and
+  publishing everything are the mitigation.
 
 ## 9. Pilot tasks
 
@@ -210,15 +219,13 @@ Levels are hypotheses for calibration; "real" tasks re-inject the upstream bug.
 ## 10. Work before the pilot
 
 - mdh-bench: apps (`bench/apps.yaml`: repository, commit, variant, package, JDK), tasks per app, the device
-  state of section 4 set and checked, conditions for the grader, `grader_error` with one rerun, the three-way
-  answers, unchecked-claim detection, a `regrade` command, per-level and per-source reports.
-- mdh: verdict ERROR, not FAIL, when a step fails for infrastructure reasons (found in version 1's runs);
-  conditions in a flow's setup (time zone, dark mode, font scale, rotation, display size, locale), useful to users
-  as well.
+  state of section 4 set and checked, `grader_error` with one rerun, the three-way answers, unchecked-claim
+  detection, `regrade` and `review` commands, per-level and per-source reports.
+- mdh: done. A step that can't be checked makes the verdict ERROR, not FAIL; flows set the device they need
+  (`setup.device`); rotation locks in one step and survives the helper reconnecting.
 - The device: 4 GB RAM for the AVD.
 
 ## 11. Open questions
 
 - Version 1's results keep version 1's prompt (no UNVERIFIED); they aren't comparable to version 2's.
 - The second app, and when.
-- Who reviews tasks (3.4) besides the author.
