@@ -159,12 +159,19 @@ pub fn run(
         .args(["--append-system-prompt", &system])
         .args(["--permission-mode", "bypassPermissions"])
         .args(["--max-budget-usd", &format!("{:.2}", options.max_usd)])
-        .args(["--disallowedTools", "WebFetch", "WebSearch"]);
+        .args(["--disallowedTools", "WebFetch", "WebSearch"])
+        // The device is shared by every run: no setup may replace it (see `Env::check_device`).
+        .args([
+            "Bash(*emulator -avd*)",
+            "Bash(*emulator @*)",
+            "Bash(*adb kill-server*)",
+            "Bash(*adb emu *)",
+        ]);
     if setup == Setup::Alone {
         cmd.args(["Bash(adb:*)", "Bash(*/adb *)", "Bash(emulator:*)"]);
     }
     if setup == Setup::Mdh {
-        cmd.arg("--plugin-dir").arg(env.plugin());
+        cmd.arg("--plugin-dir").arg(&env.plugin);
     }
     let started = Instant::now();
     let mut usage = Usage::default();
@@ -225,7 +232,9 @@ pub fn run(
     usage.timed_out = watchdog.join().unwrap_or(false);
     if usage.duration_ms == 0 {
         usage.duration_ms = started.elapsed().as_millis() as u64;
-        if usage.error.is_none() {
+        if usage.timed_out {
+            usage.error = Some(format!("timed out after {} min", timeout.as_secs() / 60));
+        } else if usage.error.is_none() {
             let why = std::fs::read_to_string(log).unwrap_or_default();
             usage.error = Some(format!(
                 "no result from the agent: {}",

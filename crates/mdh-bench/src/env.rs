@@ -9,7 +9,52 @@ pub struct Env {
     pub sdk: PathBuf,
     /// The release build of mdh the agent (setup D) and the grader use.
     pub mdh: PathBuf,
+    /// The Claude Code plugin setup D loads: a copy taken when the run started (see `main::run`).
+    pub plugin: PathBuf,
     pub serial: String,
+    /// The device the run started on; every run must find the same one.
+    pub device: Identity,
+}
+
+/// What makes runs on a device comparable: an agent that restarts the emulator with another AVD
+/// changes the screen every later run (and the grader) sees.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Identity {
+    pub avd: String,
+    pub api: String,
+    /// `wm size` and `wm density` without overrides: the display as reset leaves it.
+    pub size: String,
+    pub density: String,
+}
+
+impl Identity {
+    /// The output of `getprop` (AVD name, API level), `wm size` and `wm density`, in that order.
+    fn parse(out: &str) -> Option<Identity> {
+        let lines: Vec<&str> = out.lines().map(str::trim).collect();
+        let physical = |key: &str| {
+            lines
+                .iter()
+                .find_map(|l| l.strip_prefix(key))
+                .map(|v| v.trim().to_owned())
+        };
+        let api = lines.get(1).filter(|a| !a.is_empty())?;
+        Some(Identity {
+            avd: (*lines.first()?).to_owned(),
+            api: (*api).to_owned(),
+            size: physical("Physical size:")?,
+            density: physical("Physical density:")?,
+        })
+    }
+}
+
+impl std::fmt::Display for Identity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} (API {}, {}, {} dpi)",
+            self.avd, self.api, self.size, self.density
+        )
+    }
 }
 
 impl Env {
@@ -30,11 +75,14 @@ impl Env {
         if !mdh.is_file() {
             return Err("build mdh first: cargo build --release --bin mdh".into());
         }
+        let plugin = repo.join("integrations/claude-code");
         let env = Env {
             repo,
             sdk,
             mdh,
+            plugin,
             serial: String::new(),
+            device: Identity::default(),
         };
         let out = env.adb(&["devices"])?;
         let online: Vec<&str> = out
@@ -44,10 +92,14 @@ impl Env {
             .filter_map(|l| l.split('\t').next())
             .collect();
         match online.as_slice() {
-            [one] => Ok(Env {
-                serial: (*one).to_owned(),
-                ..env
-            }),
+            [one] => {
+                let env = Env {
+                    serial: (*one).to_owned(),
+                    ..env
+                };
+                let device = env.identity()?;
+                Ok(Env { device, ..env })
+            }
             [] => Err("no emulator online".into()),
             _ => Err(format!(
                 "several devices online ({}); keep one",
@@ -58,10 +110,6 @@ impl Env {
 
     pub fn sample(&self) -> PathBuf {
         self.repo.join("examples/android-sample")
-    }
-
-    pub fn plugin(&self) -> PathBuf {
-        self.repo.join("integrations/claude-code")
     }
 
     pub fn adb_path(&self) -> PathBuf {
@@ -75,6 +123,25 @@ impl Env {
         }
         let out = cmd.args(args).output().map_err(|e| format!("adb: {e}"))?;
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// The device online now, as reset leaves it.
+    pub fn identity(&self) -> Result<Identity, String> {
+        let out = self.adb(&[
+            "shell",
+            "getprop ro.boot.qemu.avd_name; getprop ro.build.version.sdk; wm size; wm density",
+        ])?;
+        Identity::parse(&out).ok_or_else(|| format!("{} doesn't answer", self.serial))
+    }
+
+    /// Fails unless the device is the one the run started on.
+    pub fn check_device(&self) -> Result<(), String> {
+        let now = self.identity()?;
+        if now == self.device {
+            Ok(())
+        } else {
+            Err(format!("the device changed: {} became {now}", self.device))
+        }
     }
 
     /// The device as every run finds it: the app gone, settings at their defaults, home screen.
@@ -91,9 +158,28 @@ impl Env {
             "cmd uimode night no",
             "wm size reset",
             "wm density reset",
+            // Agents disable the keyboard to type with adb.
+            "ime reset",
             "input keyevent HOME",
         ] {
             let _ = self.adb(&["shell", cmd]);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_the_physical_display_not_an_override() {
+        let out = "Pixel_9_Pro_XL\n36\nPhysical size: 1344x2992\nOverride size: 1080x2400\n\
+                   Physical density: 480\n";
+        let id = Identity::parse(out).unwrap();
+        assert_eq!(
+            id.to_string(),
+            "Pixel_9_Pro_XL (API 36, 1344x2992, 480 dpi)"
+        );
+        assert_eq!(Identity::parse("error: device offline\n"), None);
     }
 }

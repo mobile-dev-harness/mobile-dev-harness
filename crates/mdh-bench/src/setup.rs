@@ -92,8 +92,10 @@ impl Setup {
     /// What the agent is told about its environment.
     pub fn brief(self, env: &Env) -> String {
         let device = format!(
-            "An Android emulator ({}, Android 16, API 36) is running and is the only device.",
-            env.serial
+            "An Android emulator ({}, API {}) is running and is the only device. Leave the device \
+             itself alone: don't start, stop or restart the emulator or the adb server, and don't \
+             change its settings or input methods; if it stops responding, say so in your answer.",
+            env.serial, env.device.api
         );
         match self {
             Setup::Alone => {

@@ -34,8 +34,15 @@ spent: each broken change and seeded bug fails its checks, each correct change a
 Each run starts from a fresh copy of the sample app in its own git repository (the task's bug committed, the
 change to verify left uncommitted), without build output, saved flows or baselines, so no setup knows the
 expected behavior in advance. Before each run the emulator is reset: the app uninstalled, animations, rotation,
-display size, font scale and dark mode back to their defaults. Runs go one at a time; repetitions are the outer
-loop, so drift over hours spreads evenly over the setups.
+display size, font scale, dark mode and input methods back to their defaults. Runs go one at a time; repetitions
+are the outer loop, so drift over hours spreads evenly over the setups.
+
+Every run must find the device the benchmark started on (AVD, API level, display size and density). Agents are
+told to leave the device itself alone, and starting emulators or restarting adb is denied; if a run still ends
+on another device, or none, it isn't recorded and the benchmark stops until the device is restored. (An agent
+once replaced a crashed emulator with another AVD, and every later run, and the grader, saw a smaller screen.)
+Setup D loads the Claude Code plugin from a copy taken when the run started (`<out>/plugin`), so edits to the
+repository mid-run don't split its runs across versions. The report names the device.
 
 ## Metrics
 
@@ -76,7 +83,7 @@ run resumes. Each run keeps its workspace, the agent's event stream (`agent.json
 
 ## Limits
 
-- One app, one emulator (API 36), one agent and model per run: the numbers say how these setups compare here,
+- One app, one emulator, one agent and model per run: the numbers say how these setups compare here,
   not how any agent does on any app.
 - The grader replays mdh flows; each check was validated against the seeded bug and the reference fix, but a fix
   that works differently from the reference could fail a check written for it. Failed fix runs are reviewed by

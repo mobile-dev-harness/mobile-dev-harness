@@ -20,6 +20,9 @@ pub struct Record {
     pub model: String,
     #[serde(default)]
     pub provider: Option<String>,
+    /// The device: AVD, API level, display size and density.
+    #[serde(default)]
+    pub device: Option<String>,
     pub outcome: Outcome,
     /// The agent's answer: PASS / FIXED is true.
     pub answer: Option<bool>,
@@ -73,12 +76,18 @@ pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
     models.dedup();
     // Claude Code prices other providers' tokens as if they were Anthropic's, or not at all.
     let priced = records.iter().all(|r| r.provider.is_none());
-    let mut out = vec![
-        format!("Model: {}", models.join(", ")),
+    let mut devices: Vec<&str> = records.iter().filter_map(|r| r.device.as_deref()).collect();
+    devices.sort_unstable();
+    devices.dedup();
+    let mut out = vec![format!("Model: {}", models.join(", "))];
+    if !devices.is_empty() {
+        out.push(format!("Device: {}", devices.join(", ")));
+    }
+    out.extend([
         String::new(),
         "| | Correct | False pass | False fail | Fixed | No answer | Cost / run | Tokens / run | Tool calls | Screenshots | Time / run |".to_owned(),
         "|---|---|---|---|---|---|---|---|---|---|---|".to_owned(),
-    ];
+    ]);
     for s in setups {
         let r: Vec<&Record> = records.iter().filter(|r| r.setup == s.key()).collect();
         if r.is_empty() {

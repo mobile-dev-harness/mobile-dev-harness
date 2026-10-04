@@ -3,6 +3,20 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
+## Unreleased
+
+### Fixes
+- `scroll --until` (and a flow's `scroll: {until: …}`) keeps scrolling while the content moves, up to 50
+  scrolls, instead of giving up after 10: on a shorter screen a row near the end of a long list was reported
+  missing although it was there.
+
+### Benchmark
+- A run must end on the device the benchmark started on (AVD, API level, display size and density); otherwise
+  it isn't recorded and the benchmark stops. Agents are told to leave the device alone, starting emulators and
+  restarting adb are denied, and input methods are reset between runs.
+- Setup D loads the plugin from a copy taken when the run started; the report names the device; a run that
+  timed out says so.
+
 ## 0.4.0
 
 Fewer tokens on every request, a benchmark, and a home in the mobile-dev-harness organization.

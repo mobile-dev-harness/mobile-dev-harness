@@ -216,6 +216,11 @@ fn run(
     std::fs::create_dir_all(out).map_err(|e| e.to_string())?;
     // The agent runs elsewhere: every path it's given must be absolute.
     let out = &out.canonicalize().map_err(|e| e.to_string())?;
+    let env = Env {
+        plugin: snapshot_plugin(&env.plugin, out)?,
+        ..env
+    };
+    eprintln!("device: {}", env.device);
     let results = out.join("results.jsonl");
     let done = load(&results);
     let mut spent: f64 = done.iter().map(|r| r.cost_usd).sum();
@@ -281,7 +286,16 @@ fn one(
     workspace::prepare(&env.sample(), &app, t, false)?;
     let before = workspace::snapshot(&app);
     env.reset_device();
+    env.check_device()?;
     let usage = agent::run(env, s, t, &app, &dir.join("agent.log"), options);
+    // A run whose agent replaced or lost the device isn't recorded, and the ones after it would
+    // run elsewhere: stop.
+    env.check_device().map_err(|e| {
+        format!(
+            "{e} during {}; restore it and run again (recorded runs are kept)",
+            dir.display()
+        )
+    })?;
     let answer = agent::answer(t.kind, &usage.result);
     let edited = t.kind == Kind::Verify && workspace::snapshot(&app) != before;
     let (works, detail) = match t.kind {
@@ -299,6 +313,7 @@ fn one(
         setup: s.key().to_owned(),
         model: options.model.clone(),
         provider: options.provider.as_ref().map(|p| p.name.clone()),
+        device: Some(env.device.to_string()),
         rep,
         outcome,
         answer,
@@ -321,6 +336,41 @@ fn one(
                 .map(|(n, st)| format!("MCP server {n}: {st}"))
         }),
     })
+}
+
+/// The plugin as of the run's start, kept with the results: edits to the repository's copy
+/// mid-run (or between resumed sessions) would otherwise split setup D's runs across versions.
+fn snapshot_plugin(source: &Path, out: &Path) -> Result<PathBuf, String> {
+    let copy = out.join("plugin");
+    if copy.is_dir() {
+        let same = std::process::Command::new("diff")
+            .args(["-rq"])
+            .args([source, &copy])
+            .output()
+            .is_ok_and(|o| o.status.success());
+        if !same {
+            eprintln!(
+                "note: {} differs from {}; runs keep using the copy taken when this run started",
+                source.display(),
+                copy.display()
+            );
+        }
+        return Ok(copy);
+    }
+    let ok = std::process::Command::new("cp")
+        .arg("-R")
+        .args([source, &copy])
+        .status()
+        .is_ok_and(|s| s.success());
+    if ok {
+        Ok(copy)
+    } else {
+        Err(format!(
+            "couldn't copy {} to {}",
+            source.display(),
+            copy.display()
+        ))
+    }
 }
 
 fn probe(provider: Option<&str>, model: &str) -> Result<(), String> {
