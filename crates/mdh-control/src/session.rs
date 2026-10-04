@@ -20,7 +20,9 @@ use crate::{Control, Snapshot};
 
 /// Bump when the persisted shape changes; older files are discarded.
 const STATE_VERSION: u32 = 2;
-const MAX_SCROLLS: usize = 10;
+/// `scroll --until` stops when the content stops moving; this only bounds endless feeds. A small
+/// fixed count made the result depend on the screen: 10 scrolls reached row 95 at 2992 px, not 2340.
+const MAX_SCROLLS: usize = 50;
 const FOCUS_TIMEOUT: Duration = Duration::from_secs(1);
 const WAIT_POLL: Duration = Duration::from_millis(200);
 const SCROLL_MS: u32 = 400;

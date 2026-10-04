@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use mdh_control::{Action, Control, Session, Target};
+use mdh_control::{Action, Control, Direction, Session, Target};
 use mdh_core::output::Timings;
 use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
 use mdh_core::{
@@ -312,4 +312,113 @@ async fn a_crash_during_an_action_is_reported_with_the_steps_before_it() {
         "{}",
         outcome.text
     );
+}
+
+/// A list of 100 rows, ten on screen; each swipe moves it eight rows until the last row is shown.
+#[derive(Default)]
+struct ListDriver {
+    swipes: Mutex<i32>,
+}
+
+impl ListDriver {
+    const ROWS: i32 = 100;
+    const VISIBLE: i32 = 10;
+    const PER_SWIPE: i32 = 8;
+}
+
+#[async_trait]
+impl Driver for ListDriver {
+    fn platform(&self) -> Platform {
+        Platform::Android
+    }
+    async fn devices(&self) -> Result<Vec<Device>> {
+        Ok(vec![device()])
+    }
+    async fn ui_tree(&self, _: &Device) -> Result<RawTree> {
+        let first =
+            (*self.swipes.lock().unwrap() * Self::PER_SWIPE).min(Self::ROWS - Self::VISIBLE);
+        let enabled = NodeFlags {
+            enabled: true,
+            ..NodeFlags::default()
+        };
+        let rows = (0..Self::VISIBLE)
+            .map(|i| RawNode {
+                class: "android.widget.TextView".into(),
+                text: Some(format!("Row {}", first + i + 1)),
+                bounds: Rect::new(0, i * 200, 1000, (i + 1) * 200),
+                flags: enabled,
+                ..RawNode::default()
+            })
+            .collect();
+        Ok(RawTree {
+            roots: vec![RawNode {
+                class: "androidx.recyclerview.widget.RecyclerView".into(),
+                bounds: Rect::new(0, 0, 1000, 2000),
+                flags: NodeFlags {
+                    scrollable: true,
+                    ..enabled
+                },
+                children: rows,
+                ..RawNode::default()
+            }],
+            source: TreeSource::Helper,
+            windows: Vec::new(),
+        })
+    }
+    async fn foreground_activity(&self, _: &Device) -> Result<Option<String>> {
+        Ok(Some("com.example/.Messages".into()))
+    }
+    async fn input(&self, _: &Device, input: &Input) -> Result<()> {
+        if matches!(input, Input::Swipe { .. }) {
+            *self.swipes.lock().unwrap() += 1;
+        }
+        Ok(())
+    }
+    async fn screenshot(&self, _: &Device) -> Result<Vec<u8>> {
+        unsupported()
+    }
+    async fn install(&self, _: &Device, _: &Path, _: bool) -> Result<()> {
+        unsupported()
+    }
+    async fn launch(&self, _: &Device, _: &str) -> Result<LaunchInfo> {
+        unsupported()
+    }
+    async fn stop(&self, _: &Device, _: &str) -> Result<()> {
+        unsupported()
+    }
+}
+
+fn scroll_until(goal: &str) -> Action {
+    Action::Scroll {
+        direction: Direction::Down,
+        within: None,
+        until: Some(Target::parse(goal).unwrap()),
+    }
+}
+
+/// How far `scroll --until` gets mustn't depend on how many rows fit on the screen.
+#[tokio::test]
+async fn scrolling_until_keeps_going_while_the_list_moves_and_stops_at_its_end() {
+    let driver = Arc::new(ListDriver::default());
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let found = session
+        .act(scroll_until("Row 95"), &mut Timings::default())
+        .await
+        .unwrap();
+    assert!(
+        found.action.contains("found after 11 scrolls"),
+        "{}",
+        found.action
+    );
+
+    let missing = session
+        .act(scroll_until("Row 120"), &mut Timings::default())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(missing, Error::ElementNotFound { .. }),
+        "{missing}"
+    );
+    // One more scroll to reach the end, one that no longer moves it.
+    assert_eq!(*driver.swipes.lock().unwrap(), 13);
 }

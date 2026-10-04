@@ -118,7 +118,7 @@ enum Command {
         /// Scroll inside this element instead of the screen
         #[arg(long = "in")]
         within: Option<String>,
-        /// Keep scrolling (up to 10 times) until this target is on screen
+        /// Keep scrolling until this target is on screen or the content stops moving
         #[arg(long)]
         until: Option<String>,
     },
