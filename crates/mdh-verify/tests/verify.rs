@@ -21,6 +21,9 @@ struct FakeDriver {
     screens: Mutex<VecDeque<(&'static str, Vec<RawNode>)>>,
     done: Mutex<Vec<String>>,
     logs: Mutex<Vec<LogEntry>>,
+    /// The screen can't be read once the app is launched (uiautomator printed no hierarchy).
+    unreadable: Mutex<bool>,
+    launched: Mutex<bool>,
 }
 
 impl FakeDriver {
@@ -52,6 +55,12 @@ impl Driver for FakeDriver {
         Ok(vec![device()])
     }
     async fn ui_tree(&self, _: &Device) -> Result<RawTree> {
+        if *self.unreadable.lock().unwrap() && *self.launched.lock().unwrap() {
+            return Err(Error::Parse {
+                tool: "uiautomator".into(),
+                detail: "no <hierarchy> element".into(),
+            });
+        }
         Ok(RawTree {
             roots: self.current(false).1,
             source: TreeSource::Helper,
@@ -93,6 +102,7 @@ impl Driver for FakeDriver {
     }
     async fn launch(&self, _: &Device, app: &str) -> Result<LaunchInfo> {
         self.did(format!("launch {app}"));
+        *self.launched.lock().unwrap() = true;
         Ok(LaunchInfo {
             activity: None,
             total_time_ms: 100,
@@ -379,6 +389,38 @@ async fn a_step_that_cannot_run_stops_the_flow_and_says_why() {
     );
     // The final checks don't run after a failed step; `no crash` does.
     assert_eq!(verdict.findings.len(), 2, "{}", verdict.text);
+}
+
+/// Seen in the benchmark: the grader couldn't read the screen, and a correct fix was judged broken.
+#[tokio::test]
+async fn an_unreadable_screen_is_an_error_not_a_failure_of_the_app() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([login(true), inbox()]);
+    *driver.unreadable.lock().unwrap() = true;
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let flow = Flow::parse("sign-in", FLOW).unwrap();
+    let verdict = run_flow(
+        &mut session,
+        &flow,
+        &FlowOptions {
+            verify: options(),
+            step_timeout: Duration::from_millis(300),
+        },
+        &mut Timings::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(verdict.status, Status::Error, "{}", verdict.text);
+    assert!(
+        verdict.text.starts_with("verdict sign-in: ERROR"),
+        "{}",
+        verdict.text
+    );
+    assert!(
+        verdict.text.contains("no <hierarchy> element"),
+        "{}",
+        verdict.text
+    );
 }
 
 #[test]

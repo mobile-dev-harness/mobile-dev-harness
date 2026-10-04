@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use mdh_control::{Action, Direction, RecordedStep, Session, Target, TextMatch};
 use mdh_core::output::{Timings, millis};
-use mdh_core::{Error, Result};
+use mdh_core::{Error, ErrorCode, Result};
 use mdh_observe::CrashKind;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -561,7 +561,7 @@ pub async fn run_flow(
     let setup = setup(session, flow).await;
     let mut failed = setup.is_err();
     if let Err(e) = setup {
-        findings.push(step_failure(None, "setup".into(), e.to_string()));
+        findings.push(step_error(None, "setup".into(), &e));
     }
     // Check kinds that measure the whole run start here, with the app launched.
     if !failed {
@@ -698,6 +698,7 @@ async fn run_step(
         options,
     } = *replay;
     let fail = |message: String| vec![step_failure(Some(index), step.to_string(), message)];
+    let failed = |e: Error| vec![step_error(Some(index), step.to_string(), &e)];
     // Steps aimed at an element first wait for it, so replay doesn't depend on timing.
     let target = match step {
         Step::Tap(e) | Step::LongPress(e) => Some(e),
@@ -710,27 +711,26 @@ async fn run_step(
             .wait(&e.0, false, options.step_timeout, timings)
             .await
     {
-        let observed = match err {
+        return Ok(match err {
             Error::Timeout { .. } => {
                 let tree = session.observe(false, timings).await?;
                 let activity = tree.screen.activity.as_deref();
                 let visible = Assertion::Visible(e.clone()).evaluate(&tree.tree, activity);
-                format!(
+                fail(format!(
                     "{} after {} s (screen {})",
                     visible.observed.unwrap_or_else(|| "not on screen".into()),
                     options.step_timeout.as_secs(),
                     activity.map_or("unknown", |a| a.split_once('/').map_or(a, |(_, c)| c))
-                )
+                ))
             }
-            other => other.to_string(),
-        };
-        return Ok(fail(observed));
+            other => failed(other),
+        });
     }
     let action = match step {
         Step::Launch(app) => {
             return Ok(match session.launch(app).await {
                 Ok(_) => Vec::new(),
-                Err(e) => fail(e.to_string()),
+                Err(e) => failed(e),
             });
         }
         Step::Open(uri) => {
@@ -739,17 +739,14 @@ async fn run_step(
                 Ok(uri) => session.open_uri(&uri, package.as_deref()).await.map(drop),
                 Err(e) => Err(e),
             };
-            return Ok(result
-                .err()
-                .map(|e| fail(e.to_string()))
-                .unwrap_or_default());
+            return Ok(result.err().map(failed).unwrap_or_default());
         }
         Step::Wait(w) => {
             let timeout = w.timeout.map_or(options.step_timeout, Duration::from_secs);
             return Ok(
                 match session.wait(&w.target.0, w.gone, timeout, timings).await {
                     Ok(_) => Vec::new(),
-                    Err(e) => fail(e.to_string()),
+                    Err(e) => failed(e),
                 },
             );
         }
@@ -790,7 +787,7 @@ async fn run_step(
                 append: t.append,
                 enter: t.enter,
             },
-            Err(e) => return Ok(fail(e.to_string())),
+            Err(e) => return Ok(failed(e)),
         },
         Step::Swipe(s) => Action::Swipe {
             from: s.from,
@@ -818,7 +815,7 @@ async fn run_step(
                 .map(|_| fail("the app crashed (report below)".into()))
                 .unwrap_or_default())
         }
-        Err(e) => Ok(fail(e.to_string())),
+        Err(e) => Ok(failed(e)),
     }
 }
 
@@ -854,6 +851,36 @@ fn dedupe_warnings(findings: &mut Vec<Finding>) {
 pub(crate) fn activity_name(component: &str) -> &str {
     let class = component.split_once('/').map_or(component, |(_, c)| c);
     class.rsplit('.').next().unwrap_or(class)
+}
+
+/// A step that went wrong. The app failed it unless the check itself couldn't be made: the
+/// screen unreadable, the device or a tool gone, or a target the flow can't resolve. Those are
+/// errors, so a broken tool chain never reads as a broken app.
+fn step_error(step: Option<usize>, check: String, err: &Error) -> Finding {
+    let mut finding = step_failure(step, check, err.to_string());
+    if couldnt_check(err.code()) {
+        finding.outcome = Outcome::Error;
+    }
+    finding
+}
+
+fn couldnt_check(code: ErrorCode) -> bool {
+    matches!(
+        code,
+        ErrorCode::ToolNotFound
+            | ErrorCode::CommandFailed
+            | ErrorCode::UnexpectedOutput
+            | ErrorCode::EnvironmentNotReady
+            | ErrorCode::DeviceNotFound
+            | ErrorCode::EmulatorFailed
+            | ErrorCode::AmbiguousDevice
+            | ErrorCode::HelperUnavailable
+            | ErrorCode::Unsupported
+            | ErrorCode::Io
+            | ErrorCode::InvalidTarget
+            | ErrorCode::AmbiguousTarget
+            | ErrorCode::MissingSecret
+    )
 }
 
 fn step_failure(step: Option<usize>, check: String, observed: String) -> Finding {

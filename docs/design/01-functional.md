@@ -120,7 +120,7 @@ Every feature has an ID `F<module>.<n>` that the roadmap and issues refer to. Mo
 | ID | Feature | Behavior |
 |---|---|---|
 | F6.1 | Functional checks ✅ | `visible` / `not visible` / element state (`enabled`, `disabled`, `checked`, `unchecked`, `focused`) / `text` equals or contains / `screen` (current activity) / `no crash` (always checked, over the whole session or flow, including crashes already shown) / `log` and `no log`. Screen checks are re-read until they hold or a timeout (default 3 s) passes, so a result that is still loading isn't a false fail. Screenshot match comes with F13 |
-| F6.2 | **Verdict** ✅ | Structured result: overall status (pass, fail, error), one line per check with what was observed when it failed, steps completed, duration, the run directory |
+| F6.2 | **Verdict** ✅ | Structured result: overall status (pass, fail, error), one line per check with what was observed when it failed, steps completed, duration, the run directory. `error` means a check couldn't be made (the screen unreadable, the device or a tool gone, a target the flow can't resolve), never that the app failed it |
 | F6.3 | Evidence ✅ | Every verdict writes `screenshot.jpg`, `tree.txt`, `logs.txt` and `verdict.json` to `.mdh/runs/<time>-verify/` (or `-flow-<name>/`); crash reports go into the verdict itself |
 | F6.4 | Check kinds ✅ (interface) | Functional checks are built in; UI consistency (F13) and performance (F11) checks implement the same check interface, run on the same flows and report into the same verdict, so one run can say "functional: pass; UI: 2 deviations; cold start +180 ms" |
 

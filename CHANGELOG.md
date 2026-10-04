@@ -9,6 +9,10 @@ change); JSON output changes are listed here and carry the `schema` version of t
 - `scroll --until` (and a flow's `scroll: {until: …}`) keeps scrolling while the content moves, up to 50
   scrolls, instead of giving up after 10: on a shorter screen a row near the end of a long list was reported
   missing although it was there.
+- A flow step that fails because the check couldn't be made (the screen unreadable, the device or a tool gone, a
+  target the flow can't resolve) makes the verdict ERROR instead of FAIL: a broken tool chain no longer reads
+  as a broken app. Seen in the benchmark, where the grader couldn't read the screen and two correct fixes were
+  judged broken.
 
 ### Benchmark
 - A run must end on the device the benchmark started on (AVD, API level, display size and density); otherwise
