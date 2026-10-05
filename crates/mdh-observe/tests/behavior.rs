@@ -47,8 +47,9 @@ fn observe(refs: &mut RefTable, roots: &[RawNode]) -> UiTree {
     tree
 }
 
+/// A preference row: the row takes the tap, the switch only shows the state.
 fn row(title: &str, top: i32, checked: bool) -> RawNode {
-    let mut switch = clickable(node("Switch", Rect::new(800, top, 950, top + 100)));
+    let mut switch = node("Switch", Rect::new(800, top, 950, top + 100));
     switch.flags.checkable = true;
     switch.flags.checked = checked;
     RawNode {
@@ -61,6 +62,32 @@ fn row(title: &str, top: i32, checked: bool) -> RawNode {
 fn row_with_single_switch_becomes_the_switch() {
     let tree = compress(&screen(vec![row("Dark theme", 100, false)]));
     assert_eq!(render(&tree), r#"[] switch "Dark theme" off"#);
+}
+
+/// Now in Android's news card opens the article; the bookmark toggle on it takes its own taps.
+/// With the card's topic chips scrolled off, the toggle is the card's only control: as one node,
+/// tapping "the checkbox" tapped the middle of the card.
+#[test]
+fn a_toggle_that_takes_taps_itself_is_not_its_row() {
+    let bookmark_bounds = Rect::new(820, 120, 940, 240);
+    let mut bookmark = clickable(node("CheckBox", bookmark_bounds));
+    bookmark.flags.checkable = true;
+    bookmark.desc = Some("Bookmark".into());
+    let card = RawNode {
+        children: vec![
+            text("Pixel Watch", Rect::new(40, 120, 780, 240)),
+            bookmark,
+            text("Oct 6, 2022", Rect::new(40, 260, 780, 320)),
+        ],
+        ..clickable(node("View", Rect::new(0, 100, 1000, 400)))
+    };
+    let tree = compress(&screen(vec![card]));
+    assert_eq!(
+        render(&tree),
+        "[] button \"Pixel Watch\" · \"Oct 6, 2022\"\n  [] checkbox \"Bookmark\" unchecked"
+    );
+    // A tap aims at the center of a node's bounds: the toggle's own, not the card's.
+    assert_eq!(tree.nodes[0].children[0].bounds, bookmark_bounds);
 }
 
 /// Now in Android's onboarding chips: a selectable row around its own checkbox, both named by the

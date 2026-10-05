@@ -1,8 +1,8 @@
 ---
 source: crates/mdh-observe/tests/fixtures.rs
-expression: "snapshot(concat! (stringify! (nia_topic_under_status_bar), \"_api36\"))"
+expression: "snapshot(concat! (stringify! (nowinandroid_topic), \"_api36\"))"
 ---
-raw: 53 nodes, ~5181 tokens | compact: 10 nodes, ~142 tokens
+raw: 53 nodes, ~5183 tokens | compact: 10 nodes, ~142 tokens
 
 [e1] list scrollable
   [e2] item "Back"

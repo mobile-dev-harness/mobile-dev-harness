@@ -7,7 +7,8 @@ expression: text
   [e3] checkbox "NOT FOLLOWING" unchecked obscured
   [e4] "Compose"
   [e5] "All the latest and greatest news on Jetpack Compose - Android’s modern toolkit for building native user interfaces."
-  [e6] checkbox "Bookmark" · "The new Google Pixel Watch is here  — start building for Wear OS! ⌚ · Oct 6, 2022 • Article 📚 · We launched the Google P…" unchecked #newsResourceCard:2
-[e7] button "For you"
-[e8] button "Saved"
-[e9] "Interests"
+  [e6] item "The new Google Pixel Watch is here  — start building for Wear OS! ⌚" · "Oct 6, 2022 • Article 📚 · We launched the Google Pixel Watch, powered by Wear OS 3.5, at the Made by Google event — the …" #newsResourceCard:2
+    [e7] checkbox "Bookmark" unchecked
+[e8] button "For you"
+[e9] button "Saved"
+[e10] "Interests"

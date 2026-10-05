@@ -45,6 +45,7 @@ macro_rules! fixture_test {
 fixture_test!(
     launcher,
     nia_topic_under_status_bar,
+    nowinandroid_topic,
     settings,
     settings_display,
     settings_network,

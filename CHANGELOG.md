@@ -36,6 +36,14 @@ change); JSON output changes are listed here and carry the `schema` version of t
   read.
 - A Compose chip that is selectable around its own checkbox (Now in Android's topics) is one element, not two
   with the same name: targeting it by name matched twice.
+- A row or card is no longer shown as the toggle inside it when that toggle is clickable itself. A Now in
+  Android news card whose only control on screen was its bookmark button read as `checkbox "Bookmark"`, and
+  tapping it opened the article; the "Dark theme" row of Settings, which opens a page, read as its switch. They
+  are two elements now, the card or row and its toggle. A row still reads as its switch when the switch takes no
+  taps itself, as in a preference row. A flow that targets a row with a clickable switch as a switch
+  (`role=switch;text=…`) no longer finds it: target the row by its name, or the switch inside it. The sample
+  app's settings rows now leave the tap to the row (`android:clickable="false"` on the switch) and still read
+  as switches.
 - Projects with Isolated Projects on (`org.gradle.isolated-projects=true`, as in Now in Android) can be built
   and run: reading the project's modules and variants turned the configuration cache off, which Gradle refuses
   there. Isolated Projects is now off for that one Gradle call.

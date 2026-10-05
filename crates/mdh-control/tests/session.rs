@@ -140,6 +140,7 @@ fn under(kind: WindowKind, bounds: Rect) -> Vec<WindowInfo> {
 }
 
 /// A settings screen with a Wi-Fi switch row whose state is `on`; `shift` moves it (animation).
+/// As in Settings, the row takes the tap and the switch only shows the state.
 fn screen(on: bool, shift: i32) -> Vec<RawNode> {
     let enabled = NodeFlags {
         enabled: true,
@@ -164,7 +165,6 @@ fn screen(on: bool, shift: i32) -> Vec<RawNode> {
                 class: "android.widget.Switch".into(),
                 bounds: Rect::new(800, 200 + shift, 950, 300 + shift),
                 flags: NodeFlags {
-                    clickable: true,
                     checkable: true,
                     checked: on,
                     ..enabled

@@ -215,7 +215,7 @@ impl Compressor {
             let mut node = new_node(role, raw, visible);
             node.covered_by = covered_by.clone();
             fill_labels(&mut node, raw);
-            merge_toggle(&mut node, &mut children);
+            merge_toggle(&mut node, &mut children, raw);
             absorb_texts(&mut node, &mut children);
             drop_nested_twin(&node, &mut children);
             node.children = children;
@@ -423,9 +423,12 @@ fn is_control(node: &UiNode) -> bool {
     )
 }
 
-/// A row whose only control is a switch/checkbox becomes that toggle: tapping the row toggles it,
-/// and one node reads better than a row plus a nameless switch.
-fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>) {
+/// A row whose only control is a switch/checkbox that takes no taps itself becomes that toggle:
+/// tapping the row toggles it, and one node reads better than a row plus a nameless switch.
+/// A toggle that is clickable is a second target with an action of its own (the bookmark button
+/// on a card that opens an article, the switch of a settings row that opens a page): as one
+/// node, tapping "the toggle" would tap the row.
+fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>, raw: &RawNode) {
     if !matches!(node.role, Role::Button | Role::Item) || node.state.checked.is_some() {
         return;
     }
@@ -433,7 +436,7 @@ fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>) {
     let (Some((i, toggle)), None) = (controls.next(), controls.next()) else {
         return;
     };
-    if !toggle.role.is_toggle() || !toggle.children.is_empty() {
+    if !toggle.role.is_toggle() || !toggle.children.is_empty() || has_clickable_toggle(raw) {
         return;
     }
     let toggle = children.remove(i);
@@ -442,6 +445,13 @@ fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>) {
     node.state.disabled |= toggle.state.disabled;
     node.label = node.label.take().or(toggle.label);
     node.id = node.id.take().or(toggle.id);
+}
+
+/// Whether a toggle below `raw` reacts to taps itself.
+fn has_clickable_toggle(raw: &RawNode) -> bool {
+    raw.children
+        .iter()
+        .any(|c| (c.flags.clickable && infer_role(c, false).is_toggle()) || has_clickable_toggle(c))
 }
 
 /// A toggle around a toggle of the same role, name and state is one control (a Compose chip that
