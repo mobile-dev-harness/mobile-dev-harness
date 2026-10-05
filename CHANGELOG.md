@@ -12,6 +12,10 @@ change); JSON output changes are listed here and carry the `schema` version of t
   ERROR.
 
 ### Fixes
+- The screen could be read stale: the on-device helper read through an accessibility cache that a Compose
+  navigation inside one window (Now in Android's topic pages) didn't invalidate, so mdh kept showing the
+  previous screen while the device showed the new one. The helper (version 5) drops the cache before every
+  read.
 - A Compose chip that is selectable around its own checkbox (Now in Android's topics) is one element, not two
   with the same name: targeting it by name matched twice.
 - Projects with Isolated Projects on (`org.gradle.isolated-projects=true`, as in Now in Android) can be built

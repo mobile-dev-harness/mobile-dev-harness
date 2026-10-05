@@ -21,7 +21,7 @@ import org.json.JSONObject;
 /** Request handlers. Field names of the tree match {@code mdh_core::ui::RawNode}. */
 final class Commands {
     /** Bump together with versionCode and HELPER_VERSION_CODE on the host. */
-    static final int VERSION_CODE = 4;
+    static final int VERSION_CODE = 5;
 
     private static final long ROOT_RETRY_MS = 500;
 
@@ -37,6 +37,7 @@ final class Commands {
             case "ping":
                 return new JSONObject().put("version_code", VERSION_CODE).put("sdk", Build.VERSION.SDK_INT);
             case "tree":
+                clearCache();
                 return new JSONObject()
                         .put("roots", new JSONArray().put(node(root())))
                         .put("windows", windows());
@@ -56,6 +57,28 @@ final class Commands {
                 return setText(request.getString("text"));
             default:
                 throw new IllegalArgumentException("unknown cmd " + cmd);
+        }
+    }
+
+    /**
+     * Drops what the connection has cached of the screen, so a read sees the screen as it is. The
+     * connection lives as long as the helper and events keep its cache current; after a Compose
+     * navigation within one window (Now in Android's list-detail panes) it kept returning the previous
+     * screen until the helper restarted.
+     */
+    private void clearCache() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            automation.clearCache();
+            return;
+        }
+        // Before API 34 the cache is the process-wide interaction client's, reachable only by
+        // reflection; without it a read may be stale, as before.
+        try {
+            Class<?> client = Class.forName("android.view.accessibility.AccessibilityInteractionClient");
+            Object instance = client.getMethod("getInstance").invoke(null);
+            client.getMethod("clearCache").invoke(instance);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // Not available on this version.
         }
     }
 
