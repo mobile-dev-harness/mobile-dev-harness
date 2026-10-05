@@ -217,6 +217,7 @@ impl Compressor {
             fill_labels(&mut node, raw);
             merge_toggle(&mut node, &mut children);
             absorb_texts(&mut node, &mut children);
+            drop_nested_twin(&node, &mut children);
             node.children = children;
             return vec![node];
         }
@@ -441,6 +442,21 @@ fn merge_toggle(node: &mut UiNode, children: &mut Vec<UiNode>) {
     node.state.disabled |= toggle.state.disabled;
     node.label = node.label.take().or(toggle.label);
     node.id = node.id.take().or(toggle.id);
+}
+
+/// A toggle around a toggle of the same role, name and state is one control (a Compose chip that
+/// is selectable around its own checkbox): two would make its name match twice.
+fn drop_nested_twin(node: &UiNode, children: &mut Vec<UiNode>) {
+    if !node.role.is_toggle() {
+        return;
+    }
+    children.retain(|c| {
+        let twin = c.role == node.role
+            && c.children.is_empty()
+            && c.state.checked == node.state.checked
+            && (c.label.is_none() || c.label == node.label);
+        !twin
+    });
 }
 
 /// Moves plain text and image leaves into the node's label and detail. A text field only takes a

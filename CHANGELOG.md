@@ -12,6 +12,8 @@ change); JSON output changes are listed here and carry the `schema` version of t
   ERROR.
 
 ### Fixes
+- A Compose chip that is selectable around its own checkbox (Now in Android's topics) is one element, not two
+  with the same name: targeting it by name matched twice.
 - Projects with Isolated Projects on (`org.gradle.isolated-projects=true`, as in Now in Android) can be built
   and run: reading the project's modules and variants turned the configuration cache off, which Gradle refuses
   there. Isolated Projects is now off for that one Gradle call.

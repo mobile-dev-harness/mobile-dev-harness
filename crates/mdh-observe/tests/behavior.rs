@@ -63,6 +63,31 @@ fn row_with_single_switch_becomes_the_switch() {
     assert_eq!(render(&tree), r#"[] switch "Dark theme" off"#);
 }
 
+/// Now in Android's onboarding chips: a selectable row around its own checkbox, both named by the
+/// topic. One control, so the topic's name matches once.
+#[test]
+fn a_toggle_around_its_twin_is_one_control() {
+    let chip = |name: &str, top: i32, checked: bool| {
+        let mut inner = clickable(node("CheckBox", Rect::new(40, top + 20, 120, top + 80)));
+        inner.flags.checkable = true;
+        inner.flags.checked = checked;
+        inner.text = Some(name.into());
+        let mut outer = clickable(node("View", Rect::new(0, top, 600, top + 100)));
+        outer.flags.checkable = true;
+        outer.flags.checked = checked;
+        outer.children = vec![text(name, Rect::new(140, top, 600, top + 100)), inner];
+        outer
+    };
+    let tree = observe(
+        &mut RefTable::default(),
+        &screen(vec![chip("Headlines", 100, false), chip("UI", 300, true)]),
+    );
+    let out = render(&tree);
+    assert!(out.contains(r#"checkbox "Headlines" unchecked"#), "{out}");
+    assert_eq!(out.matches("Headlines").count(), 1, "{out}");
+    assert_eq!(out.matches(r#""UI""#).count(), 1, "{out}");
+}
+
 #[test]
 fn textbox_separates_hint_from_value_and_masks_passwords() {
     let mut email = node("EditText", Rect::new(0, 0, 1000, 100));
