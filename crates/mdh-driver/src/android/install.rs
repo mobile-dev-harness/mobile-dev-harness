@@ -43,6 +43,16 @@ mod tests {
     }
 
     #[test]
+    fn version_downgrade() {
+        let (reason, detail) = parse_failure(&fixture("install_version_downgrade_api36")).unwrap();
+        assert_eq!(reason, "INSTALL_FAILED_VERSION_DOWNGRADE");
+        assert_eq!(
+            detail,
+            "Downgrade detected: Update version code 5 is older than current 6"
+        );
+    }
+
+    #[test]
     fn other_output_is_not_an_install_failure() {
         assert_eq!(parse_failure("adb: device offline"), None);
     }

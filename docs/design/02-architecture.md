@@ -430,9 +430,14 @@ UiAutomation is device-wide.
 - Input is injected **asynchronously** through `UiAutomation.injectInputEvent`. Synchronous injection waits until
   the target window has handled the event and was observed to take 0.4–1.7 s while the app animates; settling is
   the host's job (§6).
-- `Helper::ensure` (host): reuse the forward → ping → on a missing or stale helper, check the installed
-  `versionCode`, (re)install the APK embedded in the binary, start it, poll until it answers. An APK signed with
-  another key is uninstalled first.
+- `Helper::ensure` (host): reuse the forward → ping → done if the version this binary embeds answers; otherwise
+  stop the helper, install the embedded APK unless the installed `versionCode` is already that one, start it, poll
+  until it answers. Host and helper change together, so only that version will do. An older helper is upgraded in
+  place. One that can't be replaced in place is uninstalled first (it keeps no data): a newer one, installed by
+  another mdh (Android refuses a downgrade, and `adb install -d` lifts that only for debuggable packages or system
+  images), or one signed with another key (a local debug build). If Android still refuses the install, the command
+  fails with `HELPER_UNAVAILABLE`, Android's reason and what to do, instead of falling back to `uiautomator dump`:
+  the problem doesn't go away by itself, and slower, poorer observations would only hide it.
 - Releases: `scripts/build-helper.sh` rebuilds the APK into `crates/mdh-driver/assets/`. The version code lives in
   three places (Gradle, `Commands.VERSION_CODE`, `HELPER_VERSION_CODE`) and must be bumped together.
 
@@ -443,6 +448,16 @@ and tap ~36 ms (median) per helper request vs. ~120 ms for `adb shell input`. Th
 **Coexistence:** only one UiAutomation client can run per device. While the helper runs, other clients'
 `uiautomator dump` is killed, so mobile-mcp, Appium or Maestro on the same device conflict with it. If the helper
 can't start, mdh falls back to `uiautomator dump`.
+
+**Two mdh versions on one device** (checkouts with different helpers, an old binary next to a new one) take turns:
+each replaces the other's helper when it runs, which ends the other's UiAutomation connection until that mdh runs
+again and does the same. A switch takes about a second instead of the ~23 ms of a warm call (0.8–1.0 s measured for
+replacing a newer helper on the API 36 emulator), on every call if the calls alternate. Having the older mdh fail
+with a hint instead was rejected: a newer mdh replaces an older helper anyway, so only the older one would be left
+unable to read the screen, until someone uninstalled the helper by hand, which is the same replacement. Using the
+newer helper as it is was rejected too: nothing says its answers mean what this host expects. The version is
+checked when a process first uses a device and after a request fails, not on every request: a long-running mdh (the
+MCP server, a flow) whose helper another version replaced keeps talking to that one until then.
 
 **Later (M5):** window-change event stream (push instead of poll), screenshots through `UiAutomation`.
 

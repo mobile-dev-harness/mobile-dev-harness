@@ -28,14 +28,15 @@ pub struct Helper {
 }
 
 impl Helper {
-    /// Connects to the helper on `serial`, installing, upgrading or starting it as needed.
+    /// Connects to the helper on `serial`, installing, replacing or starting it as needed. Only
+    /// the embedded version will do, so a newer one (another mdh's) is replaced like an older one.
     pub async fn ensure(adb: &Adb, serial: &str) -> Result<Helper> {
         let helper = Helper {
             port: forward(adb, serial).await?,
         };
         match helper.version().await {
             Ok(HELPER_VERSION_CODE) => return Ok(helper),
-            Ok(_stale) => {
+            Ok(_other) => {
                 adb.shell(serial, &format!("am force-stop {PACKAGE}"))
                     .await?;
             }
@@ -218,16 +219,41 @@ async fn install(adb: &Adb, serial: &str) -> Result<()> {
     let path = std::env::temp_dir().join(format!("mdh-helper-{HELPER_VERSION_CODE}.apk"));
     std::fs::write(&path, APK)?;
     let path = path.to_string_lossy();
-    match adb.on(serial, &["install", "-r", "-t", &path]).await {
-        // A helper signed with another key (e.g. a local debug build) can't be upgraded in place.
-        Err(Error::CommandFailed { stderr, .. })
-            if stderr.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE") =>
-        {
-            adb.on(serial, &["uninstall", PACKAGE]).await?;
-            adb.on(serial, &["install", "-t", &path]).await.map(drop)
-        }
-        result => result.map(drop),
+    let args: [&str; 4] = ["install", "-r", "-t", &path];
+    let mut result = adb.on(serial, &args).await;
+    if let Err(Error::CommandFailed { stderr, .. }) = &result
+        && blocked_by_installed_helper(stderr)
+    {
+        // The helper keeps no data, so the one in the way goes. If it can't be uninstalled, the
+        // install is refused once more and that is what gets reported.
+        let _ = adb.on(serial, &["uninstall", PACKAGE]).await;
+        result = adb.on(serial, &args).await;
     }
+    result.map(drop).map_err(install_failed)
+}
+
+/// Whether `adb install -r` was refused because of the helper already on the device: one signed
+/// with another key (a local debug build) or a newer one (another mdh's, which this binary can't
+/// use: host and helper change together). Neither can be replaced in place; `-d` allows a
+/// downgrade only where the package or the system image is debuggable.
+fn blocked_by_installed_helper(stderr: &str) -> bool {
+    super::install::parse_failure(stderr).is_some_and(|(reason, _)| {
+        matches!(
+            reason.as_str(),
+            "INSTALL_FAILED_UPDATE_INCOMPATIBLE" | "INSTALL_FAILED_VERSION_DOWNGRADE"
+        )
+    })
+}
+
+/// Android's refusal as an error about the helper: the caller asked to read the screen, not to
+/// install anything, and what fixes an app's install doesn't fix this one.
+fn install_failed(e: Error) -> Error {
+    if let Error::CommandFailed { stderr, .. } = &e
+        && let Some((reason, detail)) = super::install::parse_failure(stderr)
+    {
+        return Error::HelperInstallFailed { reason, detail };
+    }
+    e
 }
 
 #[cfg(test)]
@@ -253,5 +279,60 @@ emulator-5554 tcp:8080 tcp:8080
             parse_version_code("Unable to find package: dev.mdh.helper"),
             None
         );
+    }
+
+    /// Captured `adb install` output. `version_downgrade_api36` is what a binary embedding
+    /// version 5 got where another checkout's mdh had installed 6.
+    fn adb_install(name: &str) -> String {
+        let path = format!(
+            "{}/../../fixtures/android/adb/install_{name}.txt",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    fn failed(stderr: &str) -> Error {
+        Error::CommandFailed {
+            command: "adb install".into(),
+            code: Some(1),
+            stderr: stderr.into(),
+        }
+    }
+
+    #[test]
+    fn a_newer_or_differently_signed_helper_is_in_the_way() {
+        for capture in ["version_downgrade_api36", "signature_mismatch"] {
+            let stderr = adb_install(capture);
+            assert!(blocked_by_installed_helper(&stderr), "{capture}");
+        }
+    }
+
+    #[test]
+    fn other_failures_leave_the_installed_helper_alone() {
+        let stderr = adb_install("no_matching_abis");
+        assert!(!blocked_by_installed_helper(&stderr));
+        assert!(!blocked_by_installed_helper("adb: device offline"));
+    }
+
+    #[test]
+    fn a_refused_install_names_the_helper_and_what_to_do() {
+        let e = install_failed(failed(&adb_install("version_downgrade_api36")));
+        assert_eq!(e.code(), mdh_core::ErrorCode::HelperUnavailable);
+        assert_eq!(
+            e.to_string(),
+            "could not install the on-device helper: INSTALL_FAILED_VERSION_DOWNGRADE (Downgrade detected: \
+             Update version code 5 is older than current 6)"
+        );
+        assert!(
+            e.hint().contains("`adb uninstall dev.mdh.helper`"),
+            "{}",
+            e.hint()
+        );
+    }
+
+    #[test]
+    fn a_failure_that_isnt_androids_stays_as_it_is() {
+        let e = install_failed(failed("adb: device offline"));
+        assert!(matches!(e, Error::CommandFailed { .. }), "{e}");
     }
 }

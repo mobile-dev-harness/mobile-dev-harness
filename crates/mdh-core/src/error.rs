@@ -38,6 +38,13 @@ pub enum Error {
     #[error("on-device helper unavailable: {reason}")]
     HelperUnavailable { reason: String },
 
+    #[error("could not install the on-device helper: {reason}{}", if detail.is_empty() { String::new() } else { format!(" ({detail})") })]
+    HelperInstallFailed {
+        /// Android's code, e.g. `INSTALL_FAILED_VERSION_DOWNGRADE`.
+        reason: String,
+        detail: String,
+    },
+
     #[error("helper command `{cmd}` failed: {message}")]
     HelperCommand { cmd: String, message: String },
 
@@ -155,7 +162,9 @@ impl Error {
             Error::NoDevice { .. } | Error::DeviceNotFound { .. } => ErrorCode::DeviceNotFound,
             Error::EmulatorFailed { .. } => ErrorCode::EmulatorFailed,
             Error::AmbiguousDevice { .. } => ErrorCode::AmbiguousDevice,
-            Error::HelperUnavailable { .. } => ErrorCode::HelperUnavailable,
+            Error::HelperUnavailable { .. } | Error::HelperInstallFailed { .. } => {
+                ErrorCode::HelperUnavailable
+            }
             Error::HelperCommand { .. } => ErrorCode::HelperError,
             Error::AppNotFound { .. } => ErrorCode::AppNotFound,
             Error::LaunchFailed { .. } => ErrorCode::LaunchFailed,
@@ -225,6 +234,7 @@ impl Error {
                  mobile-mcp sessions on it and retry"
                     .into()
             }
+            Error::HelperInstallFailed { reason, .. } => helper_install_hint(reason).into(),
             Error::HelperCommand { .. } => "check the device screen state and retry".into(),
             Error::AppNotFound { .. } => {
                 "check the package name (`adb shell pm list packages`) or install the app first".into()
@@ -430,6 +440,18 @@ impl ErrorCode {
             | ErrorCode::Unsupported => 3,
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
+    }
+}
+
+/// What gets mdh's own helper installed after Android refused it.
+fn helper_install_hint(reason: &str) -> &'static str {
+    match reason {
+        // mdh uninstalls a helper it can't replace in place, so here that didn't work either.
+        "INSTALL_FAILED_VERSION_DOWNGRADE" | "INSTALL_FAILED_UPDATE_INCOMPATIBLE" => {
+            "the helper already on the device (a newer one from another mdh, or one signed with another \
+             key) could not be replaced; uninstall it by hand (`adb uninstall dev.mdh.helper`) and retry"
+        }
+        other => install_hint(other),
     }
 }
 

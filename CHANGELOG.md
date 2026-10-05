@@ -12,6 +12,12 @@ change); JSON output changes are listed here and carry the `schema` version of t
   ERROR.
 
 ### Fixes
+- A device that already had a newer on-device helper, installed by another mdh (another checkout, a newer
+  release), made every command that reads the screen fail with `INSTALL_FAILED_VERSION_DOWNGRADE` until someone
+  uninstalled the helper by hand. mdh now uninstalls it and installs its own, as it did for a helper signed with
+  another key. Two mdh versions sharing a device replace each other's helper on every switch (about a second). If
+  the helper can't be installed, the error is `HELPER_UNAVAILABLE` with Android's reason and what to do (it was a
+  bare `COMMAND_FAILED`).
 - The screen could be read stale: the on-device helper read through an accessibility cache that a Compose
   navigation inside one window (Now in Android's topic pages) didn't invalidate, so mdh kept showing the
   previous screen while the device showed the new one. The helper (version 5) drops the cache before every

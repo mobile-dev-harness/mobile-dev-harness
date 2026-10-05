@@ -1,0 +1,3 @@
+Performing Streamed Install
+adb: failed to install mdh-helper-5.apk: Failure [INSTALL_FAILED_VERSION_DOWNGRADE: Downgrade detected: Update version code 5 is older than current 6]
+
