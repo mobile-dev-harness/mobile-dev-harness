@@ -12,6 +12,9 @@ change); JSON output changes are listed here and carry the `schema` version of t
   ERROR.
 
 ### Fixes
+- Projects with Isolated Projects on (`org.gradle.isolated-projects=true`, as in Now in Android) can be built
+  and run: reading the project's modules and variants turned the configuration cache off, which Gradle refuses
+  there. Isolated Projects is now off for that one Gradle call.
 - Locking the rotation (flows, compatibility cells) could fall back to portrait mid-run: turning auto-rotate off
   made the window manager store the old rotation after mdh had set the new one. It is locked in one step now
   (`cmd window user-rotation`, Android 11+).

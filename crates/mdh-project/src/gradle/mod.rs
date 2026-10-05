@@ -191,13 +191,17 @@ impl GradleProject {
         std::fs::write(&script, PROBE_SCRIPT)?;
         let script = script.to_string_lossy().into_owned();
         // Without these, configuration cache or configure-on-demand would skip the init script's
-        // hooks for some modules.
+        // hooks for some modules. The script looks at every project, which Isolated Projects
+        // forbids (and which requires the configuration cache): off for this run only, under its
+        // name since Gradle 9 and its earlier `unsafe` one.
         let args = [
             "-q",
             "--init-script",
             &script,
             "--no-configuration-cache",
             "--no-configure-on-demand",
+            "-Dorg.gradle.isolated-projects=false",
+            "-Dorg.gradle.unsafe.isolated-projects=false",
             "mdhProbe",
         ];
         let output = Command::new(&self.gradle)
