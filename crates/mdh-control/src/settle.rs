@@ -23,17 +23,19 @@ const UNRESPONSIVE: Duration = Duration::from_millis(2000);
 
 pub(crate) struct Settled {
     pub snapshot: Snapshot,
-    /// Two identical trees and no new spinner before the timeout.
+    /// Two identical trees under windows that stayed put, and no new spinner, before the timeout.
     pub settled: bool,
     /// Set when reading the UI took this long: the app is likely blocked, possibly heading for
     /// an ANR. Settling stops early instead of waiting on a frozen app.
     pub unresponsive_ms: Option<u64>,
 }
 
-/// Waits until two consecutive trees are identical and no progress indicator that wasn't in
-/// `before` is showing, then returns the settled snapshot and whether it settled before the
-/// timeout. Spinners animate without accessibility events or tree changes, so without the second
-/// condition a tap that starts loading would report the spinner instead of the result (observed).
+/// Waits until two consecutive trees are identical, the windows over them haven't moved and no
+/// progress indicator that wasn't in `before` is showing, then returns the settled snapshot and
+/// whether it settled before the timeout. The keyboard slides in and out over an app that doesn't
+/// move for it, so without the windows an action returned with the keyboard halfway (observed).
+/// Spinners animate without accessibility events or tree changes, so without the last condition
+/// a tap that starts loading would report the spinner instead of the result (observed).
 /// With the slow uiautomator fallback a single tree is taken.
 pub(crate) async fn settle(
     control: &Control,
@@ -71,7 +73,8 @@ pub(crate) async fn settle(
             break;
         };
         let (next, next_windows, _) = next?;
-        settled = next.fingerprint() == tree.fingerprint() && !loading(&next);
+        settled =
+            next.fingerprint() == tree.fingerprint() && next_windows == windows && !loading(&next);
         (tree, windows) = (next, next_windows);
     }
 

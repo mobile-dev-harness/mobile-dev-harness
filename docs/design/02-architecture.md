@@ -268,6 +268,10 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
   wait_stable therefore (1) waits a minimum settle time longer than the throttle (150 ms), (2) calls `waitForIdle`
   (200 ms quiet, at most 2 s), and (3) confirms with two identical consecutive tree fingerprints (80 ms apart,
   5 s overall timeout).
+- **Windows that move:** the keyboard slides in and out over an app that doesn't resize for it, so the tree is
+  the same in every frame. The two consecutive reads must also list the same windows in the same places;
+  otherwise an action returned with the keyboard halfway (observed on Now in Android's search screen, 3 of 10
+  actions), its `keyboard` flag and obstructions already out of date.
 - **Measured** on API 36: a whole action takes 0.8–1.4 s, of which input is ~40 ms and settling the rest — mostly
   `waitForIdle` waiting out real transition animations, which is time the UI genuinely needs.
 - **Spinners:** indeterminate progress indicators animate without accessibility events or tree changes, so a tap

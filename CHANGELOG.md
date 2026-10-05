@@ -18,6 +18,9 @@ change); JSON output changes are listed here and carry the `schema` version of t
   another key. Two mdh versions sharing a device replace each other's helper on every switch (about a second). If
   the helper can't be installed, the error is `HELPER_UNAVAILABLE` with Android's reason and what to do (it was a
   bare `COMMAND_FAILED`).
+- An action could return while the keyboard was still sliding in or out, with `keyboard` and the obscured
+  elements out of date: over an app that doesn't resize for the keyboard the tree is the same in every frame.
+  Settling now also waits for the windows to stay where they are.
 - The screen could be read stale: the on-device helper read through an accessibility cache that a Compose
   navigation inside one window (Now in Android's topic pages) didn't invalidate, so mdh kept showing the
   previous screen while the device showed the new one. The helper (version 5) drops the cache before every

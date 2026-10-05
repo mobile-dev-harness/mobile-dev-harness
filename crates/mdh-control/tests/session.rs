@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use mdh_control::{Action, Control, Direction, Session, Target};
 use mdh_core::output::Timings;
-use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
+use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource, WindowInfo, WindowKind};
 use mdh_core::{
     Device, DeviceState, Error, Input, LaunchInfo, LogEntry, LogLevel, Platform, Result,
 };
@@ -17,6 +17,8 @@ use mdh_driver::Driver;
 #[derive(Default)]
 struct FakeDriver {
     trees: Mutex<VecDeque<Vec<RawNode>>>,
+    /// The windows on screen at each read, in step with the trees (repeating the last list).
+    windows: Mutex<VecDeque<Vec<WindowInfo>>>,
     inputs: Mutex<Vec<Input>>,
     /// Handed out by the next `logs` call.
     logs: Mutex<Vec<LogEntry>>,
@@ -25,6 +27,20 @@ struct FakeDriver {
 impl FakeDriver {
     fn script(&self, screens: impl IntoIterator<Item = Vec<RawNode>>) {
         *self.trees.lock().unwrap() = screens.into_iter().collect();
+    }
+
+    fn script_windows(&self, windows: impl IntoIterator<Item = Vec<WindowInfo>>) {
+        *self.windows.lock().unwrap() = windows.into_iter().collect();
+    }
+}
+
+/// The next scripted item; the last one stays.
+fn next<T: Clone + Default>(script: &Mutex<VecDeque<T>>) -> T {
+    let mut script = script.lock().unwrap();
+    if script.len() > 1 {
+        script.pop_front().unwrap()
+    } else {
+        script.front().cloned().unwrap_or_default()
     }
 }
 
@@ -37,16 +53,10 @@ impl Driver for FakeDriver {
         Ok(vec![device()])
     }
     async fn ui_tree(&self, _: &Device) -> Result<RawTree> {
-        let mut trees = self.trees.lock().unwrap();
-        let roots = if trees.len() > 1 {
-            trees.pop_front().unwrap()
-        } else {
-            trees.front().cloned().unwrap_or_default()
-        };
         Ok(RawTree {
-            roots,
+            roots: next(&self.trees),
             source: TreeSource::Helper,
-            windows: Vec::new(),
+            windows: next(&self.windows),
         })
     }
     async fn foreground_activity(&self, _: &Device) -> Result<Option<String>> {
@@ -100,6 +110,32 @@ fn device() -> Device {
         api: None,
         manufacturer: None,
     }
+}
+
+/// The app's window alone on a 1000 × 2000 screen.
+fn uncovered() -> Vec<WindowInfo> {
+    vec![WindowInfo {
+        kind: WindowKind::Application,
+        active: true,
+        focused: true,
+        title: None,
+        package: Some("com.example".into()),
+        bounds: Rect::new(0, 0, 1000, 2000),
+    }]
+}
+
+/// The app's window under a system window (a bar, the keyboard) at `bounds`.
+fn under(kind: WindowKind, bounds: Rect) -> Vec<WindowInfo> {
+    let mut windows = vec![WindowInfo {
+        kind,
+        active: false,
+        focused: false,
+        title: None,
+        package: Some("com.android.systemui".into()),
+        bounds,
+    }];
+    windows.extend(uncovered());
+    windows
 }
 
 /// A settings screen with a Wi-Fi switch row whose state is `on`; `shift` moves it (animation).
@@ -228,6 +264,40 @@ async fn missing_targets_fail_without_input() {
         .unwrap_err();
     assert!(matches!(err, Error::ElementNotFound { .. }), "{err}");
     assert!(driver.inputs.lock().unwrap().is_empty());
+}
+
+/// The keyboard slides in over an app that doesn't move for it: the tree is the same in every
+/// frame, the windows aren't. Seen on Now in Android's search screen, where a tap came back
+/// with the keyboard halfway up.
+#[tokio::test]
+async fn an_action_settles_once_the_keyboard_has_stopped_moving() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([screen(false, 0)]);
+    let keyboard = |top| under(WindowKind::InputMethod, Rect::new(0, top, 1000, top + 800));
+    // Before the tap, three frames of the keyboard coming up, then where it stays.
+    driver.script_windows([
+        uncovered(),
+        keyboard(1900),
+        keyboard(1500),
+        keyboard(1200),
+        keyboard(1200),
+    ]);
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let outcome = session
+        .act(
+            Action::Tap {
+                target: Target::parse("Wi-Fi").unwrap(),
+            },
+            &mut Timings::default(),
+        )
+        .await
+        .unwrap();
+    assert!(outcome.settled);
+    assert!(outcome.screen.keyboard);
+    assert_eq!(
+        outcome.screen.obstructions,
+        [Rect::new(0, 1200, 1000, 2000)]
+    );
 }
 
 #[tokio::test]
