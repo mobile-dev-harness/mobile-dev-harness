@@ -6,7 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::grade::Outcome;
 use crate::setup::Setup;
-use crate::task::Kind;
+use crate::task::{Kind, Level, Source};
+
+fn first_prompt() -> u32 {
+    1
+}
 
 /// One run, as `results.jsonl` keeps it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +27,22 @@ pub struct Record {
     /// The device: AVD, API level, display size and density.
     #[serde(default)]
     pub device: Option<String>,
+    /// The prompt's answer format (`agent::PROMPT_VERSION`); version 1's results have none.
+    #[serde(default = "first_prompt")]
+    pub prompt: u32,
+    #[serde(default)]
+    pub app: Option<String>,
+    #[serde(default)]
+    pub level: Option<Level>,
+    #[serde(default)]
+    pub source: Option<Source>,
+    /// The agent ran the app on the device after its last code change.
+    #[serde(default)]
+    pub checked: Option<bool>,
+    /// Whether it works: the truth of a verify task, the hidden checks of a fix task (`None`: the
+    /// grader couldn't tell). Version 1's results have none; `works` and the outcome tell.
+    #[serde(default)]
+    pub truth: Option<bool>,
     pub outcome: Outcome,
     /// The agent's answer: PASS / FIXED is true.
     pub answer: Option<bool>,
@@ -63,6 +83,75 @@ fn pct(n: usize, d: usize) -> String {
     }
 }
 
+impl Record {
+    /// Whether what the agent judged or fixed works.
+    fn works(&self) -> Option<bool> {
+        if self.truth.is_some() {
+            return self.truth;
+        }
+        match self.kind {
+            Kind::Fix => self.works,
+            Kind::Verify => match (self.outcome, self.answer) {
+                (Outcome::Correct, a) => a,
+                (Outcome::FalsePass, _) => Some(false),
+                (Outcome::FalseFail, _) => Some(true),
+                _ => None,
+            },
+        }
+    }
+}
+
+/// The rates of a group of runs, grader errors left out.
+struct Rates {
+    runs: usize,
+    correct: usize,
+    false_pass: (usize, usize),
+    precision: (usize, usize),
+    false_fail: (usize, usize),
+    abstained: usize,
+    no_answer: usize,
+    resolved: (usize, usize),
+    unchecked: (usize, usize),
+}
+
+impl Rates {
+    fn of(records: &[&Record]) -> Rates {
+        let r: Vec<&&Record> = records
+            .iter()
+            .filter(|x| x.outcome != Outcome::GraderError)
+            .collect();
+        let count = |f: &dyn Fn(&Record) -> bool| r.iter().filter(|x| f(x)).count();
+        let claims: Vec<&&&Record> = r.iter().filter(|x| x.answer == Some(true)).collect();
+        let fixes = count(&|x| x.kind == Kind::Fix);
+        Rates {
+            runs: r.len(),
+            correct: count(&|x| x.outcome == Outcome::Correct),
+            false_pass: (
+                count(&|x| x.outcome == Outcome::FalsePass),
+                count(&|x| x.works() == Some(false)),
+            ),
+            precision: (
+                claims.iter().filter(|x| x.works() == Some(true)).count(),
+                claims.len(),
+            ),
+            false_fail: (
+                count(&|x| x.outcome == Outcome::FalseFail),
+                count(&|x| x.works() == Some(true)),
+            ),
+            abstained: count(&|x| x.outcome == Outcome::Abstained),
+            no_answer: count(&|x| x.outcome == Outcome::NoAnswer),
+            resolved: (
+                count(&|x| x.kind == Kind::Fix && x.works == Some(true)),
+                fixes,
+            ),
+            unchecked: (
+                claims.iter().filter(|x| x.checked == Some(false)).count(),
+                claims.iter().filter(|x| x.checked.is_some()).count(),
+            ),
+        }
+    }
+}
+
 pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
     let mut models: Vec<String> = records
         .iter()
@@ -85,47 +174,30 @@ pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
     }
     out.extend([
         String::new(),
-        "| | Correct | False pass | False fail | Fixed | No answer | Cost / run | Tokens / run | Tool calls | Screenshots | Time / run |".to_owned(),
-        "|---|---|---|---|---|---|---|---|---|---|---|".to_owned(),
+        "| | Correct | False pass | Claim precision | False fail | Abstained | No answer | Resolved | Unchecked claims | Cost / run | Tokens / run | Tool calls | Screenshots | Time / run |".to_owned(),
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|".to_owned(),
     ]);
+    let by_setup =
+        |s: &Setup| -> Vec<&Record> { records.iter().filter(|r| r.setup == s.key()).collect() };
     for s in setups {
-        let r: Vec<&Record> = records.iter().filter(|r| r.setup == s.key()).collect();
+        let r = by_setup(s);
         if r.is_empty() {
             continue;
         }
-        let count = |o: Outcome| r.iter().filter(|x| x.outcome == o).count();
-        // A false pass can only happen where it doesn't work; a false fail where it does.
-        let broken = r
-            .iter()
-            .filter(|x| match x.kind {
-                Kind::Verify => {
-                    x.outcome == Outcome::FalsePass
-                        || (x.outcome == Outcome::Correct && x.answer == Some(false))
-                }
-                Kind::Fix => x.works == Some(false),
-            })
-            .count();
-        let working = r
-            .iter()
-            .filter(|x| match x.kind {
-                Kind::Verify => {
-                    x.outcome == Outcome::FalseFail
-                        || (x.outcome == Outcome::Correct && x.answer == Some(true))
-                }
-                Kind::Fix => x.works == Some(true),
-            })
-            .count();
+        let rates = Rates::of(&r);
         let m = |f: &dyn Fn(&Record) -> f64| median(r.iter().map(|x| f(x)).collect());
-        let fixes: Vec<&&Record> = r.iter().filter(|x| x.kind == Kind::Fix).collect();
-        let fixed = fixes.iter().filter(|x| x.works == Some(true)).count();
+        let ratio = |(n, d): (usize, usize)| pct(n, d);
         out.push(format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {:.0}k | {:.0} | {:.0} | {:.1} min |",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {:.0}k | {:.0} | {:.0} | {:.1} min |",
             s.name(),
-            pct(count(Outcome::Correct), r.len()),
-            pct(count(Outcome::FalsePass), broken),
-            pct(count(Outcome::FalseFail), working),
-            pct(fixed, fixes.len()),
-            pct(count(Outcome::NoAnswer), r.len()),
+            pct(rates.correct, rates.runs),
+            ratio(rates.false_pass),
+            ratio(rates.precision),
+            ratio(rates.false_fail),
+            pct(rates.abstained, rates.runs),
+            pct(rates.no_answer, rates.runs),
+            ratio(rates.resolved),
+            ratio(rates.unchecked),
             if priced {
                 format!("${:.2}", m(&|x| x.cost_usd))
             } else {
@@ -140,15 +212,88 @@ pub fn markdown(records: &[Record], setups: &[Setup]) -> String {
     out.push(String::new());
     out.push(
         "Correct: verify tasks judged right, fix tasks fixed and said so. False pass: said it works \
-         (or is fixed) when it doesn't, of the runs where it doesn't. False fail: said it doesn't when \
-         it does, of the runs where it does (an agent without a device that fixed the bug but couldn't \
-         check it lands here). Fixed: fix tasks whose hidden checks pass, whatever the agent said. \
-         Medians per run."
+         (or is fixed), of the runs where it doesn't. Claim precision: of the PASS / FIXED answers, \
+         those that are true. False fail: said it doesn't work, of the runs where it does. Abstained: \
+         answered UNVERIFIED. Resolved: fix tasks whose hidden checks pass, whatever the agent said. \
+         Unchecked claims: PASS / FIXED answers from runs that never ran the app after their last code \
+         change. Grader errors are left out. Medians per run."
             .into(),
     );
+    for (title, key) in [("Level", Group::Level), ("Source", Group::Source)] {
+        if let Some(table) = grouped(records, setups, title, key) {
+            out.push(String::new());
+            out.push(table);
+        }
+    }
+    let errors: Vec<String> = records
+        .iter()
+        .filter(|r| r.outcome == Outcome::GraderError)
+        .map(|r| format!("- {} · {} · run {}: {}", r.task, r.setup, r.rep, r.detail))
+        .collect();
+    if !errors.is_empty() {
+        out.push(String::new());
+        out.push(format!("Grader errors, left out ({}):", errors.len()));
+        out.extend(errors);
+    }
     out.push(String::new());
     out.push(by_task(records, setups));
     out.join("\n")
+}
+
+#[derive(Clone, Copy)]
+enum Group {
+    Level,
+    Source,
+}
+
+/// Correct and false-pass rates per level (or source) and setup; `None` when no run has one.
+fn grouped(records: &[Record], setups: &[Setup], title: &str, key: Group) -> Option<String> {
+    let label = |r: &Record| -> Option<String> {
+        match key {
+            Group::Level => r.level.map(|l| format!("{l:?}")),
+            Group::Source => r.source.map(|s| format!("{s:?}").to_lowercase()),
+        }
+    };
+    let mut groups: BTreeMap<String, Vec<&Record>> = BTreeMap::new();
+    for r in records {
+        if let Some(l) = label(r) {
+            groups.entry(l).or_default().push(r);
+        }
+    }
+    if groups.is_empty() {
+        return None;
+    }
+    let shown: Vec<&Setup> = setups
+        .iter()
+        .filter(|s| records.iter().any(|r| r.setup == s.key()))
+        .collect();
+    let mut out = vec![
+        format!(
+            "| {title} (correct · false pass) | {} |",
+            shown
+                .iter()
+                .map(|s| s.name())
+                .collect::<Vec<_>>()
+                .join(" | ")
+        ),
+        format!("|---|{}", "---|".repeat(shown.len())),
+    ];
+    for (group, rs) in &groups {
+        let cells: Vec<String> = shown
+            .iter()
+            .map(|s| {
+                let r: Vec<&Record> = rs.iter().copied().filter(|r| r.setup == s.key()).collect();
+                let rates = Rates::of(&r);
+                format!(
+                    "{} · {}",
+                    pct(rates.correct, rates.runs),
+                    pct(rates.false_pass.0, rates.false_pass.1)
+                )
+            })
+            .collect();
+        out.push(format!("| {group} | {} |", cells.join(" | ")));
+    }
+    Some(out.join("\n"))
 }
 
 /// Per task and setup: the outcomes of its runs.
@@ -195,7 +340,11 @@ fn by_task(records: &[Record], setups: &[Setup]) -> String {
         out.push(format!("| {task} | {} |", cells.join(" | ")));
     }
     out.push(String::new());
-    out.push("✓ correct · ✗ false pass · ⊘ false fail · – not fixed, said so · ? no answer".into());
+    out.push(
+        "✓ correct · ✗ false pass · ⊘ false fail · – not fixed, said so · ~ unverified · ? no answer \
+         · ! grader error"
+            .into(),
+    );
     out.join("\n")
 }
 
@@ -205,6 +354,8 @@ fn mark(o: Outcome) -> &'static str {
         Outcome::FalsePass => "✗",
         Outcome::FalseFail => "⊘",
         Outcome::HonestFail => "–",
+        Outcome::Abstained => "~",
         Outcome::NoAnswer => "?",
+        Outcome::GraderError => "!",
     }
 }

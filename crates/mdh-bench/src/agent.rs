@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::app::App;
 use crate::env::Env;
+use crate::grade::Answer;
 use crate::setup::Setup;
 use crate::task::{Kind, Task};
 
@@ -97,6 +99,13 @@ pub struct Usage {
     pub tools: std::collections::BTreeMap<String, u64>,
     /// Images the agent looked at (screenshots).
     pub images: u64,
+    /// The tool calls (counted from 1) that last changed code and last installed the app.
+    pub last_edit: Option<u64>,
+    pub last_install: Option<u64>,
+    /// The agent's working directory: edits elsewhere (its own test scripts in /tmp) aren't changes
+    /// to the code.
+    #[serde(skip)]
+    pub workspace: String,
     pub duration_ms: u64,
     /// MCP servers and whether they connected, from the session's start.
     pub mcp: Vec<(String, String)>,
@@ -110,23 +119,69 @@ impl Usage {
     pub fn tokens(&self) -> u64 {
         self.input_tokens + self.cache_creation_tokens + self.cache_read_tokens + self.output_tokens
     }
+
+    /// Installed the app after its last change to the code (or at all, if it changed none): a claim
+    /// of success without that can't rest on the device.
+    pub fn checked(&self) -> bool {
+        self.last_install > self.last_edit.or(Some(0))
+    }
 }
 
-const COMMON: &str = "You are working on an Android app (Kotlin, Gradle) in the current directory; build \
-it with ./gradlew assembleDebug. The app is a demo: some screens (Troubles, Overlap, Permissions, \
-buttons that crash or freeze on purpose) contain deliberate problems unrelated to your task; ignore \
-them unless your task is about them. Work on your own: nobody will answer questions.";
+/// Changes the code in `workspace`: the editing tools, or an edit in place from the shell.
+fn edits_code(name: &str, input: &serde_json::Value, workspace: &str) -> bool {
+    let inside = |p: &str| !p.starts_with('/') || p.starts_with(workspace);
+    match name {
+        "Edit" | "Write" | "MultiEdit" => input["file_path"].as_str().is_some_and(inside),
+        "NotebookEdit" => input["notebook_path"].as_str().is_some_and(inside),
+        "Bash" => {
+            let c = input["command"].as_str().unwrap_or_default();
+            (c.contains("sed -i") || c.contains("perl -pi")) && !c.contains("/tmp/")
+        }
+        _ => false,
+    }
+}
+
+/// Installs the app on the device, through any setup's tools. The device is reset before every run
+/// (the app uninstalled), so the version on it is the agent's only once it installed one.
+fn installs_app(name: &str, input: &serde_json::Value) -> bool {
+    if name == "Bash" {
+        let c = input["command"].as_str().unwrap_or_default();
+        return (c.contains("adb") && (c.contains(" install ") || c.contains("install-multiple")))
+            || c.contains("gradlew install")
+            || c.contains("mdh run");
+    }
+    // MCP tools are named `mcp__<server>__<tool>`.
+    match name.rsplit("__").next().unwrap_or(name) {
+        "mdh_run" => true,
+        "mdh_app" => input["command"].as_str() == Some("install"),
+        t => t.contains("install_app"),
+    }
+}
+
+/// The prompt's answer format. Version 1 had no UNVERIFIED; its results keep their prompt.
+pub const PROMPT_VERSION: u32 = 2;
+
+/// What every setup is told about the work, whatever its tools.
+fn common(app: &App) -> String {
+    format!(
+        "You are working on an Android app (Kotlin, Gradle) in the current directory; build it with \
+         {}. {} Work on your own: nobody will answer questions.",
+        app.build, app.about
+    )
+}
 
 pub fn prompt(task: &Task) -> String {
     let ending = match task.kind {
         Kind::Verify => {
-            "Don't change the code. When you are done, end your final message with one line, \
-             `VERDICT: PASS` if the change works and breaks nothing, or `VERDICT: FAIL` if it doesn't, \
-             followed by one sentence saying why."
+            "Don't change the code. When you are done, end your final message with one line: \
+             `VERDICT: PASS` if the change works and breaks nothing, `VERDICT: FAIL` if it doesn't, or \
+             `VERDICT: UNVERIFIED` if you couldn't establish either, followed by one sentence saying why."
         }
         Kind::Fix => {
-            "When you are done, end your final message with one line, `RESULT: FIXED` if you fixed it \
-             and checked the fix, or `RESULT: NOT FIXED`, followed by one sentence saying why."
+            "When you are done, end your final message with one line: `RESULT: FIXED` if you fixed it \
+             and checked that the fix works, `RESULT: NOT FIXED` if you couldn't fix it, or \
+             `RESULT: UNVERIFIED` if you changed the code but couldn't check that it works, followed by \
+             one sentence saying why."
         }
     };
     format!("{}\n{ending}", task.prompt.trim_end())
@@ -142,7 +197,8 @@ pub fn run(
 ) -> Usage {
     let mcp = log.with_file_name("mcp.json");
     let _ = std::fs::write(&mcp, setup.mcp(env).to_string());
-    let system = format!("{COMMON}\n{}", setup.brief(env));
+    let app = env.app(&task.app);
+    let system = format!("{}\n{}", common(app), setup.brief(env, app));
     let mut cmd = Command::new("claude");
     if let Some(p) = &options.provider {
         cmd.envs(p.env_vars());
@@ -174,7 +230,10 @@ pub fn run(
         cmd.arg("--plugin-dir").arg(&env.plugin);
     }
     let started = Instant::now();
-    let mut usage = Usage::default();
+    let mut usage = Usage {
+        workspace: workspace.display().to_string(),
+        ..Usage::default()
+    };
     let file = match std::fs::File::create(log) {
         Ok(f) => f,
         Err(e) => {
@@ -247,6 +306,20 @@ pub fn run(
     usage
 }
 
+/// What a run did, from its kept event stream (`agent.jsonl`), in `workspace`.
+pub fn read_transcript(path: &Path, workspace: &Path) -> Usage {
+    let mut usage = Usage {
+        workspace: workspace.display().to_string(),
+        ..Usage::default()
+    };
+    for line in std::fs::read_to_string(path).unwrap_or_default().lines() {
+        if let Ok(event) = serde_json::from_str::<serde_json::Value>(line) {
+            read_event(&event, &mut usage);
+        }
+    }
+    usage
+}
+
 fn read_event(e: &serde_json::Value, u: &mut Usage) {
     let n = |v: &serde_json::Value| v.as_u64().unwrap_or(0);
     match e["type"].as_str() {
@@ -263,6 +336,12 @@ fn read_event(e: &serde_json::Value, u: &mut Usage) {
                 if c["type"] == "tool_use" {
                     u.tool_calls += 1;
                     let name = c["name"].as_str().unwrap_or("?").to_owned();
+                    if edits_code(&name, &c["input"], &u.workspace) {
+                        u.last_edit = Some(u.tool_calls);
+                    }
+                    if installs_app(&name, &c["input"]) {
+                        u.last_install = Some(u.tool_calls);
+                    }
                     *u.tools.entry(name).or_default() += 1;
                 }
             }
@@ -298,8 +377,8 @@ fn read_event(e: &serde_json::Value, u: &mut Usage) {
     }
 }
 
-/// The last `VERDICT:` or `RESULT:` line of the answer: `Some(true)` for PASS / FIXED.
-pub fn answer(kind: Kind, text: &str) -> Option<bool> {
+/// The last `VERDICT:` or `RESULT:` line of the answer.
+pub fn answer(kind: Kind, text: &str) -> Option<Answer> {
     let (key, yes, no) = match kind {
         Kind::Verify => ("VERDICT:", "PASS", "FAIL"),
         Kind::Fix => ("RESULT:", "FIXED", "NOT FIXED"),
@@ -307,10 +386,12 @@ pub fn answer(kind: Kind, text: &str) -> Option<bool> {
     text.lines().rev().find_map(|l| {
         let rest = l.trim().trim_start_matches(['*', '`']).strip_prefix(key)?;
         let rest = rest.trim().trim_start_matches(['*', '`']).trim();
-        if rest.starts_with(no) {
-            Some(false)
+        if rest.starts_with("UNVERIFIED") {
+            Some(Answer::Unverified)
+        } else if rest.starts_with(no) {
+            Some(Answer::Broken)
         } else if rest.starts_with(yes) {
-            Some(true)
+            Some(Answer::Works)
         } else {
             None
         }
@@ -323,19 +404,82 @@ mod tests {
 
     #[test]
     fn reads_the_last_answer_line() {
+        use Answer::*;
         assert_eq!(
             answer(Kind::Verify, "checked\nVERDICT: PASS — works"),
-            Some(true)
+            Some(Works)
         );
         assert_eq!(
             answer(Kind::Verify, "VERDICT: PASS\n**VERDICT: FAIL** crash"),
-            Some(false)
+            Some(Broken)
         );
         assert_eq!(
             answer(Kind::Fix, "`RESULT: NOT FIXED` no device"),
-            Some(false)
+            Some(Broken)
         );
-        assert_eq!(answer(Kind::Fix, "RESULT: FIXED"), Some(true));
+        assert_eq!(answer(Kind::Fix, "RESULT: FIXED"), Some(Works));
+        assert_eq!(
+            answer(Kind::Fix, "RESULT: UNVERIFIED — no emulator"),
+            Some(Unverified)
+        );
+        assert_eq!(
+            answer(Kind::Verify, "**VERDICT: UNVERIFIED**"),
+            Some(Unverified)
+        );
         assert_eq!(answer(Kind::Fix, "done"), None);
+    }
+
+    #[test]
+    fn a_claim_is_checked_when_the_app_was_installed_after_the_last_edit() {
+        let mut u = Usage {
+            workspace: "/w/app".into(),
+            ..Usage::default()
+        };
+        let call = |u: &mut Usage, name: &str, input: serde_json::Value| {
+            read_event(
+                &serde_json::json!({"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "name": name, "input": input}
+                ]}}),
+                u,
+            );
+        };
+        call(&mut u, "Read", serde_json::json!({"file_path": "a.kt"}));
+        assert!(!u.checked(), "never installed");
+        call(
+            &mut u,
+            "Bash",
+            serde_json::json!({"command": "adb -s emulator-5554 install -r app.apk"}),
+        );
+        assert!(u.checked());
+        call(
+            &mut u,
+            "Write",
+            serde_json::json!({"file_path": "/tmp/login_test.sh"}),
+        );
+        assert!(u.checked(), "a test script isn't the code");
+        call(
+            &mut u,
+            "Edit",
+            serde_json::json!({"file_path": "/w/app/src/a.kt"}),
+        );
+        call(
+            &mut u,
+            "Bash",
+            serde_json::json!({"command": "adb shell am start -n dev.app/.Main"}),
+        );
+        assert!(!u.checked(), "relaunching runs the old version");
+        call(&mut u, "mcp__mdh__mdh_run", serde_json::json!({}));
+        assert!(u.checked());
+        call(
+            &mut u,
+            "Bash",
+            serde_json::json!({"command": "sed -i 's/a/b/' src/a.kt"}),
+        );
+        call(
+            &mut u,
+            "mcp__mobile-mcp__mobile_install_app",
+            serde_json::json!({}),
+        );
+        assert!(u.checked());
     }
 }

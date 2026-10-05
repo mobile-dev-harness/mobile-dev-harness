@@ -1,7 +1,14 @@
-//! Where things are: the repository, the sample app, the tools, the device.
+//! Where things are: the repository, the apps, the tools, the device.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use crate::app::App;
+
+/// The time zone every run starts in (bench/DESIGN.md, 4). Demo articles are published at 23:00 UTC:
+/// a date formatted in UTC instead of local time shows only east of UTC+1.
+pub const TIME_ZONE: &str = "America/Los_Angeles";
 
 #[derive(Debug, Clone)]
 pub struct Env {
@@ -14,6 +21,7 @@ pub struct Env {
     pub serial: String,
     /// The device the run started on; every run must find the same one.
     pub device: Identity,
+    pub apps: BTreeMap<String, App>,
 }
 
 /// What makes runs on a device comparable: an agent that restarts the emulator with another AVD
@@ -76,6 +84,7 @@ impl Env {
             return Err("build mdh first: cargo build --release --bin mdh".into());
         }
         let plugin = repo.join("integrations/claude-code");
+        let apps = crate::app::load_all(&repo)?;
         let env = Env {
             repo,
             sdk,
@@ -83,6 +92,7 @@ impl Env {
             plugin,
             serial: String::new(),
             device: Identity::default(),
+            apps,
         };
         let out = env.adb(&["devices"])?;
         let online: Vec<&str> = out
@@ -108,8 +118,8 @@ impl Env {
         }
     }
 
-    pub fn sample(&self) -> PathBuf {
-        self.repo.join("examples/android-sample")
+    pub fn app(&self, name: &str) -> &App {
+        &self.apps[name]
     }
 
     pub fn adb_path(&self) -> PathBuf {
@@ -144,11 +154,17 @@ impl Env {
         }
     }
 
-    /// The device as every run finds it: the app gone, settings at their defaults, home screen.
+    /// The device as every run finds it: no app of the benchmark installed, settings at their
+    /// defaults, home screen.
     pub fn reset_device(&self) {
+        for app in self.apps.values() {
+            let _ = self.adb(&[
+                "shell",
+                &format!("am force-stop {0}; pm uninstall {0}", app.package),
+            ]);
+        }
+        let _ = self.adb(&["shell", &format!("cmd alarm set-timezone {TIME_ZONE}")]);
         for cmd in [
-            "am force-stop dev.mdh.sample",
-            "pm uninstall dev.mdh.sample",
             "settings put global window_animation_scale 1",
             "settings put global transition_animation_scale 1",
             "settings put global animator_duration_scale 1",

@@ -1,8 +1,11 @@
-//! Tasks: a seeded bug (or a change to verify) in the sample app, the prompt, and the truth.
+//! Tasks: a seeded bug (or a change to verify) in an app, the prompt, and the truth.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+
+use crate::app::App;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -18,6 +21,31 @@ pub enum Kind {
 pub enum Truth {
     Pass,
     Fail,
+}
+
+/// The least evidence that decides a task (bench/DESIGN.md, 3.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, serde::Serialize)]
+pub enum Level {
+    /// The code or the diff.
+    L0,
+    /// Running the app on one path.
+    L1,
+    /// Running it under a condition, or over several steps.
+    L2,
+    /// Measuring, or looking away from the change.
+    L3,
+}
+
+/// Where a task comes from: results on re-injected real bugs are reported apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Source {
+    /// A real bug put back into the pinned commit, with its issue (`upstream`).
+    Real,
+    /// A bug written for the benchmark.
+    Synthetic,
+    /// A change from a real pull request (verify tasks).
+    Pr,
 }
 
 /// A literal replacement in one file.
@@ -37,6 +65,23 @@ pub struct Task {
     #[serde(skip)]
     pub dir: PathBuf,
     pub kind: Kind,
+    /// The app, from `bench/apps.yaml`.
+    #[serde(default = "sample")]
+    pub app: String,
+    /// Version 1's tasks have none.
+    #[serde(default)]
+    pub level: Option<Level>,
+    #[serde(default)]
+    pub source: Option<Source>,
+    /// The upstream issue a real bug comes from, `owner/repo#123`.
+    #[serde(default)]
+    pub upstream: Option<String>,
+    /// Verify tasks: the other half of the pair (the same description, the opposite truth).
+    #[serde(default)]
+    pub pair: Option<String>,
+    /// Kept out of the published task set (bench/DESIGN.md, 8).
+    #[serde(default)]
+    pub private: bool,
     /// What the task seeds, for the report.
     pub summary: String,
     /// Verify tasks: whether the change is correct.
@@ -51,22 +96,24 @@ pub struct Task {
     /// The reference fix, to validate the hidden checks.
     #[serde(default)]
     pub fix: Vec<Edit>,
+    /// Other correct fixes: the checks must accept them too.
+    #[serde(default)]
+    pub alternatives: Vec<Vec<Edit>>,
     pub prompt: String,
+}
+
+fn sample() -> String {
+    "sample".into()
 }
 
 impl Task {
     /// Hidden checks: mdh flows the grader replays after the agent is done (never shown to it).
     pub fn checks(&self) -> Vec<PathBuf> {
-        let mut out: Vec<PathBuf> = std::fs::read_dir(self.dir.join("checks"))
-            .map(|d| d.flatten().map(|e| e.path()).collect())
-            .unwrap_or_default();
-        out.retain(|p| p.extension().is_some_and(|e| e == "yaml"));
-        out.sort();
-        out
+        crate::app::yaml_files(&self.dir.join("checks"))
     }
 }
 
-pub fn load_all(root: &Path) -> Result<Vec<Task>, String> {
+pub fn load_all(root: &Path, apps: &BTreeMap<String, App>) -> Result<Vec<Task>, String> {
     let mut tasks = Vec::new();
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(root)
         .map_err(|e| format!("{}: {e}", root.display()))?
@@ -97,7 +144,27 @@ pub fn load_all(root: &Path) -> Result<Vec<Task>, String> {
         if t.checks().is_empty() {
             return Err(format!("{}: no checks/*.yaml", t.id));
         }
+        if !apps.contains_key(&t.app) {
+            return Err(format!("{}: no app {} in bench/apps.yaml", t.id, t.app));
+        }
         tasks.push(t);
+    }
+    // A pair names each other and has opposite truths.
+    for t in &tasks {
+        let Some(other) = &t.pair else { continue };
+        let ok = tasks.iter().any(|o| {
+            &o.id == other
+                && o.pair.as_deref() == Some(t.id.as_str())
+                && o.kind == Kind::Verify
+                && t.kind == Kind::Verify
+                && o.truth != t.truth
+        });
+        if !ok {
+            return Err(format!(
+                "{}: pair {other} must be a verify task naming it back, with the opposite truth",
+                t.id
+            ));
+        }
     }
     Ok(tasks)
 }

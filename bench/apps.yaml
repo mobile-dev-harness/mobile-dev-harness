@@ -1,0 +1,24 @@
+# The apps tasks run on; a task names one with `app:` (default: sample). An app is a directory in this
+# repository (`path`) or a pinned commit of another one (`repository`, `commit`), checked out once under
+# ~/.cache/mdh-bench. Regression flows every task on the app must keep passing (PASS_TO_PASS) live in
+# bench/apps/<name>/regression/.
+
+sample:
+  path: examples/android-sample
+  package: dev.mdh.sample
+  build: ./gradlew assembleDebug
+  apk: build/outputs/apk/debug/
+  about: >-
+    The app is a demo: some screens (Troubles, Overlap, Permissions, buttons that crash or freeze on
+    purpose) contain deliberate problems unrelated to your task; ignore them unless your task is about them.
+
+nowinandroid:
+  repository: https://github.com/android/nowinandroid
+  commit: a49ed253d75e61a2b6ab80a8da677b57437b08eb
+  module: app
+  variant: demoDebug
+  package: com.google.samples.apps.nowinandroid.demo.debug
+  build: ./gradlew assembleDemoDebug
+  apk: app/build/outputs/apk/demo/debug/
+  about: >-
+    The app is Now in Android, built with its demo flavor: the content is local, there is no backend.

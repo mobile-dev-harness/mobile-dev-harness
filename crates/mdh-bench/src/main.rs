@@ -2,9 +2,11 @@
 //! reports false passes, false fails, tokens, tool calls and time (milestone M10).
 
 mod agent;
+mod app;
 mod env;
 mod grade;
 mod report;
+mod review;
 mod setup;
 mod task;
 mod workspace;
@@ -17,6 +19,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 
 use crate::env::Env;
+use crate::grade::Outcome;
 use crate::report::Record;
 use crate::setup::Setup;
 use crate::task::{Kind, Task, Truth};
@@ -71,6 +74,30 @@ enum Cmd {
     },
     /// Print the results table of a run directory
     Report { out: PathBuf },
+    /// Grade recorded fix runs again from their kept workspaces, and read every run's transcript
+    /// again (unchecked claims); results.jsonl is rewritten, the old one kept as results.jsonl.bak
+    Regrade {
+        out: PathBuf,
+        #[arg(long, value_delimiter = ',')]
+        tasks: Vec<String>,
+        /// Only runs graded as not working or as grader errors
+        #[arg(long)]
+        failed_only: bool,
+        /// Read the transcripts only; no device needed
+        #[arg(long)]
+        transcripts_only: bool,
+    },
+    /// Have a model from another family review tasks against the checklist (bench/DESIGN.md, 3.4);
+    /// writes bench/tasks/<id>/review.md
+    Review {
+        #[arg(long, default_value = "glm")]
+        provider: String,
+        #[arg(long, value_delimiter = ',')]
+        tasks: Vec<String>,
+        /// Review tasks that already have a review
+        #[arg(long)]
+        again: bool,
+    },
     /// Check a provider before a run: it answers, calls a tool, and reads an image (screenshots)
     Probe {
         #[arg(long)]
@@ -116,6 +143,17 @@ fn main() -> ExitCode {
                 )
             }),
         Cmd::Report { out } => report(&out),
+        Cmd::Regrade {
+            out,
+            tasks,
+            failed_only,
+            transcripts_only,
+        } => regrade(&cli.repo, &out, &tasks, failed_only, transcripts_only),
+        Cmd::Review {
+            provider,
+            tasks,
+            again,
+        } => review::run(&cli.repo, &provider, &tasks, again),
         Cmd::Probe { provider, model } => probe(provider.as_deref(), &model),
     };
     match result {
@@ -127,8 +165,12 @@ fn main() -> ExitCode {
     }
 }
 
-fn selected(repo: &Path, names: &[String]) -> Result<Vec<Task>, String> {
-    let all = task::load_all(&repo.join("bench/tasks"))?;
+fn all_tasks(repo: &Path) -> Result<Vec<Task>, String> {
+    task::load_all(&repo.join("bench/tasks"), &app::load_all(repo)?)
+}
+
+pub(crate) fn selected(repo: &Path, names: &[String]) -> Result<Vec<Task>, String> {
+    let all = all_tasks(repo)?;
     if names.is_empty() {
         return Ok(all);
     }
@@ -141,18 +183,35 @@ fn selected(repo: &Path, names: &[String]) -> Result<Vec<Task>, String> {
 }
 
 fn list(repo: &Path) -> Result<(), String> {
-    for t in task::load_all(&repo.join("bench/tasks"))? {
+    for t in all_tasks(repo)? {
         let truth = match (t.kind, t.truth) {
             (Kind::Verify, Some(Truth::Pass)) => "verify, correct",
             (Kind::Verify, _) => "verify, broken",
             (Kind::Fix, _) => "fix",
         };
-        println!("{:32} {truth:16} {}", t.id, t.summary);
+        let level = t.level.map_or("–".into(), |l| format!("{l:?}"));
+        let origin = match (&t.upstream, t.source) {
+            (Some(u), _) => u.clone(),
+            (None, Some(s)) => format!("{s:?}").to_lowercase(),
+            (None, None) => String::new(),
+        };
+        println!(
+            "{:32} {:13} {level:3} {truth:16} {}{}{}",
+            t.id,
+            t.app,
+            t.summary,
+            if origin.is_empty() {
+                String::new()
+            } else {
+                format!(" [{origin}]")
+            },
+            if t.private { " (private)" } else { "" }
+        );
     }
     Ok(())
 }
 
-fn scratch(name: &str) -> PathBuf {
+pub(crate) fn scratch(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("mdh-bench-{name}-{}", std::process::id()))
 }
 
@@ -160,29 +219,38 @@ fn validate(repo: &Path, names: &[String]) -> Result<(), String> {
     let env = Env::detect(repo)?;
     let mut bad = 0;
     for t in selected(repo, names)? {
-        let mut cases = vec![(
-            false,
+        let source = env.app(&t.app).source(&env.repo)?;
+        // (what is applied on top, its name, whether the checks must pass)
+        let mut cases: Vec<(Option<&[task::Edit]>, String, bool)> = vec![(
+            None,
+            String::new(),
             t.kind == Kind::Verify && t.truth == Some(Truth::Pass),
         )];
         if t.kind == Kind::Fix {
-            cases.push((true, true));
+            cases.push((Some(&t.fix), " + reference fix".into(), true));
+            for (i, alt) in t.alternatives.iter().enumerate() {
+                cases.push((Some(alt), format!(" + alternative fix {}", i + 1), true));
+            }
         }
-        for (fixed, expect) in cases {
+        for (fix, name, expect) in cases {
             let dir = scratch(&t.id);
             let _ = std::fs::remove_dir_all(&dir);
             let app = dir.join("app");
-            workspace::prepare(&env.sample(), &app, &t, fixed)?;
+            workspace::prepare(&source, &app, &t, &env.sdk, fix)?;
             let checks = grade::checks(&env, &t, &app, &dir.join("grade"));
-            let ok = checks.passed == expect;
+            let ok = !checks.error && checks.passed == expect;
             if !ok {
                 bad += 1;
             }
             println!(
-                "{} {}{}: checks {} (expected {}) — {}",
+                "{} {}{name}: checks {} (expected {}) — {}",
                 if ok { "ok  " } else { "BAD " },
                 t.id,
-                if fixed { " + reference fix" } else { "" },
-                if checks.passed { "pass" } else { "fail" },
+                match (checks.error, checks.passed) {
+                    (true, _) => "error",
+                    (false, true) => "pass",
+                    (false, false) => "fail",
+                },
                 if expect { "pass" } else { "fail" },
                 checks.detail
             );
@@ -283,7 +351,8 @@ fn one(
     let dir = out.join(&t.id).join(format!("{}-{rep}", s.key()));
     let _ = std::fs::remove_dir_all(&dir);
     let app = dir.join("app");
-    workspace::prepare(&env.sample(), &app, t, false)?;
+    let source = env.app(&t.app).source(&env.repo)?;
+    workspace::prepare(&source, &app, t, &env.sdk, None)?;
     let before = workspace::snapshot(&app);
     env.reset_device();
     env.check_device()?;
@@ -301,12 +370,19 @@ fn one(
     let (works, detail) = match t.kind {
         Kind::Fix => {
             let c = grade::checks(env, t, &app, &dir.join("grade"));
-            (Some(c.passed), c.detail)
+            ((!c.error).then_some(c.passed), c.detail)
         }
         Kind::Verify => (None, String::new()),
     };
     env.reset_device();
-    let outcome = grade::outcome(t, answer, works.unwrap_or(false));
+    let outcome = grade::outcome(
+        t,
+        answer,
+        match t.kind {
+            Kind::Fix => works,
+            Kind::Verify => Some(t.truth == Some(Truth::Pass)),
+        },
+    );
     Ok(Record {
         task: t.id.clone(),
         kind: t.kind,
@@ -314,9 +390,22 @@ fn one(
         model: options.model.clone(),
         provider: options.provider.as_ref().map(|p| p.name.clone()),
         device: Some(env.device.to_string()),
+        prompt: agent::PROMPT_VERSION,
+        app: Some(t.app.clone()),
+        level: t.level,
+        source: t.source,
+        checked: Some(usage.checked()),
+        truth: match t.kind {
+            Kind::Fix => works,
+            Kind::Verify => Some(t.truth == Some(Truth::Pass)),
+        },
         rep,
         outcome,
-        answer,
+        answer: answer.and_then(|a| match a {
+            grade::Answer::Works => Some(true),
+            grade::Answer::Broken => Some(false),
+            grade::Answer::Unverified => None,
+        }),
         works,
         detail,
         edited,
@@ -474,6 +563,95 @@ fn probe(provider: Option<&str>, model: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn regrade(
+    repo: &Path,
+    out: &Path,
+    names: &[String],
+    failed_only: bool,
+    transcripts_only: bool,
+) -> Result<(), String> {
+    let results = out.join("results.jsonl");
+    let mut records = load(&results);
+    if records.is_empty() {
+        return Err(format!("no results in {}", out.display()));
+    }
+    let tasks = all_tasks(repo)?;
+    let env = if transcripts_only {
+        None
+    } else {
+        Some(Env::detect(repo)?)
+    };
+    let mut changed = 0;
+    for r in &mut records {
+        if !names.is_empty() && !names.contains(&r.task) {
+            continue;
+        }
+        let Some(t) = tasks.iter().find(|t| t.id == r.task) else {
+            eprintln!("{}: no such task any more, left as it was", r.task);
+            continue;
+        };
+        let dir = out.join(&r.task).join(format!("{}-{}", r.setup, r.rep));
+        let usage = agent::read_transcript(&dir.join("agent.jsonl"), &dir.join("app"));
+        r.checked = Some(usage.checked());
+        let answer = match (r.outcome, r.answer) {
+            (Outcome::Abstained, _) => Some(grade::Answer::Unverified),
+            (_, Some(true)) => Some(grade::Answer::Works),
+            (_, Some(false)) => Some(grade::Answer::Broken),
+            (_, None) => None,
+        };
+        let failed = matches!(r.works, Some(false) | None);
+        if let Some(env) = &env
+            && t.kind == Kind::Fix
+            && (!failed_only || failed)
+        {
+            env.check_device()?;
+            eprintln!(
+                "[{}] regrading {} · {} · run {} …",
+                now(),
+                r.task,
+                r.setup,
+                r.rep
+            );
+            let c = grade::checks(env, t, &dir.join("app"), &dir.join("grade"));
+            let works = (!c.error).then_some(c.passed);
+            if works != r.works {
+                eprintln!("  {:?} → {:?}: {}", r.works, works, c.detail);
+            }
+            r.works = works;
+            r.detail = c.detail;
+        }
+        r.truth = match t.kind {
+            Kind::Fix => r.works,
+            Kind::Verify => Some(t.truth == Some(Truth::Pass)),
+        };
+        let outcome = grade::outcome(t, answer, r.truth);
+        if outcome != r.outcome {
+            changed += 1;
+            eprintln!(
+                "{} · {} · run {}: {:?} → {outcome:?}",
+                r.task, r.setup, r.rep, r.outcome
+            );
+        }
+        r.outcome = outcome;
+    }
+    if let Some(env) = &env {
+        env.reset_device();
+    }
+    let backup = out.join("results.jsonl.bak");
+    if !backup.exists() {
+        std::fs::copy(&results, &backup).map_err(|e| e.to_string())?;
+    }
+    let text: String = records
+        .iter()
+        .map(|r| serde_json::to_string(r).expect("serializable") + "\n")
+        .collect();
+    let tmp = out.join("results.jsonl.tmp");
+    std::fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &results).map_err(|e| e.to_string())?;
+    eprintln!("{changed} outcome(s) changed");
+    report(out)
+}
+
 fn load(path: &Path) -> Vec<Record> {
     std::fs::read_to_string(path)
         .unwrap_or_default()
@@ -493,7 +671,7 @@ fn report(out: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn now() -> String {
+pub(crate) fn now() -> String {
     std::process::Command::new("date")
         .arg("+%H:%M:%S")
         .output()

@@ -97,25 +97,32 @@ are kept with the task and published with it.
 
 ### 3.5 Format
 
+`bench/tasks/<id>/task.yaml`, with the hidden checks in `checks/` and the review in `review.md`:
+
 ```yaml
-id: nia-search-blank-recent        # unique, stable
-app: nowinandroid                  # an entry in bench/apps.yaml (repository, commit, variant, package)
+app: nowinandroid                  # an entry in bench/apps.yaml; default: sample
 level: L1
-source: real                       # real (with `upstream`), synthetic, or pr
+source: real                       # real (with upstream), synthetic, or pr
 upstream: android/nowinandroid#1222
-kind: fix                          # fix, or verify with `truth: pass | fail` and `pair: <id>`
-condition: null                    # what the device needs, e.g. {timezone: Asia/Tokyo}; for the grader only
-summary: A blank query is saved as a recent search
+kind: fix                          # fix, or verify with `truth: pass | fail` and `pair: <the other task>`
+summary: a blank query is saved as a recent search
 prompt: |
   (the issue, as its reporter wrote it)
-defect: defect.patch               # applied and committed: the starting point
-fix: fix.patch                     # the reference fix (fix tasks); verify tasks have change.patch, left uncommitted
-alternatives: [fix-alt.patch]
-checks:                            # hidden mdh flows
-  fail_to_pass: [checks/recent-search.yaml]
-  pass_to_pass: [nowinandroid/regression]   # the app's shared regression flows
+bug:                               # committed: the starting point (verify tasks: `change`, left uncommitted)
+- path: feature/search/impl/src/main/kotlin/.../SearchViewModel.kt
+  find: "        if (query.isBlank()) return\n"
+  replace: ""
+fix:                               # the reference fix
+- path: ...
+  find: ...
+  replace: ...
+alternatives: []                   # other correct fixes, as lists of edits; the checks must pass them too
 private: false
 ```
+
+Edits are literal find/replace pairs; each `find` must occur once. `bench/apps.yaml` names each app's source (a
+directory here, or a repository at a pinned commit), module, variant, package and build command; its
+regression flows (PASS_TO_PASS) live in `bench/apps/<app>/regression/`.
 
 ## 4. Apps and environment
 
@@ -167,9 +174,11 @@ source:
 - **Correct**, **abstained**, **no answer**: shares of all runs. An agent that always abstains has no false
   passes and nothing correct; both numbers are shown together.
 - **Resolved** (fix tasks): the hidden checks pass, whatever was said.
-- **Unchecked claims**: PASS / FIXED answers from runs that, after their last code change, never installed the
-  app and launched it on the device (from the transcript: `adb install`, `am start`, mdh's `run` or `app`,
-  mobile-mcp's install or launch).
+- **Unchecked claims**: PASS / FIXED answers from runs that didn't install the app after their last change to
+  the code (from the transcript: `adb install`, `gradlew install…`, `mdh run`, mdh's `run` or `app install`
+  tools, mobile-mcp's install). The device is reset before every run, so the app on it is the agent's version
+  only once it installed one; relaunching after an edit runs the old one. Edits outside the workspace (the
+  agent's test scripts) don't count.
 - **Cost**: tokens, tool calls, screenshots, time; medians per run.
 
 ## 7. Size, budget, statistics
@@ -218,12 +227,14 @@ Levels are hypotheses for calibration; "real" tasks re-inject the upstream bug.
 
 ## 10. Work before the pilot
 
-- mdh-bench: apps (`bench/apps.yaml`: repository, commit, variant, package, JDK), tasks per app, the device
-  state of section 4 set and checked, `grader_error` with one rerun, the three-way answers, unchecked-claim
-  detection, `regrade` and `review` commands, per-level and per-source reports.
+- mdh-bench: done. Apps (`bench/apps.yaml`), task levels, sources and pairs, the time zone reset before every
+  run, grader errors retried once and left out, the three-way answers, unchecked claims, `regrade` (also
+  re-reads transcripts) and `review`, per-level and per-source tables.
+- mdh: projects with Isolated Projects on (Now in Android) couldn't be read; fixed.
 - mdh: done. A step that can't be checked makes the verdict ERROR, not FAIL; flows set the device they need
   (`setup.device`); rotation locks in one step and survives the helper reconnecting.
 - The device: 4 GB RAM for the AVD.
+- The tasks: 20 pilot tasks with checks, `validate`d, reviewed.
 
 ## 11. Open questions
 

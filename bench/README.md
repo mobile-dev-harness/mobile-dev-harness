@@ -1,5 +1,8 @@
 # Benchmark
 
+Version 2 is being built: its design, the levels and the move to Now in Android are in [DESIGN.md](DESIGN.md).
+This page describes how the benchmark runs.
+
 Does an agent verify Android changes more precisely with mdh? The benchmark measures it: the same agent,
 model and prompt on seeded-bug tasks in the sample app, in four setups, graded against ground truth.
 
@@ -20,21 +23,23 @@ servers, web tools disabled and permissions bypassed.
 
 `bench/tasks/<id>/task.yaml`, each with hidden checks in `checks/` (mdh flows the agent never sees):
 
-- **Verify** tasks: a teammate's uncommitted change and what it should do; the agent answers `VERDICT: PASS` or
-  `VERDICT: FAIL` without changing code. They come in pairs: the same description with a correct and a broken
+- **Verify** tasks: a teammate's uncommitted change and what it should do; the agent answers `VERDICT: PASS`,
+  `VERDICT: FAIL` or `VERDICT: UNVERIFIED` without changing code. They come in pairs: the same description with a correct and a broken
   change, so an agent that always says PASS (or FAIL) scores 50%.
-- **Fix** tasks: a bug report against committed code; the agent fixes it and answers `RESULT: FIXED` or
-  `RESULT: NOT FIXED`. The grader builds the agent's version, installs it and replays the hidden checks.
+- **Fix** tasks: a bug report against committed code; the agent fixes it and answers `RESULT: FIXED`,
+  `RESULT: NOT FIXED` or `RESULT: UNVERIFIED` (changed the code but couldn't check it). The grader builds the agent's version, installs it and replays the hidden checks.
 
 `mdh-bench list` shows them with what each seeds. `mdh-bench validate` checks the graders before anything is
 spent: each broken change and seeded bug fails its checks, each correct change and reference fix passes them.
 
 ## Isolation
 
-Each run starts from a fresh copy of the sample app in its own git repository (the task's bug committed, the
+Tasks run on an app from [`apps.yaml`](apps.yaml): the sample app, or Now in Android at a pinned commit (checked out
+once under `~/.cache/mdh-bench`). Each run starts from a fresh copy of the app in its own git repository (the task's bug committed, the
 change to verify left uncommitted), without build output, saved flows or baselines, so no setup knows the
 expected behavior in advance. Before each run the emulator is reset: the app uninstalled, animations, rotation,
-display size, font scale, dark mode and input methods back to their defaults. Runs go one at a time; repetitions
+display size, font scale, dark mode and input methods back to their defaults, the time zone set to
+America/Los_Angeles. Runs go one at a time; repetitions
 are the outer loop, so drift over hours spreads evenly over the setups.
 
 Every run must find the device the benchmark started on (AVD, API level, display size and density). Agents are
@@ -48,9 +53,13 @@ repository mid-run don't split its runs across versions. The report names the de
 
 - **Correct**: verify tasks judged right; fix tasks fixed and said so.
 - **False pass**: said it works (or is fixed) when it doesn't, of the runs where it doesn't.
-- **False fail**: said it doesn't work (or isn't fixed) when it does, of the runs where it does. An agent without a
-  device that fixed the bug but couldn't check it says NOT FIXED and lands here.
-- **Fixed**: fix tasks whose hidden checks pass, whatever the agent said.
+- **Claim precision**: of the PASS / FIXED answers, the share that are true.
+- **False fail**: said it doesn't work (or isn't fixed) when it does, of the runs where it does.
+- **Abstained**: answered UNVERIFIED; never correct, never false.
+- **Resolved**: fix tasks whose hidden checks pass, whatever the agent said.
+- **Unchecked claims**: PASS / FIXED answers from runs that didn't install the app after their last change to
+  the code.
+- **Grader errors** (the grader couldn't read the screen or lost the device, twice) are listed and left out.
 - Cost (USD, at list price), tokens (input, cache and output), tool calls, screenshots looked at, wall time:
   medians per run, from the agent's event stream.
 
@@ -62,6 +71,11 @@ cargo build --release --bin mdh --bin mdh-bench
 ./target/release/mdh-bench run --out bench/out/<name> --reps 5 --budget 100
 ./target/release/mdh-bench report bench/out/<name>
 ```
+
+`mdh-bench regrade bench/out/<name>` grades recorded fix runs again from their kept workspaces (after a grader
+fix) and re-reads every transcript; `--failed-only` limits it to runs graded as not working or as grader errors,
+`--transcripts-only` needs no device. `mdh-bench review --tasks <id>` has GLM review a task against the checklist
+in DESIGN.md (3.4) and writes `bench/tasks/<id>/review.md`.
 
 Other models: any provider with an Anthropic-compatible endpoint for Claude Code. Put the variables its
 documentation gives for Claude Code in `~/.config/mdh-bench/<name>.env` (`chmod 600`; never in the repository),

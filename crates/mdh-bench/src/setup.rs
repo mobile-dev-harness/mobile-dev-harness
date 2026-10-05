@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crate::app::App;
 use crate::env::Env;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -90,7 +91,7 @@ impl Setup {
     }
 
     /// What the agent is told about its environment.
-    pub fn brief(self, env: &Env) -> String {
+    pub fn brief(self, env: &Env, app: &App) -> String {
         let device = format!(
             "An Android emulator ({}, API {}) is running and is the only device. Leave the device \
              itself alone: don't start, stop or restart the emulator or the adb server, and don't \
@@ -104,11 +105,12 @@ impl Setup {
                     .into()
             }
             Setup::Adb => format!(
-                "{device} adb is on PATH: install the APK from build/outputs/apk/debug/, start activities \
+                "{device} adb is on PATH: install the APK from {apk}, start activities \
                  with `adb shell am start`, drive the UI with `adb shell input tap|text|swipe|keyevent`, \
                  read it with `adb exec-out uiautomator dump /dev/tty`, take screenshots with \
                  `adb exec-out screencap -p > /tmp/screen.png` and look at them with the Read tool, and \
-                 read logs with `adb logcat -d`."
+                 read logs with `adb logcat -d`.",
+                apk = app.apk
             ),
             Setup::MobileMcp => format!(
                 "{device} The mobile-mcp tools drive it: list devices, install and launch apps, list the \
