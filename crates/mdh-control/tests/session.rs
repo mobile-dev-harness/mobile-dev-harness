@@ -3,6 +3,7 @@
 use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use mdh_control::{Action, Control, Direction, Session, Target};
@@ -266,6 +267,35 @@ async fn missing_targets_fail_without_input() {
     assert!(driver.inputs.lock().unwrap().is_empty());
 }
 
+/// What the app draws under the status bar is on screen, obscured, and can't be touched there.
+#[tokio::test]
+async fn a_target_under_the_status_bar_fails_without_input() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([screen(false, 0)]);
+    driver.script_windows([under(WindowKind::System, Rect::new(0, 0, 1000, 300))]);
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let mut timings = Timings::default();
+    let observed = session.observe(false, &mut timings).await.unwrap();
+    assert!(
+        observed
+            .text
+            .contains(r#"[e1] switch "Wi-Fi" off obscured"#),
+        "{}",
+        observed.text
+    );
+    let err = session
+        .act(
+            Action::Tap {
+                target: Target::parse("Wi-Fi").unwrap(),
+            },
+            &mut timings,
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::TargetObscured { .. }), "{err}");
+    assert!(driver.inputs.lock().unwrap().is_empty());
+}
+
 /// The keyboard slides in over an app that doesn't move for it: the tree is the same in every
 /// frame, the windows aren't. Seen on Now in Android's search screen, where a tap came back
 /// with the keyboard halfway up.
@@ -297,6 +327,43 @@ async fn an_action_settles_once_the_keyboard_has_stopped_moving() {
     assert_eq!(
         outcome.screen.obstructions,
         [Rect::new(0, 1200, 1000, 2000)]
+    );
+}
+
+/// An element under the keyboard is in the tree, but waiting for it is waiting to use it: a
+/// flow's next step would otherwise find it covered while the keyboard is still on its way out.
+#[tokio::test]
+async fn waiting_for_an_element_under_the_keyboard_waits_for_the_keyboard_to_leave() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([screen(false, 0)]);
+    let keyboard = under(WindowKind::InputMethod, Rect::new(0, 100, 1000, 2000));
+    driver.script_windows([keyboard.clone(), keyboard.clone(), uncovered()]);
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let target = Target::parse("Wi-Fi").unwrap();
+    let mut timings = Timings::default();
+    let found = session
+        .wait(&target, false, Duration::from_secs(5), &mut timings)
+        .await
+        .unwrap();
+    assert!(!found.screen.keyboard, "{}", found.text);
+
+    // While it is covered it has neither appeared nor gone; the timeout says which.
+    driver.script_windows([keyboard]);
+    let covered = session
+        .wait(&target, false, Duration::ZERO, &mut timings)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        covered.to_string(),
+        "timed out after 0s waiting for Wi-Fi to come out from under the system window that covers it"
+    );
+    let still_there = session
+        .wait(&target, true, Duration::ZERO, &mut timings)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        still_there.to_string(),
+        "timed out after 0s waiting for Wi-Fi to disappear"
     );
 }
 
@@ -388,6 +455,8 @@ async fn a_crash_during_an_action_is_reported_with_the_steps_before_it() {
 #[derive(Default)]
 struct ListDriver {
     swipes: Mutex<i32>,
+    /// The windows on screen, when a scenario needs a system bar over the list.
+    windows: Vec<WindowInfo>,
 }
 
 impl ListDriver {
@@ -432,7 +501,7 @@ impl Driver for ListDriver {
                 ..RawNode::default()
             }],
             source: TreeSource::Helper,
-            windows: Vec::new(),
+            windows: self.windows.clone(),
         })
     }
     async fn foreground_activity(&self, _: &Device) -> Result<Option<String>> {
@@ -491,4 +560,32 @@ async fn scrolling_until_keeps_going_while_the_list_moves_and_stops_at_its_end()
     );
     // One more scroll to reach the end, one that no longer moves it.
     assert_eq!(*driver.swipes.lock().unwrap(), 13);
+}
+
+/// A row scrolling in under the navigation bar is in the tree before any of it can be tapped:
+/// `scroll --until` goes on until it can be, and says so when the list ends with the row there.
+#[tokio::test]
+async fn scrolling_until_goes_on_while_the_row_is_under_a_system_bar() {
+    let driver = Arc::new(ListDriver {
+        windows: under(WindowKind::System, Rect::new(0, 1800, 1000, 2000)),
+        ..ListDriver::default()
+    });
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    // Row 10 starts in the last place on screen, under the bar.
+    let found = session
+        .act(scroll_until("Row 10"), &mut Timings::default())
+        .await
+        .unwrap();
+    assert!(
+        found.action.contains("found after 1 scrolls"),
+        "{}",
+        found.action
+    );
+
+    // The list ends with Row 100 in that place.
+    let covered = session
+        .act(scroll_until("Row 100"), &mut Timings::default())
+        .await
+        .unwrap_err();
+    assert!(matches!(covered, Error::TargetObscured { .. }), "{covered}");
 }

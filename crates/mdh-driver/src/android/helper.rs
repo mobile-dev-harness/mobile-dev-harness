@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use super::Adb;
 
 /// Must match `versionCode` in android-helper/build.gradle.kts and `Commands.VERSION_CODE`.
-pub const HELPER_VERSION_CODE: u64 = 5;
+pub const HELPER_VERSION_CODE: u64 = 6;
 
 const PACKAGE: &str = "dev.mdh.helper";
 const INSTRUMENTATION: &str = "dev.mdh.helper/.HelperInstrumentation";

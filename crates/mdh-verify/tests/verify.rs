@@ -8,7 +8,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use mdh_control::{Control, Session};
 use mdh_core::output::Timings;
-use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource};
+use mdh_core::ui::{NodeFlags, RawNode, RawTree, Rect, TreeSource, WindowInfo, WindowKind};
 use mdh_core::{
     Appearance, AppearanceKind, Device, DeviceState, Error, Input, LaunchInfo, LogEntry, LogLevel,
     Platform, Result,
@@ -27,6 +27,8 @@ struct FakeDriver {
     launched: Mutex<bool>,
     /// Appearance settings changed so far, the latest last.
     settings: Mutex<Vec<Appearance>>,
+    /// The keyboard's window and for how many more reads of the screen it stays up.
+    keyboard: Mutex<Option<(Rect, usize)>>,
 }
 
 impl FakeDriver {
@@ -46,6 +48,30 @@ impl FakeDriver {
 
     fn did(&self, what: impl Into<String>) {
         self.done.lock().unwrap().push(what.into());
+    }
+
+    /// The windows on screen at this read: none are listed unless the keyboard is up.
+    fn windows(&self) -> Vec<WindowInfo> {
+        let mut keyboard = self.keyboard.lock().unwrap();
+        let Some((bounds, reads)) = *keyboard else {
+            return Vec::new();
+        };
+        *keyboard = (reads > 1).then(|| (bounds, reads - 1));
+        if keyboard.is_none() {
+            self.did("keyboard hidden");
+        }
+        let window = |kind, active, bounds| WindowInfo {
+            kind,
+            active,
+            focused: active,
+            title: None,
+            package: None,
+            bounds,
+        };
+        vec![
+            window(WindowKind::InputMethod, false, bounds),
+            window(WindowKind::Application, true, Rect::new(0, 0, 1000, 2000)),
+        ]
     }
 }
 
@@ -67,7 +93,7 @@ impl Driver for FakeDriver {
         Ok(RawTree {
             roots: self.current(false).1,
             source: TreeSource::Helper,
-            windows: Vec::new(),
+            windows: self.windows(),
         })
     }
     async fn foreground_activity(&self, _: &Device) -> Result<Option<String>> {
@@ -413,6 +439,71 @@ async fn a_step_that_cannot_run_stops_the_flow_and_says_why() {
     );
     // The final checks don't run after a failed step; `no crash` does.
     assert_eq!(verdict.findings.len(), 2, "{}", verdict.text);
+}
+
+/// The keyboard is still on its way out when the next step wants the button under it. The
+/// button is in the tree all along (obscured); the step waits for it like for one that isn't
+/// there yet.
+#[tokio::test]
+async fn a_step_waits_for_its_target_to_come_out_from_under_the_keyboard() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([login(true), inbox()]);
+    *driver.keyboard.lock().unwrap() = Some((Rect::new(0, 250, 1000, 2000), 6));
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let flow = Flow::parse("sign-in", FLOW).unwrap();
+    let verdict = run_flow(
+        &mut session,
+        &flow,
+        &FlowOptions {
+            verify: options(),
+            step_timeout: Duration::from_secs(5),
+        },
+        &mut Timings::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(verdict.status, Status::Pass, "{}", verdict.text);
+    let done = driver.done.lock().unwrap().clone();
+    let at = |what: &str| done.iter().position(|d| d.starts_with(what)).unwrap();
+    assert!(at("keyboard hidden") < at("Tap"), "{done:?}");
+}
+
+#[tokio::test]
+async fn a_step_whose_target_stays_under_the_keyboard_fails_saying_so() {
+    let driver = Arc::new(FakeDriver::default());
+    driver.script([login(true), inbox()]);
+    *driver.keyboard.lock().unwrap() = Some((Rect::new(0, 250, 1000, 2000), usize::MAX));
+    let mut session = Session::open(Control::new(driver.clone(), device()), None);
+    let flow = Flow::parse("sign-in", FLOW).unwrap();
+    let verdict = run_flow(
+        &mut session,
+        &flow,
+        &FlowOptions {
+            verify: options(),
+            step_timeout: Duration::from_millis(300),
+        },
+        &mut Timings::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(verdict.status, Status::Fail, "{}", verdict.text);
+    assert!(
+        verdict.text.contains(
+            "✗ step 1: tap id=sign_in — on screen but covered by system windows: \
+             [e2] button \"Sign in\" obscured #sign_in after 0 s (screen .LoginActivity)"
+        ),
+        "{}",
+        verdict.text
+    );
+    assert!(
+        !driver
+            .done
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|d| d.starts_with("Tap")),
+        "nothing was tapped"
+    );
 }
 
 /// Seen in the benchmark: the grader couldn't read the screen, and a correct fix was judged broken.

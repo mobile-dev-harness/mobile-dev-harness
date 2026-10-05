@@ -18,6 +18,15 @@ change); JSON output changes are listed here and carry the `schema` version of t
   another key. Two mdh versions sharing a device replace each other's helper on every switch (about a second). If
   the helper can't be installed, the error is `HELPER_UNAVAILABLE` with Android's reason and what to do (it was a
   bare `COMMAND_FAILED`).
+- Controls an app draws entirely under the status bar, the navigation bar or the keyboard are in the tree,
+  marked `obscured`, instead of missing: with the window list on, Android reports such a node as not visible to
+  the user and the on-device helper skipped it. On Now in Android's topic screen with its top inset lost, the
+  Back button and the follow chip were drawn over the clock while the tree started at the title and
+  `visible Back` failed with "not on screen". The helper (version 6) keeps what lies under a system window;
+  `visible`, taps and the `obscured` rule then say it is covered (the sample's `OverlapActivity`, broken on
+  purpose, had come to pass that rule). `not visible` and `wait --gone` no longer take such an element for
+  gone. `wait`, a flow step waiting for its target and `scroll --until` wait until part of it is clear (the
+  keyboard on its way out, a row scrolling in under a bar) and say that it is covered when it stays so.
 - An action could return while the keyboard was still sliding in or out, with `keyboard` and the obscured
   elements out of date: over an app that doesn't resize for the keyboard the tree is the same in every frame.
   Settling now also waits for the windows to stay where they are.

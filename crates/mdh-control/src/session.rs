@@ -325,7 +325,8 @@ impl Session {
         })
     }
 
-    /// Polls until `target` is on screen (or, with `gone`, no longer is).
+    /// Polls until `target` is on screen with some of it clear of the system windows (or, with
+    /// `gone`, until it has left the screen).
     pub async fn wait(
         &mut self,
         target: &Target,
@@ -338,12 +339,13 @@ impl Session {
             let snapshot = self.control.snapshot().await?;
             let source = snapshot.source;
             let view = self.adopt(snapshot);
-            let found = present(
-                target,
-                &view.tree,
-                self.state.last.as_ref().map(|v| &v.tree),
-            );
-            if found != gone {
+            let previous = self.state.last.as_ref().map(|v| &v.tree);
+            let done = if gone {
+                !on_screen(target, &view.tree, previous)
+            } else {
+                reachable(target, &view, previous)
+            };
+            if done {
                 timings.record("wait", started);
                 let entries = self.logs_since(self.state.log_cursor_ms).await?;
                 let logs = self.digest_logs(entries, &view).await?;
@@ -365,9 +367,14 @@ impl Session {
                 });
             }
             if started.elapsed() >= timeout {
+                let what = match (gone, on_screen(target, &view.tree, previous)) {
+                    (true, _) => "disappear",
+                    (false, true) => "come out from under the system window that covers it",
+                    (false, false) => "appear",
+                };
                 self.state.last = Some(view);
                 return Err(Error::Timeout {
-                    what: format!("{target} to {}", if gone { "disappear" } else { "appear" }),
+                    what: format!("{target} to {what}"),
                     seconds: timeout.as_secs(),
                 });
             }
@@ -836,7 +843,7 @@ impl Session {
                 };
                 let mut view = before.clone();
                 for scrolls in 0..=MAX_SCROLLS {
-                    if present(goal, &view.tree, None) {
+                    if reachable(goal, &view, None) {
                         return Ok((
                             format!("scroll {dir} until {goal}: found after {scrolls} scrolls"),
                             recorded,
@@ -854,10 +861,14 @@ impl Session {
                     }
                     view = next;
                 }
-                Err(Error::ElementNotFound {
-                    target: goal.to_string(),
-                    candidates: Vec::new(),
-                })
+                // Still under a system window where the scrolling ended: say so, it is there.
+                match resolve(goal, &view.tree, None, &view.screen.obstructions) {
+                    Err(obscured @ Error::TargetObscured { .. }) => Err(obscured),
+                    _ => Err(Error::ElementNotFound {
+                        target: goal.to_string(),
+                        candidates: Vec::new(),
+                    }),
+                }
             }
         }
     }
@@ -919,11 +930,27 @@ fn packages_of(app: Option<&str>, screens: &[&ScreenInfo]) -> Vec<String> {
     packages
 }
 
-fn present(target: &Target, tree: &UiTree, previous: Option<&UiTree>) -> bool {
+fn on_screen(target: &Target, tree: &UiTree, previous: Option<&UiTree>) -> bool {
     !matches!(
         resolve(target, tree, previous, &[]),
         Err(Error::ElementNotFound { .. })
     )
+}
+
+/// On screen with some of it clear of the system windows. An element entirely under one is in
+/// the tree, obscured, and nothing can be done with it yet: the keyboard is on its way out, or a
+/// row has only just scrolled in under a bar. Waiting for it means waiting for it to come out.
+fn reachable(target: &Target, view: &View, previous: Option<&UiTree>) -> bool {
+    match resolve(target, &view.tree, previous, &[]) {
+        Err(Error::ElementNotFound { .. }) => false,
+        Ok(Resolved {
+            node: Some(node), ..
+        }) => node
+            .bounds
+            .largest_visible_part(&view.screen.obstructions)
+            .is_some(),
+        _ => true,
+    }
 }
 
 /// Refs only mean something within a session; recordings store a selector instead.

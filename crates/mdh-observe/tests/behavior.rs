@@ -187,3 +187,20 @@ fn empty_generic_views_are_spacers_not_unreadable() {
     };
     assert!(compress(&screen(vec![spacer])).opaque.is_empty());
 }
+
+/// Now in Android's topic screen without its top inset: the back button is drawn under the status
+/// bar. It is on screen, so it stays in the tree; the status bar's window makes it obscured and
+/// leaves nothing of it to tap.
+#[test]
+fn a_control_under_the_status_bar_is_obscured_not_missing() {
+    let status_bar = Rect::new(0, 0, 1000, 159);
+    let mut back = clickable(node("ImageButton", Rect::new(0, 0, 144, 144)));
+    back.desc = Some("Back".into());
+    let mut tree = compress(&screen(vec![
+        back,
+        text("Compose", Rect::new(72, 636, 650, 794)),
+    ]));
+    tree.mark_obscured(&[status_bar]);
+    assert_eq!(render(&tree), "[] button \"Back\" obscured\n[] \"Compose\"");
+    assert_eq!(tree.nodes[0].visible_part(&[status_bar]), None);
+}

@@ -128,6 +128,7 @@ mod tests {
     fn parses_real_dumps() {
         for name in [
             "launcher",
+            "nia_topic_under_status_bar",
             "settings",
             "settings_display",
             "settings_network",

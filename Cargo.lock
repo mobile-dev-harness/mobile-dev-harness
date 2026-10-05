@@ -709,6 +709,7 @@ dependencies = [
  "mdh-core",
  "mdh-driver",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

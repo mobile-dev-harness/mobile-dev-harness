@@ -2,6 +2,7 @@ package dev.mdh.helper;
 
 import android.app.UiAutomation;
 import android.graphics.Rect;
+import android.graphics.Region;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -12,6 +13,7 @@ import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import org.json.JSONArray;
@@ -21,7 +23,7 @@ import org.json.JSONObject;
 /** Request handlers. Field names of the tree match {@code mdh_core::ui::RawNode}. */
 final class Commands {
     /** Bump together with versionCode and HELPER_VERSION_CODE on the host. */
-    static final int VERSION_CODE = 5;
+    static final int VERSION_CODE = 6;
 
     private static final long ROOT_RETRY_MS = 500;
 
@@ -38,9 +40,11 @@ final class Commands {
                 return new JSONObject().put("version_code", VERSION_CODE).put("sdk", Build.VERSION.SDK_INT);
             case "tree":
                 clearCache();
+                AccessibilityNodeInfo root = root();
+                List<AccessibilityWindowInfo> windows = automation.getWindows();
                 return new JSONObject()
-                        .put("roots", new JSONArray().put(node(root())))
-                        .put("windows", windows());
+                        .put("roots", new JSONArray().put(node(root, systemCovers(root, windows))))
+                        .put("windows", windows(windows));
             case "tap":
                 swipe(request.getInt("x"), request.getInt("y"), request.getInt("x"), request.getInt("y"), 0, 0);
                 return new JSONObject();
@@ -186,9 +190,9 @@ final class Commands {
     }
 
     /** On-screen windows, top-most first: reveals the keyboard and system dialogs over the app. */
-    private JSONArray windows() throws JSONException {
+    private static JSONArray windows(List<AccessibilityWindowInfo> windows) throws JSONException {
         JSONArray out = new JSONArray();
-        for (AccessibilityWindowInfo w : automation.getWindows()) {
+        for (AccessibilityWindowInfo w : windows) {
             JSONObject o = new JSONObject()
                     .put("kind", windowKind(w.getType()))
                     .put("active", w.isActive())
@@ -226,7 +230,49 @@ final class Commands {
                 .put("left", r.left).put("top", r.top).put("right", r.right).put("bottom", r.bottom);
     }
 
-    private static JSONObject node(AccessibilityNodeInfo n) throws JSONException {
+    /**
+     * The area of the system's windows over {@code root}'s window: status and navigation bars and
+     * the keyboard, the windows the host treats as obstructions ({@code ScreenInfo::new}).
+     */
+    private static Region systemCovers(AccessibilityNodeInfo root, List<AccessibilityWindowInfo> windows) {
+        Region covers = new Region();
+        int layer = Integer.MAX_VALUE;
+        for (AccessibilityWindowInfo w : windows) {
+            if (w.getId() == root.getWindowId()) {
+                layer = w.getLayer();
+            }
+        }
+        Rect r = new Rect();
+        for (AccessibilityWindowInfo w : windows) {
+            int type = w.getType();
+            boolean system = type == AccessibilityWindowInfo.TYPE_SYSTEM
+                    || type == AccessibilityWindowInfo.TYPE_INPUT_METHOD;
+            if (system && w.getLayer() > layer && !w.isActive() && !w.isFocused()) {
+                w.getBoundsInScreen(r);
+                covers.op(r, Region.Op.UNION);
+            }
+        }
+        return covers;
+    }
+
+    /**
+     * Whether {@code n} lies entirely under {@code covers}. Listing windows
+     * (FLAG_RETRIEVE_INTERACTIVE_WINDOWS) makes the system report such a node as not visible to the
+     * user whatever the app shows there, which `uiautomator dump` doesn't do: an app that draws
+     * its back button under the status bar lost it from the tree (observed with Now in Android)
+     * instead of having it reported as obscured.
+     */
+    private static boolean covered(AccessibilityNodeInfo n, Region covers) {
+        Rect r = new Rect();
+        n.getBoundsInScreen(r);
+        if (r.isEmpty() || covers.isEmpty()) {
+            return false;
+        }
+        Region rest = new Region(r);
+        return !rest.op(covers, Region.Op.DIFFERENCE);
+    }
+
+    private static JSONObject node(AccessibilityNodeInfo n, Region covers) throws JSONException {
         JSONObject o = new JSONObject();
         o.put("class", String.valueOf(n.getClassName()));
         putText(o, "package", n.getPackageName());
@@ -260,9 +306,10 @@ final class Commands {
         JSONArray children = new JSONArray();
         for (int i = 0; i < n.getChildCount(); i++) {
             AccessibilityNodeInfo child = n.getChild(i);
-            // Like `uiautomator dump`, skip what the user can't see.
-            if (child != null && child.isVisibleToUser()) {
-                children.put(node(child));
+            // Like `uiautomator dump`, skip what the app doesn't show; what it shows under a system
+            // window stays, for the host to mark as obscured.
+            if (child != null && (child.isVisibleToUser() || covered(child, covers))) {
+                children.put(node(child, covers));
             }
         }
         o.put("children", children);

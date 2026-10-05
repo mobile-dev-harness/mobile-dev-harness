@@ -253,7 +253,9 @@ Further rules learned on `examples/android-sample` (all covered by tests):
   backgrounds; only custom views, `SurfaceView`, `TextureView` and images count as drawn content.
 
 The compressor's output is pinned with snapshot tests (`insta`). Fixtures are uiautomator XML from real apps, and
-the tests also record estimated token counts before and after compression to catch regressions.
+the tests also record estimated token counts before and after compression to catch regressions. One screen is
+also kept as the on-device helper answers it (`fixtures/android/helper/`), windows included, to pin what the
+status bar obscures.
 
 ## 6. Waiting and stability
 
@@ -289,6 +291,10 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
 - **System dialogs:** every observation checks whether the foreground window belongs to the system (permission,
   ANR or crash dialogs) and flags it separately so the agent deals with it first.
 - Every wait has a timeout; timeout errors include the last observation so the agent can see where it got stuck.
+- **Waiting for something to use:** an element entirely under a system window is in the tree (obscured), but
+  `wait`, a flow step waiting for its target and `scroll --until` only count it once part of it is clear: the
+  keyboard may be on its way out, a row may have only just scrolled in under a bar. `wait --gone` counts it as
+  still there. A timeout or the end of the list says that it is covered, not that it is missing.
 - **Launches that don't navigate:** when the target app already has a task, `am start` may only bring it to the
   front and print `Warning: Activity not started, its current task has been brought to the front`. Launch and
   deep-link navigation must detect this and, depending on the reset policy, retry with `-S` (stop first) or
@@ -431,6 +437,14 @@ UiAutomation is device-wide.
   `{"ok": false, "error": ...}`. Commands: `ping` (version code, SDK level), `tree` (field names match `RawNode`),
   `wait_idle`, `set_text`, `tap`, `swipe` (with an optional `hold_ms` at the end), `key`; `tree` also returns the
   window list (keyboard, system bars, dialogs) and each node's role description.
+- The tree is what the app shows, as `uiautomator dump` reports it: children that aren't visible to the user are
+  skipped. Listing windows (`FLAG_RETRIEVE_INTERACTIVE_WINDOWS`) changes what that means: Android then also
+  reports a node as not visible when it lies entirely under the windows above its own, whatever the app draws
+  there. Such a node is kept when the windows over it are the system's (status bar, navigation bar, keyboard: the
+  host's obstructions), so the host marks it `obscured` instead of losing it; observed with a back button drawn
+  under the status bar. What can't be told apart stays wrong in the rare case: a node the app itself hides
+  (alpha 0) that also lies entirely under a system window is reported. A node reaching beyond the display (a
+  panned window) is still skipped, until the host clips to the display.
 - Input is injected **asynchronously** through `UiAutomation.injectInputEvent`. Synchronous injection waits until
   the target window has handled the event and was observed to take 0.4–1.7 s while the app animates; settling is
   the host's job (§6).
@@ -933,8 +947,10 @@ Replay (`run_flow`):
    stopped and launched, or stopped and opened through `setup.open` (`am start -a VIEW -d … <package>`). After
    the start the settings are read back and set again if the device dropped one; one that doesn't hold is an
    ERROR.
-3. Steps run in order. A step aimed at an element first waits for it (`--step-timeout`, 10 s); an element that
-   never shows fails the step with what was on screen instead (closest elements, current activity). An app crash
+3. Steps run in order. A step aimed at an element first waits for it (`--step-timeout`, 10 s) to be on screen
+   with part of it clear of the system windows, so a step right after the keyboard was dismissed doesn't find its
+   target still covered; an element that never shows fails the step with what was on screen instead (closest
+   elements, current activity), one that stays covered with that. An app crash
    during a step fails it. The first failing step stops the flow; the remaining steps and the final checks are
    skipped, `no crash` still runs, and the verdict says how many steps completed.
 4. `assert` steps and the final `assert` run `Functional` with the step number.
