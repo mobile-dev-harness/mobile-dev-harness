@@ -12,6 +12,12 @@ change); JSON output changes are listed here and carry the `schema` version of t
   ERROR.
 
 ### Fixes
+- A flow could fail at its first step with the launcher in front, or stop with an ERROR after two minutes, about
+  once in 15 runs, when it reset an app that was showing a permission dialog. `pm clear` returns while the app's
+  task is still closing, and since Android 14 the end of the dialog kills the app's processes with that task up
+  to a second later: the one the flow had just started included, without an error. Clearing an app's data
+  (`state clear-data`, a flow's `reset: data`) now returns once the app's tasks are gone: half a second later
+  than before when the app was in front, a second when a dialog was.
 - A device that already had a newer on-device helper, installed by another mdh (another checkout, a newer
   release), made every command that reads the screen fail with `INSTALL_FAILED_VERSION_DOWNGRADE` until someone
   uninstalled the helper by hand. mdh now uninstalls it and installs its own, as it did for a helper signed with

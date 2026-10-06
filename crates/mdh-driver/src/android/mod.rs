@@ -379,13 +379,28 @@ impl Driver for AndroidDriver {
             .adb
             .shell_stdout(&device.id, &format!("pm clear {}", shell_quote(package)))
             .await?;
-        if out.trim() == "Success" {
-            Ok(())
-        } else {
-            Err(Error::AppNotFound {
+        if out.trim() != "Success" {
+            return Err(Error::AppNotFound {
                 package: package.to_owned(),
-            })
+            });
         }
+        // `pm clear` returns while the app's tasks are still closing, and a start made meanwhile
+        // can die without an error. Since Android 14 a task that another app's activity was on
+        // top of (a permission dialog) takes the app's processes with it once that activity is
+        // destroyed, a second later at most: also a process started since, until its activity
+        // is attached. `am start -W` then reports a start that never drew, or never returns.
+        for _ in 0..20 {
+            let closing = self
+                .adb
+                .shell_stdout(&device.id, "am stack list")
+                .await
+                .is_ok_and(|out| am::has_task(&out, package));
+            if !closing {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        Ok(())
     }
 
     async fn density(&self, device: &Device) -> Result<u32> {

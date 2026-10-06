@@ -299,6 +299,15 @@ Flakiness mostly comes from observing or acting while the UI is still changing. 
   front and print `Warning: Activity not started, its current task has been brought to the front`. Launch and
   deep-link navigation must detect this and, depending on the reset policy, retry with `-S` (stop first) or
   report that navigation did not happen instead of claiming success.
+- **Starts that die:** `pm clear` returns while the app's tasks are still closing. Since Android 14, a task that
+  another app's activity was on top of (a permission dialog) keeps a kill pending until that activity is
+  destroyed, a second later at most; it then takes every process of the app that has no activity attached, the
+  one a start has just created included (`remove task` in the log, no crash). `am start -W` reports a start
+  without a `TotalTime` after ten seconds, or never returns, and the launcher is in front. Seen in about one of
+  15 flows that reset an app showing its permission dialog. Clearing an app's data therefore returns only once
+  `am stack list` no longer lists a task of the app (half a second when the app was in front, a second under a
+  dialog). Starting again instead would start an app that crashes on launch twice: `am` reports that the same
+  way.
 
 ## 7. Logs and crashes (`mdh-observe`)
 
