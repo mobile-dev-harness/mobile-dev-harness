@@ -8,3 +8,4 @@
 
 # Benchmark runs: workspaces, transcripts (results are summarized in bench/results/)
 /bench/out/
+.omx/
