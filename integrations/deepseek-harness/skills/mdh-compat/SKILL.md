@@ -1,5 +1,5 @@
 ---
-name: compat
+name: mdh-compat
 description: Verify Android compatibility risks identified by mdh using targeted device and configuration runs. Use for SDK checks, target SDK changes, qualified resources, rotation, saved state, background behavior, or impact-reported compatibility risks.
 ---
 
@@ -22,10 +22,10 @@ revision throughout. Leave new emulators unstarted unless authorized. Once the
 user authorizes the required starts, replace `--no-start` with `--yes`; preserve
 existing authorization and any requested emulator limit.
 
-For a client without a shell, or when specialist checks should share the active
-MCP session, explicitly configure the server as `mdh mcp --tools all`.
-Use the discovered mdh MCP tools. Examples name the underlying tool; resolve
-the actual client prefix when invoking it.
+Explicitly opt in to `tools: all` for a client without a shell, or when specialist
+checks should share the active MCP session; preserve the remaining profile config.
+DSH prefixes MCP tool names with `mcp__mdh__` by default. The examples name the
+underlying tool; resolve its actual discovered name if the server was customized.
 The equivalent MCP alternatives are:
 
 ```mcp

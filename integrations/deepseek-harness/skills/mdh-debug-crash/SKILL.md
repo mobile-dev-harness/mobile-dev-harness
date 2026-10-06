@@ -1,12 +1,12 @@
 ---
-name: debug-crash
+name: mdh-debug-crash
 description: Diagnose an Android crash, native crash or ANR reported by mdh, reproduce it, and verify a scoped fix. Use for APP_CRASHED, mdh crash reports, or a failing no-crash check.
 ---
 
 # Debug an Android crash
 
-Use the discovered mdh MCP tools. Examples name the underlying tool; resolve
-the actual client prefix when invoking it.
+DSH prefixes MCP tool names with `mcp__mdh__` by default. The examples name the
+underlying tool; resolve its actual discovered name if the server was customized.
 
 Use the connection for the affected project and device. Read the existing report:
 exception, nested causes, app frames and preceding actions. Request surrounding

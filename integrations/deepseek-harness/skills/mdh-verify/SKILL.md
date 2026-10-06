@@ -1,12 +1,12 @@
 ---
-name: verify
+name: mdh-verify
 description: Verify an Android app change with mdh by finding affected screens, building and running the app, checking behavior, and replaying relevant flows. Use after changes to app code, resources or the manifest, or when asked to verify a fix on a device.
 ---
 
 # Verify an Android change
 
-Use the discovered mdh MCP tools. Examples name the underlying tool; resolve
-the actual client prefix when invoking it.
+DSH prefixes MCP tool names with `mcp__mdh__` by default. The examples name the
+underlying tool; resolve its actual discovered name if the server was customized.
 
 The MCP process must run in the intended Android project. Its working directory
 owns flows, baselines, evidence and changed-flow selection; a per-call project
@@ -78,9 +78,9 @@ required environment variables before replay; passwords may be recorded as env r
 ```
 
 The default connection exposes eight core tools. Use the shell's `mdh visual`,
-`mdh perf` or `mdh compat` for specialist checks. For a client without a shell,
-or when specialist checks should share the active MCP session, explicitly
-configure the 11-tool server as `mdh mcp --tools all`.
+`mdh perf` or `mdh compat` for specialist checks. Explicitly opt in to the 11-tool
+`tools: all` set for a client without a shell, or when specialist checks should
+share the active MCP session; preserve the remaining profile config.
 CLI state in `.mdh/session.json` is separate: use the intended project directory,
 explicit device and app, and establish its own screen or saved-flow setup.
 

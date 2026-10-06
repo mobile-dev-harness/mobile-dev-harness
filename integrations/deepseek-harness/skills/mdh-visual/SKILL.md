@@ -1,5 +1,5 @@
 ---
-name: visual
+name: mdh-visual
 description: Check Android UI consistency with mdh rules, structural and pixel baselines, and font scale, dark mode or RTL variants. Use for layout, style, string or composable changes and reported visual regressions.
 ---
 
@@ -29,10 +29,10 @@ Approve only reviewed, intended deviations, scoped to that baseline:
 mdh --device SERIAL visual approve login
 ```
 
-For a client without a shell, or when specialist checks should share the active
-MCP session, explicitly configure the server as `mdh mcp --tools all`.
-Use the discovered mdh MCP tools. Examples name the underlying tool; resolve
-the actual client prefix when invoking it.
+Explicitly opt in to `tools: all` for a client without a shell, or when specialist
+checks should share the active MCP session; preserve the remaining profile config.
+DSH prefixes MCP tool names with `mcp__mdh__` by default. The examples name the
+underlying tool; resolve its actual discovered name if the server was customized.
 Navigate with the same MCP session before using this alternative:
 
 ```mcp

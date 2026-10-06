@@ -1,5 +1,5 @@
 ---
-name: perf
+name: mdh-perf
 description: Measure Android startup or saved-flow performance with mdh, compare repeated measurements with per-device baselines, and explain regressions with Perfetto. Use for startup, frame, memory or CPU regressions and performance-sensitive app changes.
 ---
 
@@ -36,10 +36,10 @@ same download. Without it, report that explanation was not performed.
 mdh perf setup --yes
 ```
 
-For a client without a shell, or when specialist checks should share the active
-MCP session, explicitly configure the server as `mdh mcp --tools all`.
-Use the discovered mdh MCP tools. Examples name the underlying tool; resolve
-the actual client prefix when invoking it.
+Explicitly opt in to `tools: all` for a client without a shell, or when specialist
+checks should share the active MCP session; preserve the remaining profile config.
+DSH prefixes MCP tool names with `mcp__mdh__` by default. The examples name the
+underlying tool; resolve its actual discovered name if the server was customized.
 These are the corresponding MCP invocation shapes; use only the operation needed:
 
 ```mcp

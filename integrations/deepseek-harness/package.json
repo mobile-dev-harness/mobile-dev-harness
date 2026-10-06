@@ -1,0 +1,54 @@
+{
+  "name": "dsh-mobile-dev-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Android change verification for DeepSeek Harness, powered by mdh",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "config.js",
+    "version.js",
+    "cordis.patch.yml",
+    "skills/",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-mcp-client": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-mcp-client": { "optional": true },
+    "@deepseek-ai/dsh-skill-filesystem": { "optional": true }
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check config.js && node --check version.js && node --check tests/dsh-smoke.mjs && node --check tests/mcp-contract.mjs && node --test tests/*.test.js",
+    "test": "node --test tests/*.test.js",
+    "test:dsh": "node tests/dsh-smoke.mjs",
+    "test:contract": "node tests/mcp-contract.mjs",
+    "prepack": "npm run check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mobile-dev-harness/mobile-dev-harness.git",
+    "directory": "integrations/deepseek-harness"
+  },
+  "homepage": "https://github.com/mobile-dev-harness/mobile-dev-harness/tree/main/integrations/deepseek-harness",
+  "bugs": "https://github.com/mobile-dev-harness/mobile-dev-harness/issues",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["dsh-plugin", "deepseek-harness", "android", "mcp", "verification"],
+  "publishConfig": { "access": "public" }
+}

@@ -1,0 +1,5 @@
+# Configure the project before enabling: mdh keeps one session per MCP connection.
+- insert:
+    - id: mobile-dev-harness
+      name: dsh-mobile-dev-harness
+      disabled: true

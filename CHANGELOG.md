@@ -11,6 +11,14 @@ change); JSON output changes are listed here and carry the `schema` version of t
   (`1600x2560@320`). Settings are read back once the app runs; one the device doesn't keep makes the verdict
   ERROR.
 
+### Integrations
+- DeepSeek Harness: `integrations/deepseek-harness` is a DSH bundle that connects the `mdh mcp` server and adds
+  five skills (verify a change, debug a crash, UI, performance and compatibility checks). It checks the version
+  of the installed mdh when it starts, and its own tests need no device. It isn't on npm yet; its README says
+  how to pack and enable it.
+- The skills of the Claude Code plugin show every tool call as an example, and CI checks the examples of both
+  integrations against the tools the built binary exposes: a skill can no longer drift from the MCP schemas.
+
 ### Fixes
 - A flow could fail at its first step with the launcher in front, or stop with an ERROR after two minutes, about
   once in 15 runs, when it reset an app that was showing a permission dialog. `pm clear` returns while the app's
