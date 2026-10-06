@@ -201,7 +201,9 @@ source:
   - Main model: four setups, one run each (400), plus two more runs of a fixed 20-task subset to measure
     run-to-run variance (160): 560 runs, 55–75 hours at 6–8 minutes a run.
   - Other models: the agent alone and mdh only: 200 runs.
-  - Timeout 15 minutes (version 1: 25).
+  - Timeout 25 minutes, as in version 1. The pilot's calibration ran with 15: enough in 60 of 63 runs of the
+    agent alone and in 20 of 21 with mdh, but four of the first five runs with adb or mobile-mcp were cut off,
+    and a limit most runs of two setups hit measures the limit.
 - Paired comparisons (the same tasks in every setup): about 25 points are detectable within a level, about 12
   over all 100 tasks.
 

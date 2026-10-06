@@ -11,6 +11,7 @@ change); JSON output changes are listed here and carry the `schema` version of t
   where later runs found them.
 - Two benchmarks can run side by side, each on its emulator with its own adb server
   (`ANDROID_ADB_SERVER_PORT`); the MCP servers of a run are told which one.
+- A run gets 25 minutes again: at 15, most runs with adb or mobile-mcp on Now in Android were cut off.
 
 ## 0.5.0
 
