@@ -1,7 +1,7 @@
 {
   "name": "mobile-dev-harness",
   "displayName": "mobile-dev-harness",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Precise verification for Android apps: see and drive the app, get evidence-backed verdicts, know which screens a change reaches, replay flows",
   "author": {
     "name": "qkmaosjtu",

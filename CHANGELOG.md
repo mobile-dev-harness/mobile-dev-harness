@@ -3,7 +3,10 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
-## Unreleased
+## 0.5.0
+
+Hardened on Now in Android: screens read right, flows start reliably and set the device they need. A DeepSeek
+Harness integration, and the benchmark's second version on a real app.
 
 ### Flows
 - A flow can set the device it needs, before the app starts, and puts it back afterwards: `setup.device` with
