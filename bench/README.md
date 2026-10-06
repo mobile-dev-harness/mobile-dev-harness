@@ -3,8 +3,10 @@
 Version 2 is being built: its design, the levels and the move to Now in Android are in [DESIGN.md](DESIGN.md).
 This page describes how the benchmark runs.
 
-Does an agent verify Android changes more precisely with mdh? The benchmark measures it: the same agent,
-model and prompt on seeded-bug tasks in the sample app, in four setups, graded against ground truth.
+Does an agent verify Android changes more precisely with mdh than with adb and screenshots or with mobile-mcp?
+The benchmark measures it: the same agent, model and prompt on seeded-bug tasks, in each setup, graded against
+ground truth. The agent alone, without a device, runs as a reference: it shows how far reading the code goes and
+is not what mdh is compared with.
 
 ## Setups
 

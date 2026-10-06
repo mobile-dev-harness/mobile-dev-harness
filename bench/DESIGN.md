@@ -7,7 +7,9 @@ change about that? Tasks are levelled by the evidence that decides them, from th
 device under a condition (L3); how far a model gets without a device is measured per level. The app is Now in
 Android at a pinned commit; every task has hidden checks that fail on the defect and pass on the fix, plus checks
 that the rest of the app still works. An agent may answer that it couldn't verify. The headline is how often a
-claim of success is false.
+claim of success is false. mdh is compared with the two other ways an agent gets at a device, adb with screenshots
+and mobile-mcp; the agent alone is the reference the levels are read against, not a competitor (decided
+2026-10-06, after the pilot: GLM-5.3 alone was right in 57 of 63 runs).
 
 ## 1. Why a second version
 
@@ -286,3 +288,6 @@ Changed from the first plan, and why:
 - A performance task needs a device whose frame times mean something (section 9, 18–19).
 - Typing: mdh sets a field's text at once, a keyboard a key at a time; tasks 8–9 are only seen the second way. Their
   hidden check types in two steps; an agent using `mdh_act` to type the whole query sees nothing wrong.
+- Section 7 gives other models the agent alone and mdh only. With mdh compared with adb and mobile-mcp, they need
+  those two setups as well: 400 runs a model instead of 200, or 300 without the agent alone.
+- The pilot has not been run with adb or mobile-mcp yet: 21 tasks in two setups, about 6 hours for one run each.

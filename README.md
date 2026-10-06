@@ -4,7 +4,7 @@
 
 # mobile-dev-harness
 
-**Precise verification for coding agents on Android: more accurate and fewer tokens than an agent manages on its own.**
+**Precise verification for coding agents on Android: a verdict with evidence from a real device, in fewer tokens than adb with screenshots or mobile-mcp.**
 
 When an agent changes a web app, it can open a browser, click around, read the console and see whether the change
 works. When it changes a mobile app, it usually can't: it edits code and hopes. `mobile-dev-harness` (command:
@@ -45,11 +45,12 @@ and mostly in what it believes about the running app: it calls a clean compile "
 mid-transition, misses the crash in logcat, or checks the button it changed but not the screen it broke. `mdh`
 replaces *eyeballing a screen* with structured facts and deterministic checks:
 
-- **More accurate**: fewer false passes ("it works" when it doesn't) and fewer false fails ("it's broken" when it
-  isn't), because the agent knows every screen its change reaches and sees settled states, every side effect and
-  every crash.
-- **Fewer tokens**: a screen in ~150 tokens instead of a ~1,500-token screenshot or thousands of tokens of XML, and
-  only the diff after each action — so verifying after every change is affordable.
+- **Built to verify, not only to control**: with adb and screenshots, or a device-control server such as
+  mobile-mcp, an agent can look and tap, and whether the change works remains its impression. With `mdh` it knows
+  every screen the change reaches, sees settled states, every side effect and every crash, and gets a pass or
+  fail with what was observed: "it works" becomes something that was checked.
+- **Fewer tokens than those tools**: a screen in ~150 tokens instead of a ~1,500-token screenshot or thousands of
+  tokens of XML, and only the diff after each action — so verifying after every change is affordable.
 
 ## What it looks like
 
@@ -436,7 +437,7 @@ benchmark:
 | ✅ | ↳ **Performance checks** | Startup time, jank, memory and CPU over repeated runs against per-device baselines and budgets, regressions explained by a Perfetto trace (done) |
 | ✅ | **Compatibility** | Risks from the change (OS versions, device types, vendors, screen sizes) verified on the fewest configurations that show them: screen sizes, rotation and saved state on one emulator, API levels on other AVDs, vendors on connected devices (done); cloud device farms later |
 | ⏳ | **More platforms** | React Native, Expo, Flutter, then iOS |
-| ⏳ | **Benchmark** | Seeded-bug tasks measuring false passes, false fails, success and tokens: agent alone vs. adb and screenshots vs. mobile-mcp vs. mdh |
+| ⏳ | **Benchmark** | Seeded-bug tasks measuring false passes, false fails, success and tokens: mdh compared with adb and screenshots and with mobile-mcp |
 
 Details: [design overview](docs/DESIGN.md), [functional design](docs/design/01-functional.md),
 [architecture](docs/design/02-architecture.md), [decision records](docs/adr/).
