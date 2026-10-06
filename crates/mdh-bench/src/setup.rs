@@ -62,7 +62,8 @@ impl Setup {
             }),
             Setup::Alone | Setup::Adb => serde_json::json!({}),
         };
-        serde_json::json!({ "mcpServers": servers })
+        let port = std::env::var("ANDROID_ADB_SERVER_PORT").ok();
+        serde_json::json!({ "mcpServers": on_adb_server(servers, port.as_deref()) })
     }
 
     /// `PATH` for the agent: the device tools only where the setup has them.
@@ -91,7 +92,7 @@ impl Setup {
     }
 
     /// What the agent is told about its environment.
-    pub fn brief(self, env: &Env, app: &App) -> String {
+    pub fn brief(self, env: &Env, app: &App, scratch: &Path) -> String {
         let device = format!(
             "An Android emulator ({}, API {}) is running and is the only device. Leave the device \
              itself alone: don't start, stop or restart the emulator or the adb server, and don't \
@@ -110,9 +111,10 @@ impl Setup {
                 "{device} adb is on PATH: install the APK from {apk}, start activities \
                  with `adb shell am start`, drive the UI with `adb shell input tap|text|swipe|keyevent`, \
                  read it with `adb exec-out uiautomator dump /dev/tty`, take screenshots with \
-                 `adb exec-out screencap -p > /tmp/screen.png` and look at them with the Read tool, and \
-                 read logs with `adb logcat -d`.",
-                apk = app.apk
+                 `adb exec-out screencap -p > {scratch}/screen.png` and look at them with the Read tool, \
+                 and read logs with `adb logcat -d`.",
+                apk = app.apk,
+                scratch = scratch.display()
             ),
             Setup::MobileMcp => format!(
                 "{device} The mobile-mcp tools drive it: list devices, install and launch apps, list the \
@@ -125,5 +127,38 @@ impl Setup {
                  the workflow. adb is on PATH too."
             ),
         }
+    }
+}
+
+/// Names the adb server for every MCP server. Whether a server inherits the agent's environment is
+/// the client's choice, and a benchmark beside another one, each with its emulator on its own adb
+/// server, must not reach the other's device.
+fn on_adb_server(mut servers: serde_json::Value, port: Option<&str>) -> serde_json::Value {
+    if let (Some(port), Some(servers)) = (port, servers.as_object_mut()) {
+        for server in servers.values_mut() {
+            server["env"] = serde_json::json!({ "ANDROID_ADB_SERVER_PORT": port });
+        }
+    }
+    servers
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_servers_stay_on_the_benchmarks_adb_server() {
+        let servers = serde_json::json!({ "mdh": {"command": "mdh", "args": ["mcp"]} });
+        assert_eq!(on_adb_server(servers.clone(), None), servers);
+        assert_eq!(
+            on_adb_server(servers, Some("5038")),
+            serde_json::json!({
+                "mdh": {"command": "mdh", "args": ["mcp"], "env": {"ANDROID_ADB_SERVER_PORT": "5038"}}
+            })
+        );
+        assert_eq!(
+            on_adb_server(serde_json::json!({}), Some("5038")),
+            serde_json::json!({})
+        );
     }
 }

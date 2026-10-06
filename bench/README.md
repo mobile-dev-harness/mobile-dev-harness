@@ -47,8 +47,13 @@ once under `~/.cache/mdh-bench`). Each run starts from a fresh copy of the app i
 change to verify left uncommitted), without build output, saved flows or baselines, so no setup knows the
 expected behavior in advance. Before each run the emulator is reset: the app uninstalled, and with it what an
 agent's build of the project left there (the test APKs of its modules), animations, rotation, display size, font
-scale, dark mode and input methods back to their defaults, the time zone set to America/Los_Angeles. Runs go one at a time; repetitions
+scale, dark mode and input methods back to their defaults, the time zone set to America/Los_Angeles. Runs go one at a time on a device; repetitions
 are the outer loop, so drift over hours spreads evenly over the setups.
+
+Every run has a directory of its own for what the agent makes beside the project (screenshots, dumps, a second
+checkout to compare with), named in its prompt and removed afterwards, and commands and file tools that name
+`/tmp` are refused: agents kept such files there under names any run uses (`screen.png`, `after.png`,
+`nia-baseline`), where a later run finds them and a run on another emulator overwrites them.
 
 Every run must find the device the benchmark started on (AVD, API level, display size and density). Agents are
 told to leave the device itself alone apart from the display settings a check needs (dark theme, font scale, time
@@ -101,7 +106,9 @@ then `mdh-bench probe --provider <name>` checks that it answers, calls tools and
 leaves their cost out and `--budget` can't stop such a run: mind the subscription's quota.
 
 One emulator must be online. `run` appends to `results.jsonl` and skips runs already recorded, so an interrupted
-run resumes. Each run keeps its workspace (without build output: regrading builds it again), the agent's event
+run resumes. A second benchmark can run beside the first on a second emulator of the same device profile, given
+an adb server of its own (`ANDROID_ADB_SERVER_PORT`) so that each agent, its tools and its MCP servers find one
+device; a comparison between setups stays within one such stream. Each run keeps its workspace (without build output: regrading builds it again), the agent's event
 stream (`agent.jsonl`) and the grader's output under `bench/out/<name>/<task>/<setup>-<n>/`. The agent alone on a
 verify task never touches the emulator, so those runs neither reset nor check it and can go on while it is in use.
 

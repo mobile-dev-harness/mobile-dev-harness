@@ -3,6 +3,15 @@
 All notable changes to mobile-dev-harness. Versions follow [semver](https://semver.org) (0.x: anything may
 change); JSON output changes are listed here and carry the `schema` version of the output envelope.
 
+## Unreleased
+
+### Benchmark
+- Every run gets a directory of its own for the files the agent makes beside the project, and `/tmp` is refused
+  (prompt version 3). Agents kept screenshots, dumps and second checkouts in `/tmp` under names any run uses,
+  where later runs found them.
+- Two benchmarks can run side by side, each on its emulator with its own adb server
+  (`ANDROID_ADB_SERVER_PORT`); the MCP servers of a run are told which one.
+
 ## 0.5.0
 
 Hardened on Now in Android: screens read right, flows start reliably and set the device they need. A DeepSeek

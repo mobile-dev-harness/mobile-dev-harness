@@ -160,15 +160,41 @@ fn installs_app(name: &str, input: &serde_json::Value) -> bool {
 
 /// The prompt. Version 1 had no UNVERIFIED and told agents to leave every device setting alone;
 /// version 2 lets them set the display settings a check needs (tasks decided under dark theme, a
-/// time zone, rotation). Results keep the version they ran with.
-pub const PROMPT_VERSION: u32 = 2;
+/// time zone, rotation); version 3 gives every run a directory of its own for the files it makes
+/// beside the project, and refuses /tmp: agents kept their screenshots and second checkouts there
+/// under names any other run uses too, earlier runs and a stream running beside this one. Results
+/// keep the version they ran with.
+pub const PROMPT_VERSION: u32 = 3;
+
+/// Commands and file tools that name the shared temporary directory, in the forms agents write.
+const SHARED_TMP: &[&str] = &[
+    "Bash(* /tmp/*)",
+    "Bash(*>/tmp/*)",
+    "Bash(*\"/tmp/*)",
+    "Bash(*'/tmp/*)",
+    "Bash(*=/tmp/*)",
+    "Bash(* /tmp)",
+    "Bash(* /tmp *)",
+    "Bash(*/private/tmp/*)",
+    "Read(//tmp/**)",
+    "Read(//private/tmp/**)",
+    "Write(//tmp/**)",
+    "Write(//private/tmp/**)",
+    "Edit(//tmp/**)",
+    "Edit(//private/tmp/**)",
+];
 
 /// What every setup is told about the work, whatever its tools.
-fn common(app: &App) -> String {
+fn common(app: &App, scratch: &Path) -> String {
     format!(
         "You are working on an Android app (Kotlin, Gradle) in the current directory; build it with \
-         {}. {} Work on your own: nobody will answer questions.",
-        app.build, app.about
+         {}. {} Other tasks run on this machine at the same time and share /tmp, so commands and \
+         file tools that name /tmp are refused: keep every file you create outside the project \
+         (screenshots, dumps, scripts, other checkouts or builds) in {}, which is yours alone. \
+         Work on your own: nobody will answer questions.",
+        app.build,
+        app.about,
+        scratch.display()
     )
 }
 
@@ -200,7 +226,13 @@ pub fn run(
     let mcp = log.with_file_name("mcp.json");
     let _ = std::fs::write(&mcp, setup.mcp(env).to_string());
     let app = env.app(&task.app);
-    let system = format!("{}\n{}", common(app), setup.brief(env, app));
+    let scratch = log.with_file_name("scratch");
+    let _ = std::fs::create_dir_all(&scratch);
+    let system = format!(
+        "{}\n{}",
+        common(app, &scratch),
+        setup.brief(env, app, &scratch)
+    );
     let mut cmd = Command::new("claude");
     if let Some(p) = &options.provider {
         cmd.envs(p.env_vars());
@@ -208,6 +240,7 @@ pub fn run(
     cmd.current_dir(workspace)
         .env("PATH", setup.path(env))
         .env("ANDROID_HOME", &env.sdk)
+        .env("TMPDIR", &scratch)
         .args(["-p", &prompt(task)])
         .args(["--model", &options.model])
         .args(["--output-format", "stream-json", "--verbose"])
@@ -224,7 +257,8 @@ pub fn run(
             "Bash(*emulator @*)",
             "Bash(*adb kill-server*)",
             "Bash(*adb emu *)",
-        ]);
+        ])
+        .args(SHARED_TMP);
     if setup == Setup::Alone {
         cmd.args(["Bash(adb:*)", "Bash(*/adb *)", "Bash(emulator:*)"]);
     }
@@ -290,6 +324,8 @@ pub fn run(
         .args(["-TERM", "--", &leftover])
         .stderr(Stdio::null())
         .status();
+    // Second checkouts and their builds are gigabytes; the transcript keeps what the agent saw.
+    let _ = std::fs::remove_dir_all(&scratch);
     usage.timed_out = watchdog.join().unwrap_or(false);
     if usage.duration_ms == 0 {
         usage.duration_ms = started.elapsed().as_millis() as u64;
