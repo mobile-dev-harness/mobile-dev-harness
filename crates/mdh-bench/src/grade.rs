@@ -6,7 +6,7 @@ use std::process::Command;
 use serde::Serialize;
 
 use crate::env::Env;
-use crate::task::{Kind, Task, Truth};
+use crate::task::{Kind, Probe, Task, Truth};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Checks {
@@ -31,9 +31,9 @@ const GRADER_ERRORS: &[&str] = &[
     "IO",
 ];
 
-/// Builds the app in `workspace`, installs it and replays the task's checks and the app's
-/// regression flows. `dir` is a scratch directory the grader keeps its own mdh state in. A grader
-/// error is retried once after a device reset.
+/// Builds the app in `workspace`, installs it and replays the task's checks (each followed by
+/// its probes) and the app's regression flows. `dir` is a scratch directory the grader keeps its
+/// own mdh state in. A grader error is retried once after a device reset.
 pub fn checks(env: &Env, task: &Task, workspace: &Path, dir: &Path) -> Checks {
     let first = attempt(env, task, workspace, dir);
     if !first.error {
@@ -97,6 +97,36 @@ fn attempt(env: &Env, task: &Task, workspace: &Path, dir: &Path) -> Checks {
         }
         Err(e) => return grader_error(format!("grader: mdh: {e}")),
     }
+    // A check followed by a probe runs on its own: the probe reads the device as it left it.
+    let (probed, rest): (Vec<String>, Vec<String>) = names
+        .into_iter()
+        .partition(|n| task.probes.iter().any(|p| &p.after == n));
+    for name in &probed {
+        let flow = replay(&mdh, std::slice::from_ref(name));
+        if !flow.passed {
+            return flow;
+        }
+        for probe in task.probes.iter().filter(|p| &p.after == name) {
+            if let Err(checks) = probe_holds(env, probe) {
+                return checks;
+            }
+        }
+    }
+    if rest.is_empty() {
+        return Checks {
+            passed: true,
+            error: false,
+            detail: "all checks passed".into(),
+        };
+    }
+    replay(&mdh, &rest)
+}
+
+/// Replays flows with `mdh flow run` and reads their verdicts.
+fn replay(
+    mdh: &dyn Fn(&[&str]) -> std::io::Result<std::process::Output>,
+    names: &[String],
+) -> Checks {
     let mut args = vec!["flow", "run"];
     args.extend(names.iter().map(String::as_str));
     args.extend(["--step-timeout", "20", "--timeout", "8"]);
@@ -128,6 +158,34 @@ fn attempt(env: &Env, task: &Task, workspace: &Path, dir: &Path) -> Checks {
         }
         Err(e) => grader_error(format!("grader: mdh: {e}")),
     }
+}
+
+/// Whether the device shows what `probe` expects. Read again for a few seconds: the app may
+/// still be applying what the flow's last step changed.
+fn probe_holds(env: &Env, probe: &Probe) -> Result<(), Checks> {
+    let mut out = String::new();
+    for _ in 0..10 {
+        out = env.adb(&["shell", &probe.shell]).unwrap_or_default();
+        if probe.contains.iter().all(|t| out.contains(t))
+            && probe.lacks.iter().all(|t| !out.contains(t))
+        {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    if out.trim().is_empty() {
+        return Err(grader_error(format!(
+            "grader: `{}` gave nothing after {}",
+            probe.shell, probe.after
+        )));
+    }
+    Err(fail(format!(
+        "✗ after {}: {} — `{}` gave: {}",
+        probe.after,
+        probe.expect,
+        probe.shell,
+        first_lines(&out, 2)
+    )))
 }
 
 /// The error code and the text of an `mdh --json` envelope.

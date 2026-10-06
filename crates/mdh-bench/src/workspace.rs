@@ -68,6 +68,30 @@ fn copy(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Build output and tool caches, wherever Gradle put them. The copy a run starts from has none
+/// (see `SKIP`), so every such directory was made during the run.
+const BUILT: &[&str] = &["build", ".gradle", ".kotlin"];
+
+/// Removes build output from a kept workspace: a built copy of Now in Android is five times the
+/// size of its sources, and a session keeps one per run.
+pub fn prune(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        // A link is never followed: only real directories under the workspace are touched.
+        if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        let name = entry.file_name();
+        if BUILT.iter().any(|b| name == *b) {
+            let _ = std::fs::remove_dir_all(entry.path());
+        } else if name != ".git" {
+            prune(&entry.path());
+        }
+    }
+}
+
 fn git(dir: &Path, args: &[&str]) -> Result<(), String> {
     let ok = Command::new("git")
         .args([
@@ -108,4 +132,38 @@ pub fn snapshot(dir: &Path) -> String {
         .map(str::to_owned)
         .collect();
     format!("{}\n{}", run(&["diff"]), untracked.join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pruning_removes_build_output_and_keeps_sources() {
+        let root = std::env::temp_dir().join(format!("mdh-bench-prune-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for dir in [
+            "app/build/outputs",
+            "app/src/main",
+            ".gradle/8.0",
+            "core/ui/build",
+            ".git/build",
+        ] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        std::fs::write(root.join("app/src/main/Main.kt"), "").unwrap();
+        std::fs::write(root.join("app/build.gradle.kts"), "").unwrap();
+        prune(&root);
+        assert!(!root.join("app/build").exists());
+        assert!(!root.join(".gradle").exists());
+        assert!(!root.join("core/ui/build").exists());
+        assert!(root.join("core/ui").is_dir());
+        assert!(root.join("app/src/main/Main.kt").is_file());
+        assert!(root.join("app/build.gradle.kts").is_file());
+        assert!(
+            root.join(".git/build").is_dir(),
+            "the repository is left alone"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

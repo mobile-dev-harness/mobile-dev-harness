@@ -57,6 +57,25 @@ pub struct Edit {
     pub replace: String,
 }
 
+/// What a flow can't assert, read from the device right after one of the task's checks (the app
+/// is left as that flow ended): the system bars' appearance, for one.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Probe {
+    /// The check (flow name) it follows.
+    pub after: String,
+    /// An `adb shell` command.
+    pub shell: String,
+    /// Texts its output must contain.
+    #[serde(default)]
+    pub contains: Vec<String>,
+    /// Texts its output must not contain.
+    #[serde(default)]
+    pub lacks: Vec<String>,
+    /// What that shows, for the verdict line.
+    pub expect: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
@@ -99,6 +118,9 @@ pub struct Task {
     /// Other correct fixes: the checks must accept them too.
     #[serde(default)]
     pub alternatives: Vec<Vec<Edit>>,
+    /// Device observations after a check, for what flows can't assert.
+    #[serde(default)]
+    pub probes: Vec<Probe>,
     pub prompt: String,
 }
 
@@ -147,6 +169,17 @@ pub fn load_all(root: &Path, apps: &BTreeMap<String, App>) -> Result<Vec<Task>, 
         if !apps.contains_key(&t.app) {
             return Err(format!("{}: no app {} in bench/apps.yaml", t.id, t.app));
         }
+        let checks: Vec<String> = t
+            .checks()
+            .iter()
+            .filter_map(|c| Some(c.file_stem()?.to_string_lossy().into_owned()))
+            .collect();
+        if let Some(p) = t.probes.iter().find(|p| !checks.contains(&p.after)) {
+            return Err(format!(
+                "{}: a probe follows `{}`, which is not one of its checks",
+                t.id, p.after
+            ));
+        }
         tasks.push(t);
     }
     // A pair names each other and has opposite truths.
@@ -181,4 +214,45 @@ pub fn apply(root: &Path, edits: &[Edit]) -> Result<(), String> {
         std::fs::write(&p, text.replacen(&e.find, &e.replace, 1)).map_err(|err| err.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load(name: &str, probe_after: &str) -> Result<Vec<Task>, String> {
+        let root = std::env::temp_dir().join(format!("mdh-bench-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let checks = root.join("bars/checks");
+        std::fs::create_dir_all(&checks).unwrap();
+        std::fs::write(
+            checks.join("bars-dark.yaml"),
+            "name: bars-dark\nsteps: []\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("bars/task.yaml"),
+            format!(
+                "kind: fix\nsummary: s\nprompt: p\nbug:\n- {{path: a, find: b, replace: c}}\n\
+                 probes:\n- after: {probe_after}\n  shell: dumpsys window\n  lacks: [LIGHT_STATUS_BARS]\n  \
+                 expect: light icons\n"
+            ),
+        )
+        .unwrap();
+        let apps =
+            serde_norway::from_str("sample: {path: app, package: p, build: b, apk: a, about: x}\n")
+                .unwrap();
+        let tasks = load_all(&root, &apps);
+        let _ = std::fs::remove_dir_all(&root);
+        tasks
+    }
+
+    #[test]
+    fn a_probe_follows_one_of_the_tasks_checks() {
+        let tasks = load("probe", "bars-dark").unwrap();
+        assert_eq!(tasks[0].probes[0].lacks, ["LIGHT_STATUS_BARS"]);
+        assert!(tasks[0].probes[0].contains.is_empty());
+        let err = load("probe-unknown", "bars-light").unwrap_err();
+        assert!(err.contains("bars-light"), "{err}");
+    }
 }

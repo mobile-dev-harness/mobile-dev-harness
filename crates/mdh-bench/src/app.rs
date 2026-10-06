@@ -25,6 +25,10 @@ pub struct App {
     #[serde(default)]
     pub variant: Option<String>,
     pub package: String,
+    /// What the packages the project's build can install have in common, when it is more than
+    /// `package`: the test APKs of its modules. The reset between runs uninstalls them all.
+    #[serde(default)]
+    pub namespace: Option<String>,
     /// The build command, as the agent is told.
     pub build: String,
     /// Where the built APK lands, as the agent is told.
@@ -54,6 +58,15 @@ pub fn load_all(repo: &Path) -> Result<BTreeMap<String, App>, String> {
 }
 
 impl App {
+    /// Whether an installed package is this app or came from its build (`<namespace>.….test`).
+    pub fn owns(&self, package: &str) -> bool {
+        let namespace = self.namespace.as_deref().unwrap_or(&self.package);
+        package == self.package
+            || package
+                .strip_prefix(namespace)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
+    }
+
     /// The source to copy from: the directory in this repository, or a checkout of the commit,
     /// made once (it downloads the repository at that commit).
     pub fn source(&self, repo: &Path) -> Result<PathBuf, String> {

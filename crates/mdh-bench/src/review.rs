@@ -49,6 +49,8 @@ pub fn run(repo: &Path, provider: &str, names: &[String], again: bool) -> Result
     let provider = Provider::load(provider)?;
     let apps = crate::app::load_all(repo)?;
     let tasks = crate::selected(repo, names)?;
+    // The other half of a pair is shown to the reviewer whether or not it was selected.
+    let all = crate::selected(repo, &[])?;
     let sdk = std::env::var_os("ANDROID_HOME").map_or_else(
         || Path::new(&std::env::var("HOME").unwrap_or_default()).join("Library/Android/sdk"),
         Into::into,
@@ -63,7 +65,7 @@ pub fn run(repo: &Path, provider: &str, names: &[String], again: bool) -> Result
         let _ = std::fs::remove_dir_all(&dir);
         let source = apps[&t.app].source(repo)?;
         workspace::prepare(&source, &dir.join("app"), t, &sdk, None)?;
-        copy_task(t, &tasks, &dir.join("task"))?;
+        copy_task(t, &all, &dir.join("task"))?;
         eprintln!(
             "[{}] reviewing {} with {} …",
             crate::now(),

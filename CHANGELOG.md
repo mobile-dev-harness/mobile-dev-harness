@@ -76,6 +76,20 @@ change); JSON output changes are listed here and carry the `schema` version of t
   restarting adb are denied, and input methods are reset between runs.
 - Setup D loads the plugin from a copy taken when the run started; the report names the device; a run that
   timed out says so.
+- Probes: a task can read the device right after one of its checks (`probes:` in `task.yaml`, an `adb shell`
+  command and the text its output must or must not contain), for what a flow can't assert, such as the status
+  bar's appearance.
+- `mdh-bench validate` keeps the workspace and the grader's evidence of a case that doesn't grade as expected,
+  and says where; they used to be deleted with every case.
+- Kept workspaces lose their build output (a built Now in Android is five times its sources; regrading builds
+  again), and the agent alone on a verify task leaves the emulator as it is: neither the agent nor the grader
+  uses it there.
+- Agents may set the display settings a check needs (dark theme, font scale, time zone, rotation, display
+  size); the reset before every run puts them back. They were told to leave every setting alone, which made
+  tasks decided under such a condition undecidable.
+- The reset before every run also uninstalls what an agent's build of the app left on the device: agents run
+  a project's instrumented tests, which install a test APK per module, and those stayed for every later run
+  (`namespace` in `bench/apps.yaml` says which packages belong to a project).
 
 ## 0.4.0
 

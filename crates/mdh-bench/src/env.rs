@@ -154,13 +154,17 @@ impl Env {
         }
     }
 
-    /// The device as every run finds it: no app of the benchmark installed, settings at their
-    /// defaults, home screen.
+    /// The device as every run finds it: no app of the benchmark installed, nor what an agent's
+    /// build of one left behind (agents run the projects' instrumented tests, which install a
+    /// test APK per module), settings at their defaults, home screen.
     pub fn reset_device(&self) {
-        for app in self.apps.values() {
+        let installed = self
+            .adb(&["shell", "pm list packages -3"])
+            .unwrap_or_default();
+        for package in leftovers(&installed, self.apps.values()) {
             let _ = self.adb(&[
                 "shell",
-                &format!("am force-stop {0}; pm uninstall {0}", app.package),
+                &format!("am force-stop {package}; pm uninstall {package}"),
             ]);
         }
         let _ = self.adb(&["shell", &format!("cmd alarm set-timezone {TIME_ZONE}")]);
@@ -183,9 +187,45 @@ impl Env {
     }
 }
 
+/// The packages in `pm list packages -3` that belong to an app of the benchmark.
+fn leftovers<'a>(installed: &'a str, apps: impl Iterator<Item = &'a App> + Clone) -> Vec<&'a str> {
+    installed
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("package:"))
+        .filter(|package| apps.clone().any(|app| app.owns(package)))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reset_removes_what_builds_of_the_apps_installed() {
+        let apps =
+            crate::app::load_all(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))).unwrap();
+        // The emulator after a calibration, with the two apps themselves added: agents had run
+        // instrumented tests of two of Now in Android's modules. The other packages are the
+        // helper and apps of the device's owner.
+        let installed = "package:com.google.samples.apps.nowinandroid.feature.search.impl.test
+package:com.google.samples.apps.nowinandroid.core.ui.test
+package:com.google.samples.apps.nowinandroid.demo.debug
+package:dev.mdh.sample
+package:com.nick.mydoing.trace.test
+package:com.nick.mydoing.trace
+package:dev.mdh.helper
+package:com.bodykind
+";
+        assert_eq!(
+            leftovers(installed, apps.values()),
+            [
+                "com.google.samples.apps.nowinandroid.feature.search.impl.test",
+                "com.google.samples.apps.nowinandroid.core.ui.test",
+                "com.google.samples.apps.nowinandroid.demo.debug",
+                "dev.mdh.sample",
+            ]
+        );
+    }
 
     #[test]
     fn reads_the_physical_display_not_an_override() {

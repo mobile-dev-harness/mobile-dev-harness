@@ -95,7 +95,9 @@ impl Setup {
         let device = format!(
             "An Android emulator ({}, API {}) is running and is the only device. Leave the device \
              itself alone: don't start, stop or restart the emulator or the adb server, and don't \
-             change its settings or input methods; if it stops responding, say so in your answer.",
+             change its input methods. You may change the display settings a check needs (dark \
+             theme, font scale, time zone, rotation, display size); they are reset before the next \
+             task. If the device stops responding, say so in your answer.",
             env.serial, env.device.api
         );
         match self {

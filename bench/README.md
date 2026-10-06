@@ -29,6 +29,12 @@ servers, web tools disabled and permissions bypassed.
 - **Fix** tasks: a bug report against committed code; the agent fixes it and answers `RESULT: FIXED`,
   `RESULT: NOT FIXED` or `RESULT: UNVERIFIED` (changed the code but couldn't check it). The grader builds the agent's version, installs it and replays the hidden checks.
 
+What a flow can't assert (the status bar's appearance) is a `probes:` entry in `task.yaml`: an `adb shell` command
+run right after one of the checks, and the text its output must or must not contain.
+
+Every check starts from cleared app data and gives the first screen 60 seconds, far more than a cold start
+takes on the emulator (about two seconds): a slow start must not read as a broken app.
+
 `mdh-bench list` shows them with what each seeds. `mdh-bench validate` checks the graders before anything is
 spent: each broken change and seeded bug fails its checks, each correct change and reference fix passes them.
 
@@ -37,13 +43,14 @@ spent: each broken change and seeded bug fails its checks, each correct change a
 Tasks run on an app from [`apps.yaml`](apps.yaml): the sample app, or Now in Android at a pinned commit (checked out
 once under `~/.cache/mdh-bench`). Each run starts from a fresh copy of the app in its own git repository (the task's bug committed, the
 change to verify left uncommitted), without build output, saved flows or baselines, so no setup knows the
-expected behavior in advance. Before each run the emulator is reset: the app uninstalled, animations, rotation,
-display size, font scale, dark mode and input methods back to their defaults, the time zone set to
-America/Los_Angeles. Runs go one at a time; repetitions
+expected behavior in advance. Before each run the emulator is reset: the app uninstalled, and with it what an
+agent's build of the project left there (the test APKs of its modules), animations, rotation, display size, font
+scale, dark mode and input methods back to their defaults, the time zone set to America/Los_Angeles. Runs go one at a time; repetitions
 are the outer loop, so drift over hours spreads evenly over the setups.
 
 Every run must find the device the benchmark started on (AVD, API level, display size and density). Agents are
-told to leave the device itself alone, and starting emulators or restarting adb is denied; if a run still ends
+told to leave the device itself alone apart from the display settings a check needs (dark theme, font scale, time
+zone, rotation, display size; the reset puts them back), and starting emulators or restarting adb is denied; if a run still ends
 on another device, or none, it isn't recorded and the benchmark stops until the device is restored. (An agent
 once replaced a crashed emulator with another AVD, and every later run, and the grader, saw a smaller screen.)
 Setup D loads the Claude Code plugin from a copy taken when the run started (`<out>/plugin`), so edits to the
@@ -92,8 +99,9 @@ then `mdh-bench probe --provider <name>` checks that it answers, calls tools and
 leaves their cost out and `--budget` can't stop such a run: mind the subscription's quota.
 
 One emulator must be online. `run` appends to `results.jsonl` and skips runs already recorded, so an interrupted
-run resumes. Each run keeps its workspace, the agent's event stream (`agent.jsonl`) and the grader's output under
-`bench/out/<name>/<task>/<setup>-<n>/`.
+run resumes. Each run keeps its workspace (without build output: regrading builds it again), the agent's event
+stream (`agent.jsonl`) and the grader's output under `bench/out/<name>/<task>/<setup>-<n>/`. The agent alone on a
+verify task never touches the emulator, so those runs neither reset nor check it and can go on while it is in use.
 
 ## Limits
 

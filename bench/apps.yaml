@@ -1,7 +1,8 @@
 # The apps tasks run on; a task names one with `app:` (default: sample). An app is a directory in this
 # repository (`path`) or a pinned commit of another one (`repository`, `commit`), checked out once under
 # ~/.cache/mdh-bench. Regression flows every task on the app must keep passing (PASS_TO_PASS) live in
-# bench/apps/<name>/regression/.
+# bench/apps/<name>/regression/. `namespace` is what the packages a build of the project can install share
+# (the test APKs of its modules), when that is more than `package`: the reset between runs uninstalls them.
 
 sample:
   path: examples/android-sample
@@ -18,6 +19,7 @@ nowinandroid:
   module: app
   variant: demoDebug
   package: com.google.samples.apps.nowinandroid.demo.debug
+  namespace: com.google.samples.apps.nowinandroid
   build: ./gradlew assembleDemoDebug
   apk: app/build/outputs/apk/demo/debug/
   about: >-

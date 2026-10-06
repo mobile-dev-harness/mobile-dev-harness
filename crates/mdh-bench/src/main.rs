@@ -191,7 +191,9 @@ fn list(repo: &Path) -> Result<(), String> {
         };
         let level = t.level.map_or("–".into(), |l| format!("{l:?}"));
         let origin = match (&t.upstream, t.source) {
-            (Some(u), _) => u.clone(),
+            (Some(u), Some(task::Source::Real) | None) => u.clone(),
+            // A report taken from upstream for a bug rebuilt here: no upstream fix applies.
+            (Some(u), Some(s)) => format!("{}, report of {u}", format!("{s:?}").to_lowercase()),
             (None, Some(s)) => format!("{s:?}").to_lowercase(),
             (None, None) => String::new(),
         };
@@ -232,8 +234,9 @@ fn validate(repo: &Path, names: &[String]) -> Result<(), String> {
                 cases.push((Some(alt), format!(" + alternative fix {}", i + 1), true));
             }
         }
-        for (fix, name, expect) in cases {
-            let dir = scratch(&t.id);
+        for (i, (fix, name, expect)) in cases.into_iter().enumerate() {
+            // A directory of its own: a case that is kept must outlive the task's other cases.
+            let dir = scratch(&format!("{}-{i}", t.id));
             let _ = std::fs::remove_dir_all(&dir);
             let app = dir.join("app");
             workspace::prepare(&source, &app, &t, &env.sdk, fix)?;
@@ -254,7 +257,13 @@ fn validate(repo: &Path, names: &[String]) -> Result<(), String> {
                 if expect { "pass" } else { "fail" },
                 checks.detail
             );
-            let _ = std::fs::remove_dir_all(&dir);
+            // The workspace and what the grader saw (each verdict's screenshot, tree and logs)
+            // explain a case that doesn't grade as expected: such a case keeps them.
+            if ok {
+                let _ = std::fs::remove_dir_all(&dir);
+            } else {
+                println!("     kept {}", dir.display());
+            }
         }
     }
     env.reset_device();
@@ -354,17 +363,24 @@ fn one(
     let source = env.app(&t.app).source(&env.repo)?;
     workspace::prepare(&source, &app, t, &env.sdk, None)?;
     let before = workspace::snapshot(&app);
-    env.reset_device();
-    env.check_device()?;
+    // The agent alone can't reach the device and a verify task isn't graded on it: such a run
+    // leaves the device as it is (it may be in use), whatever state that is.
+    let on_device = s != Setup::Alone || t.kind == Kind::Fix;
+    if on_device {
+        env.reset_device();
+        env.check_device()?;
+    }
     let usage = agent::run(env, s, t, &app, &dir.join("agent.log"), options);
     // A run whose agent replaced or lost the device isn't recorded, and the ones after it would
     // run elsewhere: stop.
-    env.check_device().map_err(|e| {
-        format!(
-            "{e} during {}; restore it and run again (recorded runs are kept)",
-            dir.display()
-        )
-    })?;
+    if on_device {
+        env.check_device().map_err(|e| {
+            format!(
+                "{e} during {}; restore it and run again (recorded runs are kept)",
+                dir.display()
+            )
+        })?;
+    }
     let answer = agent::answer(t.kind, &usage.result);
     let edited = t.kind == Kind::Verify && workspace::snapshot(&app) != before;
     let (works, detail) = match t.kind {
@@ -374,7 +390,11 @@ fn one(
         }
         Kind::Verify => (None, String::new()),
     };
-    env.reset_device();
+    if on_device {
+        env.reset_device();
+    }
+    // The workspace is kept for regrading, which builds it again: its build output isn't.
+    workspace::prune(&app);
     let outcome = grade::outcome(
         t,
         answer,

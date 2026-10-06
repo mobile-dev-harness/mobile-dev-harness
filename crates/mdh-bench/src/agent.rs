@@ -158,7 +158,9 @@ fn installs_app(name: &str, input: &serde_json::Value) -> bool {
     }
 }
 
-/// The prompt's answer format. Version 1 had no UNVERIFIED; its results keep their prompt.
+/// The prompt. Version 1 had no UNVERIFIED and told agents to leave every device setting alone;
+/// version 2 lets them set the display settings a check needs (tasks decided under dark theme, a
+/// time zone, rotation). Results keep the version they ran with.
 pub const PROMPT_VERSION: u32 = 2;
 
 /// What every setup is told about the work, whatever its tools.
