@@ -53,6 +53,12 @@ change); JSON output changes are listed here and carry the `schema` version of t
 - Projects with Isolated Projects on (`org.gradle.isolated-projects=true`, as in Now in Android) can be built
   and run: reading the project's modules and variants turned the configuration cache off, which Gradle refuses
   there. Isolated Projects is now off for that one Gradle call.
+- `mdh run` on a project with several application modules lists each module with the variant it would build, or
+  with the variants to choose from (`:app (demoDebug or prodDebug), :app-nia-catalog (debug)`), and its hint says
+  to pass `--variant` with `--module` where several are listed. It listed only the modules, and the call that
+  named one came back with a second `AMBIGUOUS_BUILD_TARGET` for the variant: on Now in Android every benchmark
+  run with mdh began with these two failed calls. In JSON output the text of the error's `message` and `hint`
+  changes; its code and shape don't.
 - Locking the rotation (flows, compatibility cells) could fall back to portrait mid-run: turning auto-rotate off
   made the window manager store the old rotation after mdh had set the new one. It is locked in one step now
   (`cmd window user-rotation`, Android 11+).

@@ -360,7 +360,10 @@ with product flavors: library modules are skipped and `applicationIdSuffix` is a
 `androidComponents` and isn't supported.
 
 Selection: the only application module, or `--module`; the `debug` variant, or the only variant of build type
-debug, or `--variant`. Several candidates are an `AMBIGUOUS_BUILD_TARGET` listing them (exit 2).
+debug, or `--variant`. Several candidates are an `AMBIGUOUS_BUILD_TARGET` listing them (exit 2). Several modules
+come with the variant each would build, or with those to choose from
+(`:app (demoDebug or prodDebug), :app-nia-catalog (debug)`), so that the next call can name module and variant
+instead of failing once for each.
 
 ### 8.2 Building and locating the APK
 

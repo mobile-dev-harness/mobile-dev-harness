@@ -1,6 +1,7 @@
 //! Gradle projects: finding them, probing their Android application modules, building, and
 //! locating the built APK.
 
+use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -450,9 +451,15 @@ impl ProjectModel {
                 }
                 [only] => only,
                 many => {
+                    // Each with what it would build, so that the next call can name both.
+                    let variants = many.iter().map(|a| {
+                        let names = a.default_variants().into_iter().map(|v| v.name.clone());
+                        (a.path.clone(), names.collect())
+                    });
                     return Err(Error::AmbiguousBuildTarget {
                         what: "module".into(),
                         candidates: many.iter().map(|a| a.path.clone()).collect(),
+                        variants: variants.collect(),
                     });
                 }
             },
@@ -464,32 +471,39 @@ impl ProjectModel {
                 .iter()
                 .find(|x| x.name == v)
                 .ok_or_else(|| unknown("variant", v, names()))?,
-            None => {
-                let debug: Vec<&Variant> = app
-                    .variants
-                    .iter()
-                    .filter(|v| v.build_type.as_deref() == Some("debug"))
-                    .collect();
-                match (
-                    app.variants.iter().find(|v| v.name == "debug"),
-                    debug.as_slice(),
-                ) {
-                    (Some(debug), _) => debug,
-                    (None, [only]) => only,
-                    (None, []) => app
-                        .variants
-                        .first()
-                        .ok_or_else(|| unknown("variant", "debug", names()))?,
-                    (None, many) => {
-                        return Err(Error::AmbiguousBuildTarget {
-                            what: "variant".into(),
-                            candidates: many.iter().map(|v| v.name.clone()).collect(),
-                        });
-                    }
+            None => match app.default_variants().as_slice() {
+                [] => return Err(unknown("variant", "debug", names())),
+                [only] => only,
+                many => {
+                    return Err(Error::AmbiguousBuildTarget {
+                        what: "variant".into(),
+                        candidates: many.iter().map(|v| v.name.clone()).collect(),
+                        variants: BTreeMap::new(),
+                    });
                 }
-            }
+            },
         };
         Ok((app, variant))
+    }
+}
+
+impl AppModule {
+    /// What a build that names no variant could mean: `debug`, else the variants of build type
+    /// debug, else the first one. Several are a choice only the caller can make.
+    fn default_variants(&self) -> Vec<&Variant> {
+        if let Some(debug) = self.variants.iter().find(|v| v.name == "debug") {
+            return vec![debug];
+        }
+        let debug: Vec<&Variant> = self
+            .variants
+            .iter()
+            .filter(|v| v.build_type.as_deref() == Some("debug"))
+            .collect();
+        if debug.is_empty() {
+            self.variants.first().into_iter().collect()
+        } else {
+            debug
+        }
     }
 }
 
@@ -627,8 +641,61 @@ mod tests {
         assert!(
             matches!(err, Error::AmbiguousBuildTarget { ref candidates, .. } if candidates == &["freeDebug", "paidDebug"])
         );
+        assert_eq!(
+            err.to_string(),
+            "several variants could be built: freeDebug, paidDebug"
+        );
+        assert_eq!(err.hint(), "pick one with --variant");
         let err = m.select(Some(":lib"), None).unwrap_err();
         assert!(matches!(err, Error::UnknownBuildTarget { .. }));
+    }
+
+    #[test]
+    fn several_modules_come_with_what_each_would_build() {
+        // The shape of Now in Android: flavors in one application, plain build types in the other.
+        let mut m = model();
+        let v = |name: &str| Variant {
+            name: name.into(),
+            application_id: Some("com.example.mm.catalog".into()),
+            build_type: Some(name.into()),
+        };
+        m.apps.push(AppModule {
+            path: ":catalog".into(),
+            dir: PathBuf::from("/work/mm/catalog"),
+            variants: vec![v("debug"), v("release")],
+        });
+        let err = m.select(None, None).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "several modules could be built: :app (freeDebug or paidDebug), :catalog (debug)"
+        );
+        assert_eq!(
+            err.hint(),
+            "pick one with --module, and a variant with --variant where several are listed"
+        );
+        // What the error names is enough for the next call.
+        let (app, variant) = m.select(Some("app"), Some("paidDebug")).unwrap();
+        assert_eq!(assemble_task(app, variant), ":app:assemblePaidDebug");
+        let (app, variant) = m.select(Some("catalog"), None).unwrap();
+        assert_eq!(assemble_task(app, variant), ":catalog:assembleDebug");
+
+        // With one debug variant in each, only the module is left to choose.
+        m.apps[0].variants.retain(|v| v.name != "paidDebug");
+        let err = m.select(None, None).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "several modules could be built: :app (freeDebug), :catalog (debug)"
+        );
+        assert_eq!(err.hint(), "pick one with --module");
+        // Without a debug variant, the first one is what gets built.
+        m.apps[0].variants.retain(|v| v.name != "freeDebug");
+        let err = m.select(None, None).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "several modules could be built: :app (freeRelease), :catalog (debug)"
+        );
+        let (_, variant) = m.select(Some("app"), None).unwrap();
+        assert_eq!(variant.name, "freeRelease");
     }
 
     #[test]

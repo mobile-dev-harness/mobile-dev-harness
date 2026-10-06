@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -87,10 +89,16 @@ pub enum Error {
     #[error("could not read the Gradle project: {message}")]
     ProbeFailed { message: String },
 
-    #[error("several {what}s could be built: {}", candidates.join(", "))]
+    #[error(
+        "several {what}s could be built: {}",
+        build_candidates(candidates, variants)
+    )]
     AmbiguousBuildTarget {
         what: String,
         candidates: Vec<String>,
+        /// What each candidate module builds when no variant is named: one variant, or the
+        /// several to choose from. Empty when the candidates are variants.
+        variants: BTreeMap<String, Vec<String>>,
     },
 
     #[error("no {what} `{name}`; available: {}", candidates.join(", "))]
@@ -274,6 +282,12 @@ impl Error {
             Error::ProbeFailed { .. } => {
                 "the Gradle build itself doesn't configure; run `./gradlew help` to see why".into()
             }
+            // One call must be enough: a module alone would come back asking for its variant.
+            Error::AmbiguousBuildTarget { what, variants, .. }
+                if variants.values().any(|v| v.len() > 1) =>
+            {
+                format!("pick one with --{what}, and a variant with --variant where several are listed")
+            }
             Error::AmbiguousBuildTarget { what, .. } => format!("pick one with --{what}"),
             Error::UnknownBuildTarget { what, .. } => format!("pass one of the available {what}s with --{what}"),
             Error::BuildFailed { .. } => {
@@ -441,6 +455,18 @@ impl ErrorCode {
             ErrorCode::UnexpectedOutput | ErrorCode::HelperError | ErrorCode::Io => 10,
         }
     }
+}
+
+/// `:app (freeDebug or paidDebug), :wear (debug)`: a module comes with what it would build.
+fn build_candidates(candidates: &[String], variants: &BTreeMap<String, Vec<String>>) -> String {
+    candidates
+        .iter()
+        .map(|c| match variants.get(c) {
+            Some(v) if !v.is_empty() => format!("{c} ({})", v.join(" or ")),
+            _ => c.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// What gets mdh's own helper installed after Android refused it.
