@@ -1,0 +1,17 @@
+# Bookmarking a card on the feed, and finding it under Saved.
+name: nia-bookmark
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Headlines
+- tap: Done
+- wait: text~=The new Google Pixel Watch is here
+- tap: role=checkbox;text=Bookmark;index=0
+- wait: role=checkbox;text=Unbookmark
+- tap: Saved
+- wait: role=checkbox;text=Unbookmark
+assert:
+- visible text~=The new Google Pixel Watch is here

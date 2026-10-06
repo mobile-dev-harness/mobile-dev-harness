@@ -1,0 +1,13 @@
+# First launch: onboarding, following a topic, its articles in the feed.
+name: nia-start
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Headlines
+- tap: Done
+- wait: id=forYou:feed
+assert:
+- visible role=checkbox;text=Bookmark

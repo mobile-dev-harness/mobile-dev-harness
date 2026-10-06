@@ -1,0 +1,18 @@
+# A real query is still saved, and found again under Recent searches.
+name: search-recent
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Search
+- type: { text: kotlin, into: id=searchTextField }
+- key: enter
+- wait: role=checkbox;text=Kotlin
+- tap: Clear search text
+- wait: Recent searches
+- tap: role=button;text=kotlin
+assert:
+- text id=searchTextField == "kotlin"
+- visible role=checkbox;text=Kotlin

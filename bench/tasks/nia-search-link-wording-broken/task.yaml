@@ -1,0 +1,18 @@
+app: nowinandroid
+level: L3
+source: synthetic
+kind: verify
+truth: fail
+pair: nia-search-link-wording
+summary: 'the link in the no-results message reads "the Interests tab" by rewording the string the navigation bar and the app bar use too: the tab and its title are now called "the Interests tab"'
+prompt: |
+  A teammate reworded the link in the message shown when a search finds nothing: "Try another
+  search or explorer Interests to browse topics" didn't say where to go, so the link now reads "the
+  Interests tab". The link still opens the Interests tab. The change is uncommitted in this project.
+  Verify that the change works and that nothing else in the app changed.
+change:
+- path: feature/search/api/src/main/res/values/strings.xml
+  find: |2
+        <string name="feature_search_api_interests">Interests</string>
+  replace: |2
+        <string name="feature_search_api_interests">the Interests tab</string>

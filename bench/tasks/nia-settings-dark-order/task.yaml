@@ -1,0 +1,45 @@
+app: nowinandroid
+level: L0
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-settings-dark-order-broken
+summary: dark mode options reordered
+change:
+- path: feature/settings/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/settings/impl/SettingsDialog.kt
+  find: |2
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_system_default),
+                selected = settings.darkThemeConfig == FOLLOW_SYSTEM,
+                onClick = { onChangeDarkThemeConfig(FOLLOW_SYSTEM) },
+            )
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_light),
+                selected = settings.darkThemeConfig == LIGHT,
+                onClick = { onChangeDarkThemeConfig(LIGHT) },
+            )
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_dark),
+                selected = settings.darkThemeConfig == DARK,
+                onClick = { onChangeDarkThemeConfig(DARK) },
+            )
+  replace: |2
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_light),
+                selected = settings.darkThemeConfig == LIGHT,
+                onClick = { onChangeDarkThemeConfig(LIGHT) },
+            )
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_dark),
+                selected = settings.darkThemeConfig == DARK,
+                onClick = { onChangeDarkThemeConfig(DARK) },
+            )
+            SettingsDialogThemeChooserRow(
+                text = stringResource(string.feature_settings_impl_dark_mode_config_system_default),
+                selected = settings.darkThemeConfig == FOLLOW_SYSTEM,
+                onClick = { onChangeDarkThemeConfig(FOLLOW_SYSTEM) },
+            )
+prompt: |
+  A teammate reordered the dark mode options in the settings dialog to Light, Dark, System default,
+  the order Android's own display settings use. The change is uncommitted in this project. Verify that
+  the change works and that choosing each option still behaves as before.

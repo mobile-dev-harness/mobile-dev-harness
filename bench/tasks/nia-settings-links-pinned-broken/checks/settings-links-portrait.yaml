@@ -1,0 +1,21 @@
+# In portrait everything fits: the options and the links.
+name: settings-links-portrait
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Settings
+- wait: Dark mode preference
+- tap: role=checkbox;text=Dark
+- assert:
+  - checked role=checkbox;text=Dark
+  - visible Privacy policy
+  - visible Licenses
+  - visible Brand Guidelines
+  - visible Feedback
+- tap: role=checkbox;text=System default
+- tap: OK
+assert:
+- visible What are you interested in?

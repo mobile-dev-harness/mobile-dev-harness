@@ -1,0 +1,17 @@
+# A topic's screen has no app bar: its back button and follow chip stay below the status bar.
+name: topic-top
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+visual:
+  rules: [obscured]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Interests
+- wait: id=interests:topics
+- tap: Compose
+- wait: text~=latest and greatest news on Jetpack Compose
+assert:
+- visible Back
+- visible text=NOT FOLLOWING

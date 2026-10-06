@@ -1,0 +1,15 @@
+# An article published on Oct 6, 2022 at 23:00 UTC is dated Oct 7 in Tokyo.
+name: card-date-tokyo
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+  device:
+    time_zone: Asia/Tokyo
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Headlines
+- tap: Done
+- wait: text~=The new Google Pixel Watch is here
+assert:
+- visible text=Oct 7, 2022 • Article 📚

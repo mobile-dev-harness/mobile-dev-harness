@@ -1,0 +1,15 @@
+# The same article is dated Oct 6 in Los Angeles, the device's time zone.
+name: card-date-los-angeles
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+  device:
+    time_zone: America/Los_Angeles
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Headlines
+- tap: Done
+- wait: text~=The new Google Pixel Watch is here
+assert:
+- visible text=Oct 6, 2022 • Article 📚

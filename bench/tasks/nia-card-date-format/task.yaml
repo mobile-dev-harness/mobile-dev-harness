@@ -1,0 +1,56 @@
+app: nowinandroid
+level: L2
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-card-date-format-broken
+summary: card dates formatted with kotlinx-datetime and remembered, at the reader's offset
+prompt: |
+  A teammate changed how the dates on news cards are produced: instead of building a java.time
+  formatter for every card on every recomposition, the date is now formatted with kotlinx-datetime
+  and remembered per card. Cards should read exactly as before, for example "Oct 6, 2022 • Article 📚"
+  (the app is English only, so the month names are the English ones now). The change is uncommitted
+  in this project. Verify that the change works and that every card still shows the date it showed
+  before.
+change:
+- path: core/ui/src/main/kotlin/com/google/samples/apps/nowinandroid/core/ui/NewsResourceCard.kt
+  find: |
+    import kotlinx.datetime.Instant
+    import kotlinx.datetime.toJavaInstant
+    import kotlinx.datetime.toJavaZoneId
+    import java.time.format.DateTimeFormatter
+    import java.time.format.FormatStyle
+    import java.util.Locale
+  replace: |
+    import kotlinx.datetime.Instant
+    import kotlinx.datetime.format
+    import kotlinx.datetime.format.DateTimeComponents
+    import kotlinx.datetime.format.MonthNames
+    import kotlinx.datetime.format.Padding
+    import kotlinx.datetime.format.char
+    import kotlinx.datetime.offsetAt
+    import java.util.Locale
+- path: core/ui/src/main/kotlin/com/google/samples/apps/nowinandroid/core/ui/NewsResourceCard.kt
+  find: |
+    @Composable
+    fun dateFormatted(publishDate: Instant): String = DateTimeFormatter
+        .ofLocalizedDate(FormatStyle.MEDIUM)
+        .withLocale(Locale.getDefault())
+        .withZone(LocalTimeZone.current.toJavaZoneId())
+        .format(publishDate.toJavaInstant())
+  replace: |
+    private val CardDateFormat = DateTimeComponents.Format {
+        monthName(MonthNames.ENGLISH_ABBREVIATED)
+        char(' ')
+        dayOfMonth(Padding.NONE)
+        chars(", ")
+        year()
+    }
+
+    @Composable
+    fun dateFormatted(publishDate: Instant): String {
+        val timeZone = LocalTimeZone.current
+        return remember(publishDate, timeZone) {
+            publishDate.format(CardDateFormat, timeZone.offsetAt(publishDate))
+        }
+    }

@@ -1,0 +1,42 @@
+app: nowinandroid
+level: L0
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-topic-follow-button-broken
+summary: the topic screen's follow chip becomes a Follow / Following button
+change:
+- path: feature/topic/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/topic/impl/TopicScreen.kt
+  find: |
+    import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaFilterChip
+  replace: |
+    import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaButton
+- path: feature/topic/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/topic/impl/TopicScreen.kt
+  find: |2
+            NiaFilterChip(
+                selected = selected,
+                onSelectedChange = onFollowClick,
+                modifier = Modifier.padding(end = 24.dp),
+            ) {
+                if (selected) {
+                    Text("FOLLOWING")
+                } else {
+                    Text("NOT FOLLOWING")
+                }
+            }
+  replace: |2
+            NiaButton(
+                onClick = { onFollowClick(!selected) },
+                modifier = Modifier.padding(end = 24.dp),
+                text = { Text(if (selected) "Following" else "Follow") },
+                leadingIcon = if (selected) {
+                    { Icon(imageVector = NiaIcons.Check, contentDescription = null) }
+                } else {
+                    null
+                },
+            )
+prompt: |
+  A teammate replaced the NOT FOLLOWING / FOLLOWING chip on the topic screen with a button: it says
+  Follow while you don't follow the topic and Following, with a check mark, once you do, and tapping
+  it follows or unfollows the topic as the chip did. The change is uncommitted in this project.
+  Verify that the change works and that following topics still behaves as before.

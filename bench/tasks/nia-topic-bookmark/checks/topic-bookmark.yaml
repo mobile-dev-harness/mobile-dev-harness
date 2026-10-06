@@ -1,0 +1,24 @@
+# Bookmarking an article on a topic's screen marks that article, and Saved shows it.
+name: topic-bookmark
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Interests
+- wait: id=interests:topics
+- tap: Compose
+- wait: text~=latest and greatest news on Jetpack Compose
+# The first article's card, whole: a slow drag, so nothing flings.
+- swipe: { from: [672, 2200], to: [672, 1400], duration_ms: 2000 }
+- wait: text~=The new Google Pixel Watch is here
+- tap: role=checkbox;text=Bookmark;index=0
+- assert:
+  - checked role=checkbox;text=Unbookmark
+- key: back
+- tap: Saved
+- wait: role=checkbox;text=Unbookmark
+assert:
+- visible text~=The new Google Pixel Watch is here
+- not visible text~=Listen to our major Text to Speech

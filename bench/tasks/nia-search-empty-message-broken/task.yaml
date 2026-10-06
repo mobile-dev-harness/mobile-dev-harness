@@ -1,0 +1,44 @@
+app: nowinandroid
+level: L1
+source: synthetic
+kind: verify
+truth: fail
+pair: nia-search-empty-message
+summary: the no-results message says "explore"; the spaces between its parts are left to the string resources, where the build trims them
+change:
+- path: feature/search/api/src/main/res/values/strings.xml
+  find: |2
+        <string name="feature_search_api_try_another_search">Try another search or explorer </string>
+  replace: |2
+        <string name="feature_search_api_try_another_search">Try another search or explore </string>
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                append(stringResource(id = searchR.string.feature_search_api_try_another_search))
+                append(" ")
+                withLink(
+  replace: |2
+                append(stringResource(id = searchR.string.feature_search_api_try_another_search))
+                withLink(
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                }
+
+                append(" ")
+                append(stringResource(id = searchR.string.feature_search_api_to_browse_topics))
+  replace: |2
+                }
+
+                append(stringResource(id = searchR.string.feature_search_api_to_browse_topics))
+- path: feature/search/impl/src/androidTest/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreenTest.kt
+  find: |2
+                tryAnotherSearchString = getString(R.string.feature_search_api_try_another_search) +
+                    " " + getString(R.string.feature_search_api_interests) + " " + getString(R.string.feature_search_api_to_browse_topics)
+  replace: |2
+                tryAnotherSearchString = getString(R.string.feature_search_api_try_another_search) +
+                    getString(R.string.feature_search_api_interests) + getString(R.string.feature_search_api_to_browse_topics)
+prompt: |
+  A teammate fixed the typo in the message shown when a search finds nothing ("Try another search
+  or explorer Interests to browse topics" now says "explore") and tidied up how the three parts of
+  that sentence are put together; nothing else about the message was meant to change. The change is
+  uncommitted in this project. Verify that the change works and that the message otherwise reads as
+  before.

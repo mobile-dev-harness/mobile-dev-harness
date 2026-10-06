@@ -1,0 +1,139 @@
+app: nowinandroid
+level: L0
+source: real
+upstream: android/nowinandroid#1222
+kind: fix
+summary: a blank query is saved as a recent search (the guards and the trimming of android/nowinandroid#1223 taken out)
+prompt: |
+  Empty search text is added in recent searches.
+
+  Open Search and press the search key on the keyboard (or Enter) without typing anything: an empty
+  entry is added under Recent searches. The same happens when the field holds only spaces.
+bug:
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                    if (it.key == Key.Enter) {
+                        if (searchQuery.isBlank()) return@onKeyEvent false
+                        onSearchExplicitlyTriggered()
+  replace: |2
+                    if (it.key == Key.Enter) {
+                        onSearchExplicitlyTriggered()
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                onSearch = {
+                    if (searchQuery.isBlank()) return@KeyboardActions
+                    onSearchExplicitlyTriggered()
+  replace: |2
+                onSearch = {
+                    onSearchExplicitlyTriggered()
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+  find: |2
+                            if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) {
+  replace: |2
+                            if (query.length < SEARCH_QUERY_MIN_LENGTH) {
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+  find: |2
+        fun onSearchTriggered(query: String) {
+            if (query.isBlank()) return
+            viewModelScope.launch {
+  replace: |2
+        fun onSearchTriggered(query: String) {
+            viewModelScope.launch {
+- path: feature/search/impl/src/test/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModelTest.kt
+  find: |2+
+        @Test
+        fun emptySearchText_isNotAddedToRecentSearches() = runTest {
+            viewModel.onSearchTriggered("")
+
+            val recentSearchQueriesStream = getRecentQueryUseCase()
+            val recentSearchQueries = recentSearchQueriesStream.first()
+            val recentSearchQuery = recentSearchQueries.firstOrNull()
+
+            assertNull(recentSearchQuery)
+        }
+
+        @Test
+        fun searchTextWithThreeSpaces_isEmptyQuery() = runTest {
+            searchContentsRepository.addNewsResources(newsResourcesTestData)
+            searchContentsRepository.addTopics(topicsTestData)
+            val collectJob = launch(UnconfinedTestDispatcher()) { viewModel.searchResultUiState.collect() }
+
+            viewModel.onSearchQueryChanged("   ")
+
+            assertIs<EmptyQuery>(viewModel.searchResultUiState.value)
+
+            collectJob.cancel()
+        }
+
+        @Test
+        fun searchTextWithThreeSpacesAndOneLetter_isEmptyQuery() = runTest {
+            searchContentsRepository.addNewsResources(newsResourcesTestData)
+            searchContentsRepository.addTopics(topicsTestData)
+            val collectJob = launch(UnconfinedTestDispatcher()) { viewModel.searchResultUiState.collect() }
+
+            viewModel.onSearchQueryChanged("   a")
+
+            assertIs<EmptyQuery>(viewModel.searchResultUiState.value)
+
+            collectJob.cancel()
+        }
+
+  replace: ''
+- path: feature/search/impl/src/test/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModelTest.kt
+  find: |
+    import kotlin.test.assertIs
+    import kotlin.test.assertNull
+  replace: |
+    import kotlin.test.assertIs
+fix:
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                    if (it.key == Key.Enter) {
+                        onSearchExplicitlyTriggered()
+  replace: |2
+                    if (it.key == Key.Enter) {
+                        if (searchQuery.isBlank()) return@onKeyEvent false
+                        onSearchExplicitlyTriggered()
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                onSearch = {
+                    onSearchExplicitlyTriggered()
+  replace: |2
+                onSearch = {
+                    if (searchQuery.isBlank()) return@KeyboardActions
+                    onSearchExplicitlyTriggered()
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+  find: |2
+                            if (query.length < SEARCH_QUERY_MIN_LENGTH) {
+  replace: |2
+                            if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) {
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+  find: |2
+        fun onSearchTriggered(query: String) {
+            viewModelScope.launch {
+  replace: |2
+        fun onSearchTriggered(query: String) {
+            if (query.isBlank()) return
+            viewModelScope.launch {
+alternatives:
+- - path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+    find: |2
+          fun onSearchTriggered(query: String) {
+              viewModelScope.launch {
+    replace: |2
+          fun onSearchTriggered(query: String) {
+              if (query.isBlank()) return
+              viewModelScope.launch {
+- - path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+    find: |2
+          val onSearchExplicitlyTriggered = {
+              keyboardController?.hide()
+              onSearchTriggered(searchQuery)
+          }
+    replace: |2
+          val onSearchExplicitlyTriggered = {
+              if (searchQuery.isNotBlank()) {
+                  keyboardController?.hide()
+                  onSearchTriggered(searchQuery)
+              }
+          }

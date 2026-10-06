@@ -1,0 +1,31 @@
+app: nowinandroid
+level: L1
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-search-recent-trim-broken
+summary: recent searches are saved without the spaces around them; the query is trimmed where it is saved
+change:
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchViewModel.kt
+  find: |2
+        fun onSearchTriggered(query: String) {
+            if (query.isBlank()) return
+            viewModelScope.launch {
+                recentSearchRepository.insertOrReplaceRecentSearch(searchQuery = query)
+            }
+            analyticsHelper.logEventSearchTriggered(query = query)
+        }
+  replace: |2
+        fun onSearchTriggered(query: String) {
+            val trimmed = query.trim()
+            if (trimmed.isEmpty()) return
+            viewModelScope.launch {
+                recentSearchRepository.insertOrReplaceRecentSearch(searchQuery = trimmed)
+            }
+            analyticsHelper.logEventSearchTriggered(query = trimmed)
+        }
+prompt: |
+  A teammate made recent searches ignore the spaces around a query: searching for "compose" and
+  then for "compose " (with a space after it) used to leave two entries that look the same in the
+  list of recent searches, and now leaves one. The change is uncommitted in this project. Verify
+  that the change works and that searching still behaves as before.

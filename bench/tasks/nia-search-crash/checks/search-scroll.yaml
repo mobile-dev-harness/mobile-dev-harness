@@ -1,0 +1,24 @@
+# Results for a word that finds topics and articles, scrolled until the second article shows.
+name: search-scroll
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Search
+- type: { text: compose, into: id=searchTextField }
+- wait: Topics
+- key: enter
+# A slow drag, so nothing flings: the topic rows are still on screen when the second card arrives.
+- swipe: { from: [672, 2200], to: [672, 1400], duration_ms: 2000 }
+- assert:
+  - visible id=newsResourceCard:2
+- tap: Clear search text
+- type: { text: studio, into: id=searchTextField }
+- wait: role=checkbox;text=Android Studio & Tools
+- key: enter
+- swipe: { from: [672, 2200], to: [672, 1400], duration_ms: 2000 }
+assert:
+- text id=searchTextField == "studio"
+- visible id=newsResourceCard:5

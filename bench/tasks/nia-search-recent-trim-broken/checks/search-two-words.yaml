@@ -1,0 +1,23 @@
+# A query of two words, typed a word at a time as a keyboard does, and the recent searches it leaves.
+name: search-two-words
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Search
+- type: { text: "wear ", into: id=searchTextField }
+- type: { text: os, append: true }
+- assert:
+  - text id=searchTextField == "wear os"
+  - visible role=checkbox;text=Wear OS
+- key: enter
+# The same query with a space after it must not become a second entry.
+- type: { text: "wear os ", into: id=searchTextField }
+- key: enter
+- tap: Clear search text
+- wait: Recent searches
+assert:
+- visible role=button;text=wear os
+- not visible role=button;text~=wear os;index=1

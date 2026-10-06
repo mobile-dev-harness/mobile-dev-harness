@@ -4,7 +4,7 @@ Status: draft, before the pilot. Version 1 (the ten tasks in `tasks/`, results i
 
 **In short.** When a coding agent says an Android change works, can you believe it, and what does device access
 change about that? Tasks are levelled by the evidence that decides them, from the diff (L0) to measuring on a
-device under a condition (L3); the levels are checked by running the agent without a device. The app is Now in
+device under a condition (L3); how far a model gets without a device is measured per level. The app is Now in
 Android at a pinned commit; every task has hidden checks that fail on the defect and pass on the fix, plus checks
 that the rest of the app still works. An agent may answer that it couldn't verify. The headline is how often a
 claim of success is false.
@@ -60,14 +60,19 @@ A task's level is the least evidence that decides it:
 
 ### 3.2 Calibration
 
-A level is a hypothesis until measured. Each task is run three times by the agent alone with the strongest model
-available, and once with mdh to show it is solvable:
+A level says where a task's defect shows: in the diff, on one path, under a condition, in a measurement. Whether a
+model gets there without that evidence is a difference between models, and a result, not a property of the task.
+Each task is run three times by the agent alone with the strongest model available, and once with mdh to show it
+is solvable:
 
 - **Verify pairs** are scored per pair: a run decides the pair if it judges both changes right (a coin decides it
-  25% of the time). L0: decided in at least 2 of 3 runs. L1–L3: in at most 1 of 3.
-- **Fix tasks**: L0: resolved (hidden checks pass) in at least 2 of 3 runs. L1–L3: in at most 1 of 3, so the issue
-  must invite a fix that reads right but doesn't work: a second cause, a condition, a decoy.
-- A task that misses its level is moved or rewritten. Calibration runs are kept and published but not scored.
+  25% of the time).
+- **Fix tasks** are resolved when the hidden checks pass.
+- How often the agent alone decides a pair or resolves a fix is reported per level and per model. A model that is
+  right above L0 without a device inferred the behavior from the code, or ran the code off the device (the build,
+  JVM tests, Robolectric): the task keeps its level.
+- A task is repaired only when it is broken: nothing decides it, a check fails a correct answer, the prompt or the
+  workspace gives the answer away. Calibration runs are kept and published but not scored.
 
 ### 3.3 Sources
 
@@ -117,6 +122,7 @@ fix:                               # the reference fix
   find: ...
   replace: ...
 alternatives: []                   # other correct fixes, as lists of edits; the checks must pass them too
+probes: []                         # device observations after a check, for what a flow can't assert (section 5)
 private: false
 ```
 
@@ -150,6 +156,9 @@ offline. Article images still come from the network; no check depends on them.
   must keep passing; a fix that breaks one isn't resolved.
 - **Conditions**: the checks set the task's condition with `setup.device` (dark theme, font scale, time zone, the
   app's language, orientation, display size), which mdh puts back afterwards and verifies held while the app ran.
+- **Probes**: what a flow can't assert is read from the device right after the check that sets it up, while the
+  app is as that flow left it: an `adb shell` command and the text its output must or must not contain (the status
+  bar's appearance, from `dumpsys window`). A probe is read again for a few seconds before it counts as failed.
 - Checks test behavior, never the implementation, and accept every alternative fix.
 - **Infrastructure errors aren't verdicts.** A check that ends in ERROR (the screen unreadable, the device gone) is
   rerun after a device reset; a second ERROR records the run as `grader_error`, left out of every rate and
@@ -183,8 +192,9 @@ source:
 
 ## 7. Size, budget, statistics
 
-- **Pilot**: 20 tasks on Now in Android, five per level (two verify pairs and one fix task each). Calibration
-  (60 runs, agent alone) and one mdh run each (20): 80 runs, about 10 hours. It answers whether the levels hold.
+- **Pilot**: 21 tasks on Now in Android, five per level (two verify pairs and one fix task each) and a second fix
+  task at L0. Calibration (63 runs, agent alone) and one mdh run each (21): 84 runs, about 10 hours. It answers
+  whether the levels hold.
 - **Full**: 100 tasks, 25 per level (eight verify pairs and nine fix tasks each), across apps.
   - Main model: four setups, one run each (400), plus two more runs of a fixed 20-task subset to measure
     run-to-run variance (160): 560 runs, 55–75 hours at 6–8 minutes a run.
@@ -208,22 +218,51 @@ source:
 
 ## 9. Pilot tasks
 
-Levels are hypotheses for calibration; "real" tasks re-inject the upstream bug.
+A task's level follows from where its defect shows (3.1). Every task is in `bench/tasks/nia-*`; `mdh-bench list`
+shows them.
 
-| # | Level | Kind | Bug or change | Note |
-|---|---|---|---|---|
-| 1–2 | L0 | verify pair | Settings "Light" and "Dark"; the broken change maps both to dark | |
-| 3–4 | L0 | verify pair | Following from the topic screen; the broken change inverts the toggle | |
-| 5 | L0 | fix | Bookmarking an article bookmarks another one (wrong id) | |
-| 6–7 | L1 | verify pair | Card metadata "date • type"; the broken change drops the blank-type check | 2 of 311 articles show a dangling "•" |
-| 8–9 | L1 | verify pair | Search needs 2 characters after trimming; the broken change counts spaces | |
-| 10 | L1 | fix, real #1222 | A blank query is saved as a recent search | may calibrate as L0: one `isBlank` |
-| 11–12 | L2 | verify pair | Dates in the reader's time zone; the broken change formats in UTC | invisible in Los Angeles, visible east of UTC+1 |
-| 13–14 | L2 | verify pair | Keep the settings dialog open across rotation (#611); the broken change uses `remember` | |
-| 15 | L2 | fix, real #1864 | The snackbar sits under the keyboard | |
-| 16–17 | L3 | verify pair | Feed padding in the design system; the broken change also puts the Interests list under the app bar | |
-| 18–19 | L3 | verify pair | Precomputing followed topics; the broken change does it in composition for every card | jank while scrolling |
-| 20 | L3 | fix, real #232 | Dark system bar icons in dark mode | |
+| # | Level | Kind | Task | Bug or change | What decides it |
+|---|---|---|---|---|---|
+| 1–2 | L0 | verify pair | `nia-settings-dark-order` | The dark mode options reordered; the broken change's Dark row sets Light | the diff |
+| 3–4 | L0 | verify pair | `nia-topic-follow-button` | The topic screen's follow chip becomes a Follow / Following button; the broken change passes the current state, so tapping changes nothing | the diff |
+| 5 | L0 | fix | `nia-topic-bookmark` | Bookmarking on a topic screen passes the topic's id: another article is saved | the view model |
+| 10 | L0 | fix, real #1222 | `nia-search-blank-recent` | A blank query is saved as a recent search (upstream's fix and its tests taken out) | the view model: one `isBlank` |
+| 6–7 | L1 | verify pair | `nia-search-empty-message` | "explorer" → "explore" in the no-results message; the broken change leaves the spaces between the sentence's parts to the string resources, where the build trims them: "exploreIntereststo browse topics" | one search without results; from the code, only by knowing that the build trims the spaces at the ends of a string resource |
+| 8–9 | L1 | verify pair | `nia-search-recent-trim` | Recent searches saved without the spaces around them; the broken change trims the query as it is typed, so a space at the end never stays and words run together | typing two words a key at a time; setting the field's text at once hides it |
+| 21 | L1 | fix | `nia-search-crash` | Topic rows and article cards in the search results share one key space: with a topic and an article of the same id on screen together ("compose" or "studio", scrolled a little) the grid crashes | the stack trace (`Key "2" was already used`); without a device, a guess at why some words crash |
+| 11–12 | L2 | verify pair | `nia-card-date-format` | Card dates formatted with kotlinx-datetime and remembered; the broken change calls `Instant.format` without an offset, which is UTC | a time zone east of UTC+1 (the same dates in Los Angeles) |
+| 13–14 | L2 | verify pair | `nia-settings-links-pinned` | The settings dialog's links stay below the scrolling options; the broken change gives the options no weight, so they take all the height when they don't fit | landscape: the links are gone (portrait is fine) |
+| 15 | L2 | fix | `nia-tab-from-topic` | Tapping the tab you are in no longer leaves a topic opened from it (the report is #1614's; the cause is rebuilt in the Navigation 3 code) | three steps: a card's topic tag, then the tab |
+| 16–17 | L3 | verify pair | `nia-app-bar-inset` | A refactoring of NiaApp's top inset workaround; the broken change consumes the top inset everywhere, and the topic screen, which has no app bar, slides under the status bar | a screen the change doesn't name, and where its controls sit |
+| 18–19 | L3 | verify pair | `nia-search-link-wording` | The link in the no-results message reads "the Interests tab"; the broken change rewords the string the navigation bar and the app bar use too | the tab's label, away from the search screen |
+| 20 | L3 | fix | `nia-system-bars-dark` | The system bars are styled once from the system's theme: with the app set to Dark on a light system the status bar icons stay dark (the report is #232's; the cause is rebuilt on `enableEdgeToEdge`) | the status bar's icons, with the app's own dark setting |
+
+Changed from the first plan, and why:
+
+- **Reading decided too much.** A removed guard or an explicit `UTC` in a diff is seen by a careful reader, as
+  version 1 showed. The L1–L3 pairs now turn on what the code doesn't say: a rule of the build (6–7), how a text
+  field behaves while typing (8–9), a library's default argument (11–12), a layout that only overflows when the
+  window is short (13–14), a screen and a string away from the diff (16–19). How often a model still gets there
+  without a device is what calibration measures (3.2).
+- **6–7** was the cards' "date • type" line losing its blank-type check (a removed `if`).
+- **10** was the L1 fix task. Its defect is a missing guard in plain sight in the view model, so it is an L0 task,
+  and L1's fix task is **21**: a crash whose cause is in the log and not in the report.
+- **13–14** was the settings dialog kept open across rotation (#611): `remember` against `rememberSaveable` reads
+  from the diff.
+- **15** was #1864, the snackbar's position with the keyboard open: it needs the device offline, which a flow can't
+  set, and a check of where the snackbar sits, which a flow can't assert; upstream's fix also leaves the snackbar
+  under the keyboard.
+- **18–19** was jank while scrolling. On the pilot's emulator the unmodified app already drops every frame
+  (`mdh perf flow` on the For you feed: 99% janky frames, p90 150 ms, CPU 100%), so frame timing can't tell a
+  change apart; cold start (1.9 s ± 0.1 s) can, but parsing all 311 articles on the main thread adds only 40 ms.
+  A performance pair waits for a device whose frame times leave room to get worse: a physical device, or an
+  emulator on which the unmodified app scrolls smoothly. It isn't the load on the host: freshly booted, with the
+  host's memory free, this headless emulator gave 100% janky frames again while the app used a third of one
+  core.
+- **20** keeps #232's report; its cause (a style name in `values-night`) no longer has an effect, because
+  `enableEdgeToEdge` sets the bars at run time. **15** has #1614's report the same way: its cause was in the
+  Navigation Compose code the app has since replaced. Both are `synthetic` with the issue in `upstream`: no
+  upstream fix applies to them.
 
 ## 10. Work before the pilot
 
@@ -234,9 +273,16 @@ Levels are hypotheses for calibration; "real" tasks re-inject the upstream bug.
 - mdh: done. A step that can't be checked makes the verdict ERROR, not FAIL; flows set the device they need
   (`setup.device`); rotation locks in one step and survives the helper reconnecting.
 - The device: 4 GB RAM for the AVD.
-- The tasks: 20 pilot tasks with checks, `validate`d, reviewed.
+- mdh-bench: probes (section 5); agents may set the display settings a check needs (dark theme, font scale, time
+  zone, rotation, display size), which the reset before every run puts back. Version 1's prompt forbade every
+  device setting, which left L2 tasks undecidable.
+- The tasks: 21 pilot tasks with checks, written and `validate`d. Still to do: the rest of calibration (3.2) and
+  review (3.4); where the pilot stands and what comes next is in [STATUS.md](STATUS.md).
 
 ## 11. Open questions
 
 - Version 1's results keep version 1's prompt (no UNVERIFIED); they aren't comparable to version 2's.
 - The second app, and when.
+- A performance task needs a device whose frame times mean something (section 9, 18–19).
+- Typing: mdh sets a field's text at once, a keyboard a key at a time; tasks 8–9 are only seen the second way. Their
+  hidden check types in two steps; an agent using `mdh_act` to type the whole query sees nothing wrong.

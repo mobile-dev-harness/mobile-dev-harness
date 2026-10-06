@@ -1,0 +1,16 @@
+# The three tabs and a topic.
+name: nia-tabs
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Saved
+- wait: No saved updates
+- tap: Interests
+- wait: id=interests:topics
+- tap: Compose
+- wait: text~=latest and greatest news on Jetpack Compose
+assert:
+- visible role=checkbox;text=Bookmark

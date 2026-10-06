@@ -1,0 +1,16 @@
+# Dark, then Light again: the status bar goes back to dark icons (the probe reads it).
+name: system-bars-light
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Settings
+- tap: role=checkbox;text=Dark
+- tap: role=checkbox;text=Light
+- assert:
+  - checked role=checkbox;text=Light
+- tap: OK
+assert:
+- visible What are you interested in?

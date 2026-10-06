@@ -1,0 +1,20 @@
+# In landscape the options need scrolling; the links stay where they are and still open.
+name: settings-links-landscape
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+  device:
+    orientation: landscape
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Settings
+- wait: text=Theme
+- assert:
+  - visible Privacy policy
+  - visible Licenses
+  - visible Brand Guidelines
+  - visible Feedback
+- tap: OK
+assert:
+- visible What are you interested in?

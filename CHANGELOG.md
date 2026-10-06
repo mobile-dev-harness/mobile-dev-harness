@@ -76,6 +76,9 @@ change); JSON output changes are listed here and carry the `schema` version of t
   restarting adb are denied, and input methods are reset between runs.
 - Setup D loads the plugin from a copy taken when the run started; the report names the device; a run that
   timed out says so.
+- The pilot's 21 tasks on Now in Android, five per level and a second fix task at L0 (`bench/tasks/nia-*`; the
+  list and what decides each is in `bench/DESIGN.md`, section 9), with five regression flows every fix must
+  keep passing.
 - Probes: a task can read the device right after one of its checks (`probes:` in `task.yaml`, an `adb shell`
   command and the text its output must or must not contain), for what a flow can't assert, such as the status
   bar's appearance.

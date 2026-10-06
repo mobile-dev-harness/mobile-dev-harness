@@ -1,0 +1,23 @@
+# Following and unfollowing from a topic's screen, and the Interests list showing it.
+name: topic-follow
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Interests
+- wait: id=interests:topics
+- tap: Compose
+- tap: text=Follow
+- wait: text=Following
+- key: back
+- assert:
+  - checked role=checkbox;text=Unfollow interest
+- tap: Compose
+- tap: text=Following
+- wait: text=Follow
+- key: back
+- wait: id=interests:topics
+assert:
+- not visible role=checkbox;text=Unfollow interest

@@ -1,0 +1,27 @@
+app: nowinandroid
+level: L3
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-search-link-wording-broken
+summary: the link in the no-results message reads "the Interests tab", from a string of its own
+prompt: |
+  A teammate reworded the link in the message shown when a search finds nothing: "Try another
+  search or explorer Interests to browse topics" didn't say where to go, so the link now reads "the
+  Interests tab". The link still opens the Interests tab. The change is uncommitted in this project.
+  Verify that the change works and that nothing else in the app changed.
+change:
+- path: feature/search/api/src/main/res/values/strings.xml
+  find: |2
+        <string name="feature_search_api_interests">Interests</string>
+  replace: |2
+        <string name="feature_search_api_interests">Interests</string>
+        <string name="feature_search_api_interests_link">the Interests tab</string>
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                        append(stringResource(id = searchR.string.feature_search_api_interests))
+  replace: |2
+                        append(stringResource(id = searchR.string.feature_search_api_interests_link))
+- path: feature/search/impl/src/androidTest/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreenTest.kt
+  find: '" " + getString(R.string.feature_search_api_interests) + " " +'
+  replace: '" " + getString(R.string.feature_search_api_interests_link) + " " +'

@@ -1,0 +1,25 @@
+# A topic opened from a card, then the tab it was opened from: back at that tab's own screen.
+name: tab-from-topic
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Headlines
+- tap: Done
+- wait: text~=The new Google Pixel Watch is here
+- tap: text=WEAR OS
+- wait: text=NOT FOLLOWING
+- tap: For you
+- assert:
+  - visible text=Now in Android
+  - not visible text=NOT FOLLOWING
+- tap: Interests
+- wait: id=interests:topics
+- tap: Compose
+- wait: text~=latest and greatest news on Jetpack Compose
+- tap: Interests
+assert:
+- visible id=interests:topics
+- not visible text~=latest and greatest news on Jetpack Compose

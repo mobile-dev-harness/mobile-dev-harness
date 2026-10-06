@@ -1,0 +1,13 @@
+# The no-results message names the Interests tab, and its link goes there.
+name: search-link
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Search
+- type: { text: zzzz, into: id=searchTextField }
+- wait: text~=there is no content found for your search
+assert:
+- visible text=Try another search or explorer the Interests tab to browse topics

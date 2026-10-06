@@ -1,0 +1,94 @@
+app: nowinandroid
+level: L2
+source: synthetic
+upstream: android/nowinandroid#1614
+kind: fix
+summary: "tapping the tab you are in no longer leaves a topic opened from it"
+prompt: |
+  Can't navigate to 'For You' after selecting a topic tag on a news item.
+
+  Steps to reproduce:
+  - After launching the app, click on any topic tag from a news item (e.g., Headlines or Wear OS).
+  - Once you've navigated to this topic, try clicking on the first tab of the Navigation Bar (For You).
+
+  Current behavior: clicking on the first tab of the Navigation Bar (For You) does nothing.
+
+  Expected behavior: clicking on the first tab of the Navigation Bar (For You) should navigate to
+  'For You' (or perhaps perform a back action in this case).
+bug:
+- path: core/navigation/src/main/kotlin/com/google/samples/apps/nowinandroid/core/navigation/Navigator.kt
+  find: |2
+            when (key) {
+                state.currentTopLevelKey -> clearSubStack()
+                in state.topLevelKeys -> goToTopLevel(key)
+  replace: |2
+            when (key) {
+                in state.topLevelKeys -> goToTopLevel(key)
+- path: core/navigation/src/main/kotlin/com/google/samples/apps/nowinandroid/core/navigation/Navigator.kt
+  find: |2
+
+        /**
+         * Clearing all but the root key in the current sub stack.
+         */
+        private fun clearSubStack() {
+            state.currentSubStack.run {
+                if (size > 1) subList(1, size).clear()
+            }
+        }
+    }
+  replace: |
+    }
+- path: core/navigation/src/test/kotlin/com/google/samples/apps/nowinandroid/core/navigation/NavigatorTest.kt
+  find: |2+
+        @Test
+        fun testNavigateTopLevelSingleTop() {
+            navigator.navigate(TestSecondTopLevelKey)
+            navigator.navigate(TestKeyFirst)
+
+            assertThat(navigationState.currentSubStack).containsExactly(
+                TestSecondTopLevelKey,
+                TestKeyFirst,
+            ).inOrder()
+
+            navigator.navigate(TestSecondTopLevelKey)
+
+            assertThat(navigationState.currentSubStack).containsExactly(
+                TestSecondTopLevelKey,
+            ).inOrder()
+        }
+
+  replace: ''
+fix:
+- path: core/navigation/src/main/kotlin/com/google/samples/apps/nowinandroid/core/navigation/Navigator.kt
+  find: |2
+            when (key) {
+                in state.topLevelKeys -> goToTopLevel(key)
+  replace: |2
+            when (key) {
+                state.currentTopLevelKey -> clearSubStack()
+                in state.topLevelKeys -> goToTopLevel(key)
+- path: core/navigation/src/main/kotlin/com/google/samples/apps/nowinandroid/core/navigation/Navigator.kt
+  find: |2
+        }
+    }
+  replace: |2
+        }
+
+        /**
+         * Clearing all but the root key in the current sub stack.
+         */
+        private fun clearSubStack() {
+            state.currentSubStack.run {
+                if (size > 1) subList(1, size).clear()
+            }
+        }
+    }
+alternatives:
+- - path: core/navigation/src/main/kotlin/com/google/samples/apps/nowinandroid/core/navigation/Navigator.kt
+    find: |2
+              when (key) {
+                  in state.topLevelKeys -> goToTopLevel(key)
+    replace: |2
+              when (key) {
+                  state.currentTopLevelKey -> if (state.currentKey != key) goBack()
+                  in state.topLevelKeys -> goToTopLevel(key)

@@ -1,0 +1,15 @@
+# The tab and its screen are still called Interests.
+name: interests-tab-name
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- assert:
+  - visible role=button;text=Interests
+- tap: role=button;text=Interests
+- wait: id=interests:topics
+assert:
+- visible text=Interests
+- not visible text~=the Interests tab

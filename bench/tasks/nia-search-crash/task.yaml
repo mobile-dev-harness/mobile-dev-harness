@@ -1,0 +1,48 @@
+app: nowinandroid
+level: L1
+source: synthetic
+kind: fix
+summary: 'topic rows and article cards in the search results share one key space: when a topic and an article with the same id are on screen together the grid crashes'
+prompt: |
+  Search crashes when I scroll the results.
+
+  Search for "compose", press search on the keyboard, then scroll the results up a little: as the
+  second article comes into view the app closes. "studio" does the same. Other words are fine:
+  "kotlin" scrolls without a problem.
+bug:
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                        item(
+                            // Append a prefix to distinguish a key for news resources
+                            key = "topic-$topicId",
+                            span = StaggeredGridItemSpan.FullLine,
+                        ) {
+  replace: |2
+                        item(
+                            key = topicId,
+                            span = StaggeredGridItemSpan.FullLine,
+                        ) {
+fix:
+- path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+  find: |2
+                        item(
+                            key = topicId,
+                            span = StaggeredGridItemSpan.FullLine,
+                        ) {
+  replace: |2
+                        item(
+                            // Append a prefix to distinguish a key for news resources
+                            key = "topic-$topicId",
+                            span = StaggeredGridItemSpan.FullLine,
+                        ) {
+alternatives:
+- - path: feature/search/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/search/impl/SearchScreen.kt
+    find: |2
+                          item(
+                              key = topicId,
+                              span = StaggeredGridItemSpan.FullLine,
+                          ) {
+    replace: |2
+                          item(
+                              span = StaggeredGridItemSpan.FullLine,
+                          ) {

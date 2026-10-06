@@ -1,0 +1,14 @@
+# Search finds topics and articles.
+name: nia-search
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Search
+- type: { text: compose }
+- key: ENTER
+- wait: Topics
+assert:
+- visible Updates

@@ -1,0 +1,22 @@
+# The three tabs keep their app bar, and their content starts below it.
+name: tabs-top
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+visual:
+  rules: [obscured, overlap]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- assert:
+  - visible text=Now in Android
+  - visible Settings
+- tap: Saved
+- wait: No saved updates
+- assert:
+  - visible Settings
+- tap: Interests
+- wait: id=interests:topics
+assert:
+- visible Settings
+- visible text=Accessibility

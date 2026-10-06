@@ -1,0 +1,26 @@
+app: nowinandroid
+level: L0
+source: synthetic
+kind: fix
+summary: bookmarking on a topic screen passes the topic's id; another article is saved
+prompt: |
+  Bookmarking from a topic's page saves the wrong article.
+
+  Steps: open Interests, tap Compose, and tap the bookmark on the first article ("The new Google
+  Pixel Watch is here"). The bookmark icon doesn't change. Then open Saved: instead of the article I
+  tapped there is "Listen to our major Text to Speech upgrades for 64 bit devices", which isn't even
+  a Compose article.
+
+  Bookmarking from the For you feed works as expected.
+bug:
+- path: feature/topic/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/topic/impl/TopicViewModel.kt
+  find: |2
+                userDataRepository.setNewsResourceBookmarked(newsResourceId, bookmarked)
+  replace: |2
+                userDataRepository.setNewsResourceBookmarked(topicId, bookmarked)
+fix:
+- path: feature/topic/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/topic/impl/TopicViewModel.kt
+  find: |2
+                userDataRepository.setNewsResourceBookmarked(topicId, bookmarked)
+  replace: |2
+                userDataRepository.setNewsResourceBookmarked(newsResourceId, bookmarked)

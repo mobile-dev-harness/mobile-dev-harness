@@ -1,0 +1,39 @@
+app: nowinandroid
+level: L3
+source: synthetic
+kind: verify
+truth: fail
+pair: nia-app-bar-inset
+summary: 'the shouldShowTopAppBar flag is dropped and the top inset consumed everywhere: the topic and search screens, which have no app bar, slide under the status bar'
+prompt: |
+  A teammate tidied up NiaApp: the mutable `shouldShowTopAppBar` flag that tied the top app bar to
+  the inset workaround below it is gone. It is a refactoring; nothing in the app should look or
+  behave differently. The change is uncommitted in this project. Verify that the change works and
+  that the app's screens are as they were.
+change:
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/ui/NiaApp.kt
+  find: |2-
+                    // Only show the top app bar on top level destinations.
+                    var shouldShowTopAppBar = false
+
+                    if (appState.navigationState.currentKey in appState.navigationState.topLevelKeys) {
+                        shouldShowTopAppBar = true
+
+                        val destination
+  replace: |2-
+                    // Only show the top app bar on top level destinations.
+                    if (appState.navigationState.currentKey in appState.navigationState.topLevelKeys) {
+                        val destination
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/ui/NiaApp.kt
+  find: |2
+                        modifier = Modifier.consumeWindowInsets(
+                            if (shouldShowTopAppBar) {
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                            } else {
+                                WindowInsets(0, 0, 0, 0)
+                            },
+                        ),
+  replace: |2
+                        modifier = Modifier.consumeWindowInsets(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
+                        ),

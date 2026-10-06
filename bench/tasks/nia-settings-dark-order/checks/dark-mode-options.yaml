@@ -1,0 +1,19 @@
+name: dark-mode-options
+app: com.google.samples.apps.nowinandroid.demo.debug
+setup:
+  reset: data
+  permissions: [android.permission.POST_NOTIFICATIONS]
+steps:
+- wait: { target: "What are you interested in?", timeout: 60 }
+- tap: Settings
+- tap: role=checkbox;text=Dark
+- assert:
+  - checked role=checkbox;text=Dark
+  - unchecked role=checkbox;text=Light
+- tap: role=checkbox;text=Light
+- assert:
+  - checked role=checkbox;text=Light
+  - unchecked role=checkbox;text=Dark
+- tap: role=checkbox;text=System default
+assert:
+- checked role=checkbox;text=System default

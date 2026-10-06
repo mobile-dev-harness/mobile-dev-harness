@@ -1,0 +1,66 @@
+app: nowinandroid
+level: L2
+source: synthetic
+kind: verify
+truth: pass
+pair: nia-settings-links-pinned-broken
+summary: the links of the settings dialog stay below the scrolling options; the options take the height that is left
+prompt: |
+  A teammate changed the Settings dialog so that the links at its bottom (Privacy policy, Licenses,
+  Brand Guidelines, Feedback) no longer scroll away with the options: they stay in place above the OK
+  button, and only the options above them scroll. The change is uncommitted in this project. Verify
+  that the change works and that the dialog otherwise behaves as before.
+change:
+- path: feature/settings/impl/src/main/kotlin/com/google/samples/apps/nowinandroid/feature/settings/impl/SettingsDialog.kt
+  find: |2
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    when (settingsUiState) {
+                        Loading -> {
+                            Text(
+                                text = stringResource(string.feature_settings_impl_loading),
+                                modifier = Modifier.padding(vertical = 16.dp),
+                            )
+                        }
+
+                        is Success -> {
+                            SettingsPanel(
+                                settings = settingsUiState.settings,
+                                supportDynamicColor = supportDynamicColor,
+                                onChangeThemeBrand = onChangeThemeBrand,
+                                onChangeDynamicColorPreference = onChangeDynamicColorPreference,
+                                onChangeDarkThemeConfig = onChangeDarkThemeConfig,
+                            )
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(top = 8.dp))
+                    LinksPanel()
+                }
+  replace: |2
+                Column {
+                    Column(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        when (settingsUiState) {
+                            Loading -> {
+                                Text(
+                                    text = stringResource(string.feature_settings_impl_loading),
+                                    modifier = Modifier.padding(vertical = 16.dp),
+                                )
+                            }
+
+                            is Success -> {
+                                SettingsPanel(
+                                    settings = settingsUiState.settings,
+                                    supportDynamicColor = supportDynamicColor,
+                                    onChangeThemeBrand = onChangeThemeBrand,
+                                    onChangeDynamicColorPreference = onChangeDynamicColorPreference,
+                                    onChangeDarkThemeConfig = onChangeDarkThemeConfig,
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(top = 8.dp))
+                    LinksPanel()
+                }

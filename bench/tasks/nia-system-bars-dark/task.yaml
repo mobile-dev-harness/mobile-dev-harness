@@ -1,0 +1,259 @@
+app: nowinandroid
+level: L3
+source: synthetic
+upstream: android/nowinandroid#232
+kind: fix
+summary: "the system bars are styled once from the system's theme, not from the app's: with the app set to Dark on a light system the status bar icons stay dark"
+prompt: |
+  System bar icons are dark in dark mode.
+
+  With Dark selected under Settings > Dark mode preference (the phone itself is in light mode) the
+  app turns dark, but the clock and the icons in the status bar stay dark as well and can't be read.
+bug:
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import androidx.activity.ComponentActivity
+    import androidx.activity.SystemBarStyle
+  replace: |
+    import androidx.activity.ComponentActivity
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import androidx.metrics.performance.JankStats
+    import androidx.tracing.trace
+  replace: |
+    import androidx.metrics.performance.JankStats
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import kotlinx.coroutines.flow.combine
+    import kotlinx.coroutines.flow.distinctUntilChanged
+    import kotlinx.coroutines.flow.map
+    import kotlinx.coroutines.flow.onEach
+    import kotlinx.coroutines.launch
+  replace: |
+    import kotlinx.coroutines.flow.combine
+    import kotlinx.coroutines.launch
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |2+
+            // Update the uiState
+            lifecycleScope.launch {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    combine(
+                        isSystemInDarkTheme(),
+                        viewModel.uiState,
+                    ) { systemDark, uiState ->
+                        ThemeSettings(
+                            darkTheme = uiState.shouldUseDarkTheme(systemDark),
+                            androidTheme = uiState.shouldUseAndroidTheme,
+                            disableDynamicTheming = uiState.shouldDisableDynamicTheming,
+                        )
+                    }
+                        .onEach { themeSettings = it }
+                        .map { it.darkTheme }
+                        .distinctUntilChanged()
+                        .collect { darkTheme ->
+                            trace("niaEdgeToEdge") {
+                                // Turn off the decor fitting system windows, which allows us to handle insets,
+                                // including IME animations, and go edge-to-edge.
+                                // This is the same parameters as the default enableEdgeToEdge call, but we manually
+                                // resolve whether or not to show dark theme using uiState, since it can be different
+                                // than the configuration's dark theme value based on the user preference.
+                                enableEdgeToEdge(
+                                    statusBarStyle = SystemBarStyle.auto(
+                                        lightScrim = android.graphics.Color.TRANSPARENT,
+                                        darkScrim = android.graphics.Color.TRANSPARENT,
+                                    ) { darkTheme },
+                                    navigationBarStyle = SystemBarStyle.auto(
+                                        lightScrim = lightScrim,
+                                        darkScrim = darkScrim,
+                                    ) { darkTheme },
+                                )
+                            }
+                        }
+                }
+            }
+
+  replace: |2+
+            // Turn off the decor fitting system windows, which allows us to handle insets,
+            // including IME animations, and go edge-to-edge.
+            enableEdgeToEdge()
+
+            // Update the uiState
+            lifecycleScope.launch {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    combine(
+                        isSystemInDarkTheme(),
+                        viewModel.uiState,
+                    ) { systemDark, uiState ->
+                        ThemeSettings(
+                            darkTheme = uiState.shouldUseDarkTheme(systemDark),
+                            androidTheme = uiState.shouldUseAndroidTheme,
+                            disableDynamicTheming = uiState.shouldDisableDynamicTheming,
+                        )
+                    }
+                        .collect { themeSettings = it }
+                }
+            }
+
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |+
+    /**
+     * The default light scrim, as defined by androidx and the platform:
+     * https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:activity/activity/src/main/java/androidx/activity/EdgeToEdge.kt;l=35-38;drc=27e7d52e8604a080133e8b842db10c89b4482598
+     */
+    private val lightScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+
+    /**
+     * The default dark scrim, as defined by androidx and the platform:
+     * https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:activity/activity/src/main/java/androidx/activity/EdgeToEdge.kt;l=40-44;drc=27e7d52e8604a080133e8b842db10c89b4482598
+     */
+    private val darkScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+
+  replace: ''
+fix:
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import androidx.activity.ComponentActivity
+  replace: |
+    import androidx.activity.ComponentActivity
+    import androidx.activity.SystemBarStyle
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import androidx.metrics.performance.JankStats
+  replace: |
+    import androidx.metrics.performance.JankStats
+    import androidx.tracing.trace
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |
+    import kotlinx.coroutines.flow.combine
+    import kotlinx.coroutines.launch
+  replace: |
+    import kotlinx.coroutines.flow.combine
+    import kotlinx.coroutines.flow.distinctUntilChanged
+    import kotlinx.coroutines.flow.map
+    import kotlinx.coroutines.flow.onEach
+    import kotlinx.coroutines.launch
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |2+
+            // Turn off the decor fitting system windows, which allows us to handle insets,
+            // including IME animations, and go edge-to-edge.
+            enableEdgeToEdge()
+
+            // Update the uiState
+            lifecycleScope.launch {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    combine(
+                        isSystemInDarkTheme(),
+                        viewModel.uiState,
+                    ) { systemDark, uiState ->
+                        ThemeSettings(
+                            darkTheme = uiState.shouldUseDarkTheme(systemDark),
+                            androidTheme = uiState.shouldUseAndroidTheme,
+                            disableDynamicTheming = uiState.shouldDisableDynamicTheming,
+                        )
+                    }
+                        .collect { themeSettings = it }
+                }
+            }
+
+  replace: |2+
+            // Update the uiState
+            lifecycleScope.launch {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    combine(
+                        isSystemInDarkTheme(),
+                        viewModel.uiState,
+                    ) { systemDark, uiState ->
+                        ThemeSettings(
+                            darkTheme = uiState.shouldUseDarkTheme(systemDark),
+                            androidTheme = uiState.shouldUseAndroidTheme,
+                            disableDynamicTheming = uiState.shouldDisableDynamicTheming,
+                        )
+                    }
+                        .onEach { themeSettings = it }
+                        .map { it.darkTheme }
+                        .distinctUntilChanged()
+                        .collect { darkTheme ->
+                            trace("niaEdgeToEdge") {
+                                // Turn off the decor fitting system windows, which allows us to handle insets,
+                                // including IME animations, and go edge-to-edge.
+                                // This is the same parameters as the default enableEdgeToEdge call, but we manually
+                                // resolve whether or not to show dark theme using uiState, since it can be different
+                                // than the configuration's dark theme value based on the user preference.
+                                enableEdgeToEdge(
+                                    statusBarStyle = SystemBarStyle.auto(
+                                        lightScrim = android.graphics.Color.TRANSPARENT,
+                                        darkScrim = android.graphics.Color.TRANSPARENT,
+                                    ) { darkTheme },
+                                    navigationBarStyle = SystemBarStyle.auto(
+                                        lightScrim = lightScrim,
+                                        darkScrim = darkScrim,
+                                    ) { darkTheme },
+                                )
+                            }
+                        }
+                }
+            }
+
+- path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+  find: |-
+    /**
+     * Class for the system theme settings.
+  replace: |-
+    /**
+     * The default light scrim, as defined by androidx and the platform:
+     * https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:activity/activity/src/main/java/androidx/activity/EdgeToEdge.kt;l=35-38;drc=27e7d52e8604a080133e8b842db10c89b4482598
+     */
+    private val lightScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+
+    /**
+     * The default dark scrim, as defined by androidx and the platform:
+     * https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:activity/activity/src/main/java/androidx/activity/EdgeToEdge.kt;l=40-44;drc=27e7d52e8604a080133e8b842db10c89b4482598
+     */
+    private val darkScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+
+    /**
+     * Class for the system theme settings.
+alternatives:
+- - path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+    find: |
+      import androidx.activity.ComponentActivity
+    replace: |
+      import androidx.activity.ComponentActivity
+      import androidx.activity.SystemBarStyle
+  - path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+    find: |
+      import androidx.compose.runtime.CompositionLocalProvider
+    replace: |
+      import androidx.compose.runtime.CompositionLocalProvider
+      import androidx.compose.runtime.DisposableEffect
+  - path: app/src/main/kotlin/com/google/samples/apps/nowinandroid/MainActivity.kt
+    find: |2
+                  val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
+    replace: |2
+                  val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
+
+                  val darkTheme = themeSettings.darkTheme
+                  DisposableEffect(darkTheme) {
+                      enableEdgeToEdge(
+                          statusBarStyle = SystemBarStyle.auto(
+                              android.graphics.Color.TRANSPARENT,
+                              android.graphics.Color.TRANSPARENT,
+                          ) { darkTheme },
+                          navigationBarStyle = SystemBarStyle.auto(
+                              android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF),
+                              android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b),
+                          ) { darkTheme },
+                      )
+                      onDispose {}
+                  }
+probes:
+- after: system-bars-dark
+  shell: dumpsys window | grep mLastAppearance
+  lacks:
+  - LIGHT_STATUS_BARS
+  expect: light status bar icons while the app is dark
+- after: system-bars-light
+  shell: dumpsys window | grep mLastAppearance
+  contains:
+  - LIGHT_STATUS_BARS
+  expect: dark status bar icons while the app is light
